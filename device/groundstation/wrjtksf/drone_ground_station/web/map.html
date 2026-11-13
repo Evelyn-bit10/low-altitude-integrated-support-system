@@ -1,0 +1,1985 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <title>嵌入式地图 - Leaflet直连高德稳定版</title>
+    <link rel="stylesheet" href="leaflet/leaflet.css" />
+    <script src="leaflet/leaflet.js"></script>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #f0f2f5; }
+        #container { width: 100%; height: 100%; margin: 0; padding: 0; }
+
+        /* ====== 退出全屏按钮样式 ====== */
+        #btnExitFullscreen {
+            position: absolute; top: 106px; left: 14px; z-index: 2000;
+            background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(6px);
+            border: 1px solid rgba(220, 223, 230, 1); border-radius: 999px;
+            padding: 5px 10px 5px 8px; font-size: 12px; font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer; color: #F56C6C; box-shadow: 0 3px 14px rgba(0,0,0,0.14);
+            display: flex; align-items: center; gap: 6px; user-select: none;
+        }
+        #btnExitFullscreen:hover { background: rgba(254, 240, 240, 1); border-color: rgba(245, 108, 108, 0.35); }
+        #btnExitFullscreen:active { transform: translateY(1px); }
+        #btnExitFullscreen .btn-icon {
+            width: 22px; height: 22px; border-radius: 50%; display: inline-flex;
+            align-items: center; justify-content: center; background: rgba(245, 108, 108, 0.12);
+            border: 1px solid rgba(245, 108, 108, 0.28); font-size: 12px; line-height: 1; color: #F56C6C;
+        }
+
+        /* ====== 回到地面站按钮样式 ====== */
+        #btnReturnToGS {
+            position: absolute; top: 14px; left: 14px; z-index: 2000;
+            background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(6px);
+            border: 1px solid rgba(220, 223, 230, 1); border-radius: 999px;
+            padding: 5px 10px 5px 8px; font-size: 12px; font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer; color: #409EFF; box-shadow: 0 3px 14px rgba(0,0,0,0.14);
+            display: flex; align-items: center; gap: 6px; user-select: none;
+        }
+        #btnReturnToGS:hover { background: rgba(240, 247, 255, 1); border-color: rgba(64, 158, 255, 0.35); }
+        #btnReturnToGS:active { transform: translateY(1px); }
+        #btnReturnToGS .btn-icon {
+            width: 22px; height: 22px; border-radius: 50%; display: inline-flex;
+            align-items: center; justify-content: center; background: rgba(64, 158, 255, 0.12);
+            border: 1px solid rgba(64, 158, 255, 0.28); font-size: 12px; line-height: 1; color: #409EFF;
+        }
+
+        /* ====== 图层切换按钮样式 ====== */
+        .btn-basemap {
+            position: absolute; bottom: 20px; z-index: 2000;
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px);
+            border: 2px solid rgba(64, 158, 255, 0.3); border-radius: 8px;
+            padding: 8px 16px; font-size: 13px; font-weight: 600;
+            font-family: 'Microsoft YaHei', sans-serif; cursor: pointer; color: #606266;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: all 0.3s ease;
+        }
+        .btn-basemap.active { background: linear-gradient(135deg, #409EFF 0%, #66b1ff 100%); border-color: #409EFF; color: #ffffff; }
+        #btnBasemapNormal { right: 200px; }
+        #btnBasemapSatellite { right: 110px; }
+        #btnDSM { right: 20px; }
+
+        /* 消除 Leaflet 默认背景框 */
+        .custom-div-icon { background: transparent; border: none; }
+        .arrow-marker { background: transparent; border: none; }
+        .emoji-marker { cursor: pointer; transition: transform 0.2s; }
+        .emoji-marker:hover { transform: scale(1.2); }
+
+        /* ==================== 经纬度定位 ==================== */
+        #coordPanel {
+            position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 2000;
+            display: flex; align-items: center; gap: 4px;
+        }
+        #coordLat, #coordLng {
+            width: 110px; padding: 6px 10px; border: 2px solid rgba(64, 158, 255, 0.35); border-radius: 999px;
+            outline: none; font-size: 12px; font-family: 'Microsoft YaHei', sans-serif;
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
+            box-shadow: 0 3px 14px rgba(0,0,0,0.12); transition: border-color 0.3s;
+            text-align: center;
+        }
+        #coordLat:focus, #coordLng:focus { border-color: rgba(64, 158, 255, 0.8); }
+        #coordLat::placeholder, #coordLng::placeholder { color: #bbb; font-size: 11px; }
+        #btnCoordGo {
+            height: 32px; padding: 0 12px; border-radius: 999px; border: none; cursor: pointer;
+            background: rgba(64, 158, 255, 0.9); color: #fff; font-size: 12px;
+            font-family: 'Microsoft YaHei', sans-serif; font-weight: 600;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15); transition: all 0.2s;
+            white-space: nowrap;
+        }
+        #btnCoordGo:hover { background: #66b1ff; transform: scale(1.05); }
+        #coordMsg {
+            position: absolute; top: 50px; left: 50%; transform: translateX(-50%); z-index: 2000;
+            font-family: 'Microsoft YaHei', sans-serif; font-size: 11px; color: #F56C6C;
+            background: rgba(255,255,255,0.92); padding: 3px 12px; border-radius: 4px;
+            display: none;
+        }
+
+        /* ==================== 区域切换按钮 ==================== */
+        #btnToggleZone {
+            position: absolute; top: 60px; left: 14px; z-index: 2000;
+            background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(6px);
+            border: 1px solid rgba(220, 223, 230, 1); border-radius: 999px;
+            padding: 5px 10px 5px 8px; font-size: 12px; font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer; color: #606266; box-shadow: 0 3px 14px rgba(0,0,0,0.14);
+            display: flex; align-items: center; gap: 6px; user-select: none; transition: all 0.2s;
+        }
+        #btnToggleZone:hover { background: rgba(240, 247, 255, 1); border-color: rgba(64, 158, 255, 0.35); color: #409EFF; }
+        #btnToggleZone:active { transform: translateY(1px); }
+        #btnToggleZone.active { background: rgba(64, 158, 255, 0.12); border-color: rgba(64, 158, 255, 0.4); color: #409EFF; }
+        #btnToggleZone .btn-icon {
+            width: 22px; height: 22px; border-radius: 50%; display: inline-flex;
+            align-items: center; justify-content: center; background: rgba(64, 158, 255, 0.12);
+            border: 1px solid rgba(64, 158, 255, 0.28); font-size: 12px; line-height: 1; color: #409EFF;
+        }
+
+        /* ==================== 区域面板容器 ==================== */
+        #zonePanel {
+            position: absolute; top: 104px; left: 14px; z-index: 1999;
+            display: none; flex-direction: column; gap: 8px; max-height: calc(100% - 120px);
+        }
+        #zonePanel.show { display: flex; }
+
+        /* ==================== 区域管理工具栏 ==================== */
+        #zoneToolbar {
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
+            border: 1px solid rgba(220, 223, 230, 1); border-radius: 12px;
+            padding: 8px; box-shadow: 0 3px 14px rgba(0,0,0,0.12);
+            display: flex; flex-direction: column; gap: 5px; min-width: 170px;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        #zoneToolbar .toolbar-title {
+            font-size: 13px; font-weight: 700; color: #303133; text-align: center;
+            padding-bottom: 4px; border-bottom: 1px solid #ebeef5; margin-bottom: 2px;
+        }
+        #zoneToolbar .type-row { display: flex; gap: 4px; flex-wrap: wrap; }
+        .zone-type-btn {
+            flex: 1; min-width: 34px; padding: 4px 2px; border: 2px solid transparent;
+            border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: 600;
+            text-align: center; transition: all 0.2s; color: #fff; opacity: 0.7;
+        }
+        .zone-type-btn:hover { opacity: 0.9; transform: scale(1.03); }
+        .zone-type-btn.active { opacity: 1; border-color: #303133; transform: scale(1.05); }
+        .zone-type-btn.nofly  { background: #F56C6C; }
+        .zone-type-btn.obstacle { background: #E6A23C; }
+        .zone-type-btn.landing { background: #67C23A; }
+        .zone-type-btn.custom  { background: #409EFF; }
+
+        #zoneNameInput {
+            width: 100%; box-sizing: border-box; padding: 4px 8px;
+            border: 1px solid #dcdfe6; border-radius: 4px; font-size: 11px;
+            font-family: 'Microsoft YaHei', sans-serif; outline: none;
+        }
+        #zoneNameInput:focus { border-color: #409EFF; }
+
+        .zone-action-row { display: flex; gap: 4px; }
+        .zone-action-btn {
+            flex: 1; padding: 5px 0; border: 1px solid #dcdfe6; border-radius: 4px;
+            cursor: pointer; font-size: 11px; font-weight: 600; font-family: 'Microsoft YaHei', sans-serif;
+            background: #fff; color: #606266; transition: all 0.2s; text-align: center;
+        }
+        .zone-action-btn:hover { background: #ecf5ff; border-color: #409EFF; color: #409EFF; }
+        .zone-action-btn.primary { background: #409EFF; color: #fff; border-color: #409EFF; }
+        .zone-action-btn.primary:hover { background: #66b1ff; }
+        .zone-action-btn.danger { background: #F56C6C; color: #fff; border-color: #F56C6C; }
+        .zone-action-btn.danger:hover { background: #f78989; }
+        .zone-action-btn.rotate-btn { background: #f0f9ff; color: #409EFF; border-color: #b3d8ff; }
+        .zone-action-btn.rotate-btn:hover { background: #409EFF; color: #fff; }
+        #editZoneRotation { accent-color: #409EFF; height: 4px; cursor: pointer; }
+        .zone-shape-draggable { cursor: move !important; }
+        .zone-shape-draggable:hover { filter: brightness(1.08); }
+        .zone-action-btn.success { background: #67C23A; color: #fff; border-color: #67C23A; }
+        .zone-action-btn.success:hover { background: #85ce61; }
+
+        #drawStatus {
+            font-size: 10px; color: #909399; text-align: center;
+            min-height: 14px; line-height: 14px;
+        }
+
+        /* ==================== 区域列表管理面板 ==================== */
+        #zoneListPanel {
+            background: rgba(255,255,255,0.96); backdrop-filter: blur(8px);
+            border: 1px solid rgba(220, 223, 230, 1); border-radius: 12px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.12);
+            font-family: 'Microsoft YaHei', sans-serif;
+            display: flex; flex-direction: column; min-width: 170px;
+        }
+        #zoneListPanel.collapsed #zoneListBody,
+        #zoneListPanel.collapsed #zoneListTitleText { display: none; }
+        #zoneListPanel.collapsed { min-width: auto; }
+
+        #zoneListHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; cursor: pointer; user-select: none;
+            border-bottom: 1px solid #ebeef5;
+        }
+        #zoneListTitleText { font-size: 13px; font-weight: 700; color: #303133; }
+        #zoneListToggle { font-size: 12px; color: #909399; transition: transform 0.3s; }
+        #zoneListPanel.collapsed #zoneListToggle { transform: rotate(180deg); }
+
+        #zoneListBody {
+            overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; max-height: 300px;
+        }
+        .zone-list-empty {
+            color: #c0c4cc; font-size: 12px; text-align: center; padding: 20px 0;
+        }
+        .zone-list-item {
+            display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+            border-radius: 6px; cursor: pointer; transition: all 0.15s;
+            border: 1px solid transparent; font-size: 11px;
+        }
+        .zone-list-item:hover { background: #f5f7fa; }
+        .zone-list-item.selected { background: #ecf5ff; border-color: #409EFF; }
+        .zone-list-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+        .zone-list-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .zone-list-type { font-size: 10px; color: #909399; flex-shrink: 0; }
+        .zone-list-eye {
+            flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+            border: none; cursor: pointer; background: #ecf5ff; color: #409EFF;
+            font-size: 10px; line-height: 18px; text-align: center; padding: 0;
+        }
+        .zone-list-eye:hover { background: #409EFF; color: #fff; }
+        .zone-list-eye.hidden { background: #f5f5f5; color: #c0c4cc; }
+        .zone-list-eye.hidden:hover { background: #c0c4cc; color: #fff; }
+        .zone-list-del {
+            flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%;
+            border: none; cursor: pointer; background: #fef0f0; color: #F56C6C;
+            font-size: 11px; line-height: 18px; text-align: center; padding: 0; display: none;
+        }
+        .zone-list-item:hover .zone-list-del { display: block; }
+        .zone-list-del:hover { background: #F56C6C; color: #fff; }
+        .zone-list-item.hidden-item .zone-list-name { color: #c0c4cc; text-decoration: line-through; }
+        .zone-list-item.hidden-item .zone-list-color { opacity: 0.35; }
+
+        /* 删除确认弹窗 */
+        #zoneDeleteOverlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 3000;
+            background: rgba(0,0,0,0.3); display: none;
+            justify-content: center; align-items: center;
+        }
+        #zoneDeleteOverlay.show { display: flex; }
+        #zoneDeleteDialog {
+            background: #fff; border-radius: 12px; padding: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2); min-width: 300px;
+            font-family: 'Microsoft YaHei', sans-serif; text-align: center;
+        }
+        #zoneDeleteDialog p { margin: 8px 0 16px 0; color: #606266; font-size: 13px; }
+        #zoneDeleteDialog .zone-del-name { color: #F56C6C; font-weight: 700; }
+        #zoneDeleteDialog .edit-btns { display: flex; gap: 6px; justify-content: center; }
+        #zoneDeleteDialog .edit-btns button {
+            padding: 6px 18px; border-radius: 4px; border: 1px solid #dcdfe6; cursor: pointer;
+            font-size: 12px; font-family: 'Microsoft YaHei', sans-serif; background: #fff;
+        }
+        #zoneDeleteDialog .edit-btns .btn-danger { background: #F56C6C; color: #fff; border-color: #F56C6C; }
+        #zoneDeleteDialog .edit-btns .btn-danger:hover { background: #f78989; }
+
+        /* 确认创建弹窗 & 编辑弹窗（共用 overlay 样式） */
+        #zoneConfirmOverlay, #zoneEditOverlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 3000;
+            background: rgba(0,0,0,0.3); display: none;
+            justify-content: center; align-items: center;
+        }
+        #zoneConfirmOverlay.show, #zoneEditOverlay.show { display: flex; }
+        #zoneConfirmDialog, #zoneEditDialog {
+            background: #fff; border-radius: 12px; padding: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2); min-width: 280px;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        #zoneConfirmDialog h4, #zoneEditDialog h4 { margin: 0 0 10px 0; font-size: 14px; color: #303133; }
+        #zoneConfirmDialog .edit-row, #zoneEditDialog .edit-row { margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        #zoneConfirmDialog .edit-row label, #zoneEditDialog .edit-row label { font-size: 12px; color: #606266; min-width: 45px; }
+        #zoneConfirmDialog .edit-row input, #zoneEditDialog .edit-row input,
+        #zoneConfirmDialog .edit-row select, #zoneEditDialog .edit-row select {
+            flex:1; padding: 4px 8px; border:1px solid #dcdfe6; border-radius:4px; font-size:12px; outline:none;
+        }
+        #zoneConfirmDialog .edit-btns, #zoneEditDialog .edit-btns { display: flex; gap: 6px; justify-content: flex-end; margin-top: 12px; }
+        #zoneConfirmDialog .edit-btns button, #zoneEditDialog .edit-btns button {
+            padding: 5px 14px; border-radius: 4px; border: 1px solid #dcdfe6; cursor: pointer;
+            font-size: 12px; font-family: 'Microsoft YaHei', sans-serif; background: #fff;
+        }
+        #zoneConfirmDialog .edit-btns .btn-ok, #zoneEditDialog .edit-btns .btn-ok { background: #409EFF; color: #fff; border-color: #409EFF; }
+        #zoneConfirmDialog .edit-btns .btn-ok:hover, #zoneEditDialog .edit-btns .btn-ok:hover { background: #66b1ff; }
+        #zoneConfirmDialog .edit-btns .btn-continue { background: #67C23A; color: #fff; border-color: #67C23A; }
+        #zoneConfirmDialog .edit-btns .btn-continue:hover { background: #85ce61; }
+
+        /* Toast */
+        #toastMsg {
+            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 4000;
+            background: rgba(48,49,51,0.85); color: #fff; padding: 8px 20px; border-radius: 999px;
+            font-size: 12px; font-family: 'Microsoft YaHei', sans-serif; pointer-events: none;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        #toastMsg.show { opacity: 1; }
+
+        /* ==================== 待确认图形的操作弹窗 ==================== */
+        #shapeActionPopup {
+            position: absolute; z-index: 2500; display: none;
+            background: rgba(255,255,255,0.96); backdrop-filter: blur(8px);
+            border: 1px solid rgba(64, 158, 255, 0.4); border-radius: 10px;
+            padding: 6px; box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+            font-family: 'Microsoft YaHei', sans-serif; gap: 5px;
+            align-items: center; user-select: none; white-space: nowrap;
+        }
+        #shapeActionPopup.show { display: flex; }
+        #shapeActionPopup .shape-act-label {
+            font-size: 11px; color: #909399; margin-right: 2px;
+        }
+        .shape-act-btn {
+            padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer;
+            font-size: 12px; font-weight: 600; font-family: 'Microsoft YaHei', sans-serif;
+            transition: all 0.15s; user-select: none;
+        }
+        .shape-act-btn.rotate-act {
+            background: #ecf5ff; color: #409EFF; border: 1px solid #b3d8ff;
+        }
+        .shape-act-btn.rotate-act:hover, .shape-act-btn.rotate-act.active {
+            background: #409EFF; color: #fff;
+        }
+        .shape-act-btn.move-act {
+            background: #f0f9eb; color: #67C23A; border: 1px solid #c2e7b0;
+        }
+        .shape-act-btn.move-act:hover, .shape-act-btn.move-act.active {
+            background: #67C23A; color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <!-- ====== 经纬度定位 ====== -->
+    <div id="coordPanel">
+        <input id="coordLng" type="text" placeholder="经度 (如 106.5577)" />
+        <input id="coordLat" type="text" placeholder="纬度 (如 29.5689)" />
+        <button id="btnCoordGo">📍 定位</button>
+    </div>
+    <div id="coordMsg"></div>
+
+    <!-- ====== 区域面板容器（含工具栏+列表） ====== -->
+    <div id="zonePanel">
+
+    <!-- ====== 区域绘制工具栏 ====== -->
+    <div id="zoneToolbar">
+        <div class="toolbar-title">📐 区域绘制</div>
+        <div class="type-row">
+            <button class="zone-type-btn nofly active" data-type="nofly" title="禁飞区">🚫禁飞</button>
+            <button class="zone-type-btn obstacle" data-type="obstacle" title="障碍物">⚠障碍</button>
+            <button class="zone-type-btn landing" data-type="landing" title="起降区">🛬起降</button>
+            <button class="zone-type-btn custom" data-type="custom" title="自定义">📌自定义</button>
+        </div>
+        <div class="zone-action-row">
+            <button class="zone-action-btn" id="btnDrawRect">▭ 矩形</button>
+            <button class="zone-action-btn" id="btnDrawCircle">◯ 圆形</button>
+        </div>
+        <div class="zone-action-row">
+            <button class="zone-action-btn danger" id="btnUndoShape" disabled>↩ 撤销</button>
+            <button class="zone-action-btn success" id="btnConfirmZone" disabled>✓ 确认添加</button>
+        </div>
+        <div class="zone-action-row">
+            <button class="zone-action-btn danger" id="btnCancelDraw">✕ 取消绘制</button>
+        </div>
+        <div class="zone-action-row" id="rotateRow" style="display:none;">
+            <button class="zone-action-btn" id="btnRotateCCW" title="逆时针旋转 15°">↺ -15°</button>
+            <button class="zone-action-btn" id="btnRotateCW" title="顺时针旋转 15°">↻ +15°</button>
+        </div>
+        <div id="drawStatus">点击"矩形"或"圆形"开始绘制</div>
+    </div>
+
+    <!-- ====== 区域列表管理面板 ====== -->
+    <div id="zoneListPanel">
+        <div id="zoneListHeader" onclick="toggleZoneList()">
+            <span id="zoneListTitleText">📋 区域列表 (<span id="zoneCount">0</span>)</span>
+            <span id="zoneListToggle">▲</span>
+        </div>
+        <div id="zoneListBody">
+            <div class="zone-list-empty">暂无区域，使用上方工具栏绘制</div>
+        </div>
+    </div>
+    </div>
+    <!-- end #zonePanel -->
+
+    <!-- ====== 确认创建区域弹窗 ====== -->
+    <div id="zoneConfirmOverlay">
+        <div id="zoneConfirmDialog">
+            <h4>✅ 确认创建区域</h4>
+            <div class="edit-row"><label>名称：</label><input id="confirmZoneName" type="text" maxlength="30" /></div>
+            <div class="edit-row"><label>类型：</label><select id="confirmZoneType"></select></div>
+            <div class="edit-row" style="color:#909399; font-size:11px;">已绘制 <b id="confirmShapeCount">0</b> 个图形（<span id="confirmShapeDetail"></span>）</div>
+            <div class="edit-btns">
+                <button onclick="cancelConfirmDialog()">取消</button>
+                <button class="btn-continue" id="btnContinueDraw" onclick="continueDrawFromDialog()" style="display:none;">继续绘制</button>
+                <button class="btn-ok" onclick="doConfirmZone()">确认创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 区域编辑弹窗 ====== -->
+    <div id="zoneEditOverlay">
+        <div id="zoneEditDialog">
+            <h4>✏️ 编辑区域</h4>
+            <div class="edit-row"><label>名称：</label><input id="editZoneName" type="text" maxlength="30" /></div>
+            <div class="edit-row"><label>类型：</label><select id="editZoneType"></select></div>
+            <div class="edit-row"><label>旋转：</label>
+                <input id="editZoneRotation" type="range" min="0" max="360" value="0" step="1" style="flex:1;" />
+                <span id="editRotVal" style="min-width:32px; text-align:right; font-size:12px; color:#409EFF; font-weight:600;">0°</span>
+            </div>
+            <div class="edit-btns">
+                <button onclick="closeEditDialog()">取消</button>
+                <button class="btn-ok" onclick="saveEditDialog()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 删除确认弹窗 ====== -->
+    <div id="zoneDeleteOverlay">
+        <div id="zoneDeleteDialog">
+            <h4>⚠️ 确认删除</h4>
+            <p>确定要删除区域 <span class="zone-del-name" id="deleteZoneName"></span> 吗？<br>此操作不可恢复。</p>
+            <div class="edit-btns">
+                <button onclick="cancelDeleteDialog()">取消</button>
+                <button class="btn-danger" id="btnConfirmDelete" onclick="confirmDeleteZone()">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Toast ====== -->
+    <div id="toastMsg"></div>
+
+    <!-- ====== 待确认图形操作弹窗 ====== -->
+    <div id="shapeActionPopup">
+        <span class="shape-act-label">图形操作:</span>
+        <button class="shape-act-btn rotate-act" id="btnShapeRotate" title="按住拖动鼠标旋转图形">↻ 旋转</button>
+        <button class="shape-act-btn move-act" id="btnShapeMove" title="按住拖动鼠标移动图形">↔ 移动</button>
+    </div>
+
+    <!-- ====== 原有按钮 ====== -->
+    <button id="btnReturnToGS" onclick="if(window.returnToGroundStation) window.returnToGroundStation();">
+        <span class="btn-icon">↺</span><span class="btn-text">地面站</span>
+    </button>
+    <button id="btnBasemapNormal" class="btn-basemap active" onclick="setBasemapMode('normal')">普通</button>
+    <button id="btnBasemapSatellite" class="btn-basemap" onclick="setBasemapMode('satellite')">卫星</button>
+    <button id="btnDSM" class="btn-basemap" onclick="toggleDSM()">高程</button>
+
+    <!-- ====== 区域切换按钮 ====== -->
+    <button id="btnToggleZone" title="区域管理" onclick="toggleZonePanel()">
+        <span class="btn-icon">⬡</span>区域
+    </button>
+
+    <!-- ====== 退出全屏按钮 ====== -->
+    <button id="btnExitFullscreen" onclick="bridge.exitAppFullscreen()">
+        <span class="btn-icon">✕</span><span class="btn-text">退出全屏</span>
+    </button>
+
+    <!-- ====== 区域面板容器（含工具栏+列表） ====== -->
+    <script>
+        // ================================================================
+        //  原有变量 & 核心函数（保持不动）
+        // ================================================================
+        var map = null;
+        var normalLayer, satLayer, roadLayer, satGroup, dsmLayer;
+        var basemapMode = 'normal';
+
+        var groundMarker = null; var groundPos = null; 
+        var droneMarkers = {}; var dronePosMap = {}; var droneTrails = {}; var droneTrailPaths = {}; 
+        var linkLines = {}; var linkLabelsDrone = {}; var linkLabelsGS = {};    
+        var MAX_TRAIL_POINTS = 300; 
+        var bridge = null; var mapInitialized = false;
+        var pendingGround = null; var pendingDrone = null;
+
+        // ====== 仿真航线图层 ======
+        var simRoutes = {};       // droneId -> L.polyline (航线)
+        var simRouteData = {};    // droneId -> {pts: [...], visible: true}
+
+        function createOfflineBaseLayer(mode) {
+            var OfflineLayer = L.GridLayer.extend({
+                createTile: function (coords) {
+                    var tile = document.createElement('canvas');
+                    tile.width = 256; tile.height = 256;
+                    var ctx = tile.getContext('2d');
+                    var gradient = ctx.createLinearGradient(0, 0, 256, 256);
+                    if (mode === 'satellite') {
+                        gradient.addColorStop(0, '#263a4b'); gradient.addColorStop(1, '#172532');
+                    } else {
+                        gradient.addColorStop(0, '#eef3f7'); gradient.addColorStop(1, '#dce7ee');
+                    }
+                    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
+                    ctx.strokeStyle = mode === 'satellite' ? 'rgba(120,190,200,.18)' : 'rgba(80,130,155,.16)';
+                    ctx.lineWidth = 1;
+                    for (var i = 0; i <= 256; i += 32) {
+                        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+                    }
+                    ctx.strokeStyle = mode === 'satellite' ? 'rgba(178,225,224,.28)' : 'rgba(71,115,132,.25)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.moveTo(-20, 215); ctx.quadraticCurveTo(90, 120, 276, 154); ctx.stroke();
+                    ctx.fillStyle = mode === 'satellite' ? 'rgba(220,250,255,.65)' : 'rgba(67,100,112,.64)';
+                    ctx.font = '11px Microsoft YaHei, sans-serif';
+                    ctx.fillText(mode === 'satellite' ? 'OFFLINE SATELLITE' : 'OFFLINE BASEMAP', 12, 22);
+                    return tile;
+                }
+            });
+            return new OfflineLayer({ tileSize: 256, noWrap: true, minZoom: 0, maxZoom: 18 });
+        }
+
+        function createAmapLayer(mode) {
+            var subdomains = ['1', '2', '3', '4'];
+            if (mode === 'satellite') {
+                return L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', {
+                    subdomains: subdomains, maxZoom: 18, tileSize: 256, attribution: '© 高德地图'
+                });
+            }
+            return L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+                subdomains: subdomains, maxZoom: 18, tileSize: 256, attribution: '© 高德地图'
+            });
+        }
+
+        function initMap(centerLng, centerLat) {
+            map = L.map('container', { zoomControl: false, attributionControl: false }).setView([centerLat, centerLng], 15);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            // 真实底图：高德在线瓦片（普通/卫星）
+            normalLayer = createAmapLayer('normal');
+            satLayer = createAmapLayer('satellite');
+            satGroup = L.layerGroup([satLayer]);
+            // DSM 高程叠加层（?v= 缓存破坏，每次启动加载新瓦片）
+            dsmLayer = L.tileLayer('http://127.0.0.1:8081/dsm/{z}/{x}/{y}.png?v=2', { maxZoom: 18, opacity: 0.85, pane: 'overlayPane' });
+
+            // 离线兜底：外网不可达/高德瓦片加载失败时，回退到内置占位底图，避免白屏
+            var offlineNormal = createOfflineBaseLayer('normal');
+            var offlineSat = createOfflineBaseLayer('satellite');
+            var amapUnavailable = false;
+            normalLayer.on('tileerror', function () {
+                if (amapUnavailable) return;
+                amapUnavailable = true;
+                map.removeLayer(normalLayer);
+                map.removeLayer(satGroup);
+                normalLayer = offlineNormal;
+                satLayer = offlineSat;
+                satGroup = L.layerGroup([satLayer]);
+                if (basemapMode === 'normal') { normalLayer.addTo(map); }
+                else { satGroup.addTo(map); }
+            });
+
+            normalLayer.addTo(map);
+            mapInitialized = true;
+
+            if (pendingGround) { updateGroundStation(pendingGround.lat, pendingGround.lng, pendingGround.options); pendingGround = null; }
+            if (pendingDrone) {
+                try {
+                    if (pendingDrone.droneId || pendingDrone.options) updateDroneMulti(pendingDrone.droneId || '1', pendingDrone.lat, pendingDrone.lng, pendingDrone.alt, pendingDrone.battery, pendingDrone.sats, pendingDrone.options || null);
+                    else updateDrone(pendingDrone.lat, pendingDrone.lng, pendingDrone.alt, pendingDrone.battery, pendingDrone.sats);
+                } catch (e) {}
+                pendingDrone = null;
+            }
+
+            // 初始化区域管理系统（在 initMap 末尾调用）
+            initZoneSystem();
+        }
+
+        function setBasemapMode(mode) {
+            basemapMode = mode;
+            if (!map) return;
+            if (mode === 'normal') {
+                map.removeLayer(satGroup);
+                normalLayer.addTo(map);
+            } else {
+                map.removeLayer(normalLayer);
+                satGroup.addTo(map);
+            }
+            document.getElementById('btnBasemapNormal').classList.toggle('active', mode === 'normal');
+            document.getElementById('btnBasemapSatellite').classList.toggle('active', mode !== 'normal');
+        }
+
+        var dsmVisible = false;
+        function toggleDSM() {
+            dsmVisible = !dsmVisible;
+            if (dsmVisible) { dsmLayer.addTo(map); }
+            else { map.removeLayer(dsmLayer); }
+            document.getElementById('btnDSM').classList.toggle('active', dsmVisible);
+        }
+        window.setBasemapMode = setBasemapMode;
+
+        function refreshLinkAndTrail(droneId) {
+            if (!map || !mapInitialized) return;
+            if (groundPos && droneId && dronePosMap[droneId]) {
+                var p1 = dronePosMap[droneId];
+                var p2 = groundPos;
+                var linkPath = [p1, p2];
+                
+                if (!linkLines[droneId]) {
+                    linkLines[droneId] = L.polyline(linkPath, { color: '#FF9900', opacity: 1.0, weight: 2.5, dashArray: '10, 8', lineJoin: 'round' }).addTo(map);
+                } else {
+                    linkLines[droneId].setLatLngs(linkPath);
+                }
+
+                var pDroneLat = p1[0] * 0.9 + p2[0] * 0.1; var pDroneLng = p1[1] * 0.9 + p2[1] * 0.1;
+                var pGsLat = p1[0] * 0.1 + p2[0] * 0.9; var pGsLng = p1[1] * 0.1 + p2[1] * 0.9;
+                
+                var dx = (p2[1] - p1[1]) * Math.cos(p1[0] * Math.PI / 180);
+                var dy = p2[0] - p1[0];
+                var angleToGs = Math.atan2(dx, dy) * 180 / Math.PI;
+
+                var getArrowIcon = function(angle) {
+                    var svg = '<div style="transform: translate(-50%, -50%) rotate(' + angle + 'deg); width:20px; height:20px;">' +
+                              '<svg viewBox="0 0 1024 1024" width="20" height="20" style="filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.4));">' +
+                              '<path d="M512 100 L200 800 L512 650 L824 800 Z" fill="#FF9900" stroke="#FFFFFF" stroke-width="30"/></svg></div>';
+                    return L.divIcon({ className: 'arrow-marker', html: svg, iconSize: [0, 0] });
+                };
+
+                if (!linkLabelsDrone[droneId]) {
+                    linkLabelsDrone[droneId] = L.marker([pDroneLat, pDroneLng], { icon: getArrowIcon(angleToGs + 180) }).addTo(map);
+                } else { linkLabelsDrone[droneId].setLatLng([pDroneLat, pDroneLng]); linkLabelsDrone[droneId].setIcon(getArrowIcon(angleToGs + 180)); }
+
+                if (!linkLabelsGS[droneId]) {
+                    linkLabelsGS[droneId] = L.marker([pGsLat, pGsLng], { icon: getArrowIcon(angleToGs) }).addTo(map);
+                } else { linkLabelsGS[droneId].setLatLng([pGsLat, pGsLng]); linkLabelsGS[droneId].setIcon(getArrowIcon(angleToGs)); }
+            }
+
+            var path = (droneId && droneTrailPaths[droneId]) ? droneTrailPaths[droneId] : null;
+            if (path && path.length >= 2) {
+                if (!droneTrails[droneId]) {
+                    droneTrails[droneId] = L.polyline(path, { color: '#F56C6C', opacity: 0.9, weight: 3, dashArray: '10, 5', lineJoin: 'round' }).addTo(map);
+                } else {
+                    droneTrails[droneId].setLatLngs(path);
+                }
+            }
+        }
+
+        function pushTrailPoint(droneId, pos) {
+            if (!droneId || !pos) return;
+            if (!droneTrailPaths[droneId]) droneTrailPaths[droneId] = [];
+            droneTrailPaths[droneId].push(pos);
+            if (droneTrailPaths[droneId].length > MAX_TRAIL_POINTS) droneTrailPaths[droneId] = droneTrailPaths[droneId].slice(droneTrailPaths[droneId].length - MAX_TRAIL_POINTS);
+        }
+
+        function updateGroundStation(lat, lng, options) {
+            if (!map || !mapInitialized) { pendingGround = {lat: lat, lng: lng, options: options}; return; }
+            if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                groundPos = [lat, lng];
+                map.setView(groundPos);
+                
+                var markerIcon = (options && options.markerIcon) ? options.markerIcon : '🏠';
+                var iconHtml = typeof markerIcon === 'string' && markerIcon.includes('<img') ? markerIcon : '<div style="font-size:35px; text-shadow: 2px 2px 4px rgba(0,0,0,0.4);">' + markerIcon + '</div>';
+                var wrapHtml = '<div class="emoji-marker" style="transform: translate(-50%, -100%); display: inline-block;">' + iconHtml + '</div>';
+                var myIcon = L.divIcon({ className: 'custom-div-icon', html: wrapHtml, iconSize: [0, 0] });
+
+                if (!groundMarker) {
+                    groundMarker = L.marker(groundPos, {icon: myIcon}).addTo(map);
+                } else {
+                    groundMarker.setLatLng(groundPos);
+                    groundMarker.setIcon(myIcon);
+                }
+                try { Object.keys(dronePosMap).forEach(function(id) { refreshLinkAndTrail(id); }); } catch (e) {}
+            }
+        }
+
+        function returnToGroundStation() {
+            if (!map || !mapInitialized) return false;
+            if (groundPos) {
+                map.setView(groundPos, 16);
+                return true;
+            }
+            // 如果 groundPos 未设置，使用默认中心
+            if (window.defaultCenter) {
+                map.setView([window.defaultCenter.lat, window.defaultCenter.lng], 16);
+                return true;
+            }
+            return false;
+        }
+
+        function updateDroneMulti(droneId, lat, lng, alt, battery, sats, options) {
+            if (!map || !mapInitialized) { pendingDrone = {droneId: droneId, lat: lat, lng: lng, alt: alt, battery: battery, sats: sats, options: options}; return; }
+            if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                if (!droneId) droneId = '1';
+                var title = (options && options.name) ? options.name : ('无人机 ' + droneId);
+                var emoji = (options && options.emoji) ? options.emoji : '🚁';
+                
+                dronePosMap[droneId] = [lat, lng];
+                var iconHtml = typeof emoji === 'string' && emoji.includes('<img') ? emoji : '<div style="font-size:32px; text-shadow: 2px 2px 3px rgba(0,0,0,0.4);">' + emoji + '</div>';
+                var wrapHtml = '<div class="emoji-marker" style="transform: translate(-50%, -100%); display: inline-block;">' + iconHtml + '</div>';
+                var myIcon = L.divIcon({ className: 'custom-div-icon', html: wrapHtml, iconSize: [0, 0] });
+
+                if (!droneMarkers[droneId]) {
+                    droneMarkers[droneId] = L.marker(dronePosMap[droneId], {icon: myIcon, title: title}).addTo(map);
+                } else {
+                    droneMarkers[droneId].setLatLng(dronePosMap[droneId]);
+                    droneMarkers[droneId].setIcon(myIcon);
+                }
+
+                pushTrailPoint(droneId, dronePosMap[droneId]);
+                refreshLinkAndTrail(droneId);
+            }
+        }
+
+        function clearDroneMulti(droneId) {
+            if (!droneId) droneId = '1';
+            try {
+                if (droneMarkers[droneId]) { map.removeLayer(droneMarkers[droneId]); delete droneMarkers[droneId]; }
+                if (droneTrails[droneId]) { map.removeLayer(droneTrails[droneId]); delete droneTrails[droneId]; }
+                if (linkLines[droneId]) { map.removeLayer(linkLines[droneId]); delete linkLines[droneId]; }
+                if (linkLabelsDrone[droneId]) { map.removeLayer(linkLabelsDrone[droneId]); delete linkLabelsDrone[droneId]; }
+                if (linkLabelsGS[droneId]) { map.removeLayer(linkLabelsGS[droneId]); delete linkLabelsGS[droneId]; }
+                if (droneTrailPaths[droneId]) { delete droneTrailPaths[droneId]; }
+                if (dronePosMap[droneId]) { delete dronePosMap[droneId]; }
+            } catch (e) {}
+        }
+
+        function updateDrone(lat, lng, alt, battery, sats) { return updateDroneMulti('1', lat, lng, alt, battery, sats, {name: '无人机 1', emoji: '🚁'}); }
+
+        // ====== 仿真航线渲染 ======
+        function drawSimRoute(droneId, ptsArray) {
+            if (!map || !mapInitialized) return;
+            if (!ptsArray || ptsArray.length < 2) return;
+            // 先清除旧航线
+            removeSimRoute(droneId);
+            // 转为 Leaflet LatLng 数组: ptsArray 格式 [[lat,lng],...]
+            var latlngs = ptsArray.map(function(p) { return [p[0], p[1]]; });
+            var color = droneId.indexOf('demo') >= 0 ? '#E6A23C' : '#409EFF';
+            simRoutes[droneId] = L.polyline(latlngs, {
+                color: color, weight: 3, opacity: 0.75,
+                dashArray: droneId.indexOf('demo') >= 0 ? '8, 6' : null,
+                lineJoin: 'round'
+            }).addTo(map);
+            simRouteData[droneId] = { pts: ptsArray, visible: true };
+        }
+
+        function removeSimRoute(droneId) {
+            if (simRoutes[droneId]) {
+                map.removeLayer(simRoutes[droneId]);
+                delete simRoutes[droneId];
+            }
+            delete simRouteData[droneId];
+        }
+
+        function removeSimDrone(droneId) {
+            // 清除仿真无人机在地图上的所有痕迹
+            removeSimRoute(droneId);
+            clearDroneMulti(droneId);
+        }
+
+        function clearSimRoutes() {
+            Object.keys(simRoutes).forEach(function(k) { removeSimRoute(k); });
+            simRoutes = {};
+            simRouteData = {};
+        }
+        window.drawSimRoute = drawSimRoute;
+        window.removeSimDrone = removeSimDrone;
+        window.clearSimRoutes = clearSimRoutes;
+
+        // ====== RID 探测无人机 ======
+        var ridMarkers = {};
+        var ridDroneData = {};
+        function _getRidIcon(droneType, productType) {
+            // 根据 drone_type / 产品型号 返回不同图标
+            var type = parseInt(droneType) || 0;
+            var pt = (productType || '').toUpperCase();
+            if (type === 1 || pt.indexOf('AIRPLANE') >= 0 || pt.indexOf('FIXED') >= 0) return '✈️';
+            if (type === 6 || pt.indexOf('GLIDER') >= 0) return '🪂';
+            if (pt.indexOf('MAVIC') >= 0) return '🛸';
+            if (pt.indexOf('PHANTOM') >= 0) return '🛸';
+            if (pt.indexOf('INSPIRE') >= 0) return '🚁';
+            if (pt.indexOf('AGRAS') >= 0 || pt.indexOf('AGRICULTURE') >= 0) return '🚜';
+            if (pt.indexOf('MINI') >= 0 || pt.indexOf('AIR') >= 0 || pt.indexOf('SPARK') >= 0) return '🪁';
+            if (pt.indexOf('FPV') >= 0 || pt.indexOf('AVATA') >= 0) return '🏎️';
+            if (pt.indexOf('AUTEL') >= 0) return '🛸';
+            return '🛰';  // 默认图标
+        }
+
+        function updateRidDrone(serialNum, lat, lng, height, speed, heading, productType, droneType, isNew) {
+            if (!map || !mapInitialized) return;
+            if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+            if (!serialNum) return;
+
+            var emoji = _getRidIcon(droneType, productType);
+            var shortSerial = serialNum.length > 10 ? serialNum.substring(0, 10) + '...' : serialNum;
+            var h = height !== null && height !== undefined ? height.toFixed(0) : '--';
+            var s = speed !== null && speed !== undefined ? speed.toFixed(1) : '--';
+            var title = (productType && productType !== '--' ? productType : '无人机') + ' ' + shortSerial;
+            var tooltipHtml = '<b>' + title + '</b><br>'
+                + '离地高: ' + h + ' m<br>'
+                + '速度: ' + s + ' km/h<br>'
+                + (heading ? '航向: ' + heading + '<br>' : '');
+
+            var iconHtml = '<div style="font-size:28px; text-shadow: 1px 1px 3px rgba(0,0,0,0.4);">' + emoji + '</div>';
+            var wrapHtml = '<div class="emoji-marker" style="transform: translate(-50%, -100%); display: inline-block;">' + iconHtml + '</div>';
+            var myIcon = L.divIcon({ className: 'custom-div-icon', html: wrapHtml, iconSize: [0, 0] });
+
+            if (!ridMarkers[serialNum]) {
+                ridMarkers[serialNum] = L.marker([lat, lng], {icon: myIcon, title: title}).addTo(map);
+                ridMarkers[serialNum].bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -30] });
+                ridMarkers[serialNum].on('click', function() {
+                    if (window.bridge && window.bridge.showRidDroneDetail) {
+                        window.bridge.showRidDroneDetail(serialNum);
+                    }
+                });
+            } else {
+                ridMarkers[serialNum].setLatLng([lat, lng]);
+                ridMarkers[serialNum].setIcon(myIcon);
+                ridMarkers[serialNum].setTooltipContent(tooltipHtml);
+            }
+
+            ridDroneData[serialNum] = {
+                serialNum: serialNum, lat: lat, lng: lng, height: height,
+                speed: speed, heading: heading, productType: productType,
+                droneType: droneType, timestamp: Date.now()
+            };
+        }
+
+        function removeRidDrone(serialNum) {
+            if (ridMarkers[serialNum]) {
+                map.removeLayer(ridMarkers[serialNum]);
+                delete ridMarkers[serialNum];
+            }
+            delete ridDroneData[serialNum];
+        }
+
+        function clearAllRidDrones() {
+            Object.keys(ridMarkers).forEach(function(k) { map.removeLayer(ridMarkers[k]); });
+            ridMarkers = {};
+            ridDroneData = {};
+        }
+
+        function cleanupStaleRidDrones(maxAgeMs) {
+            var now = Date.now();
+            var stale = [];
+            Object.keys(ridDroneData).forEach(function(k) {
+                if (now - ridDroneData[k].timestamp > maxAgeMs) stale.push(k);
+            });
+            stale.forEach(function(k) { removeRidDrone(k); });
+            return stale.length;
+        }
+        window.updateRidDrone = updateRidDrone;
+        window.removeRidDrone = removeRidDrone;
+        window.clearAllRidDrones = clearAllRidDrones;
+
+        function connectWebChannel() {
+            try {
+                new QWebChannel(qt.webChannelTransport, function(channel) {
+                    bridge = channel.objects.bridge;
+                    if (window.positionData) { updateGroundStation(window.positionData.lat, window.positionData.lng); window.positionData = null; }
+                    if (window.groundStationData) { updateGroundStation(window.groundStationData.lat, window.groundStationData.lng, window.groundStationData.options); window.groundStationData = null; }
+                    if (window.droneData) { updateDroneMulti(window.droneData.id || '1', window.droneData.lat, window.droneData.lng, window.droneData.alt, window.droneData.battery, window.droneData.sats, window.droneData.options || null); window.droneData = null; }
+                });
+            } catch (e) { setTimeout(connectWebChannel, 5000); }
+        }
+
+        if (!window.defaultCenter) { window.defaultCenter = {lng: 106.5577, lat: 29.5689}; }
+
+        window.onload = function() {
+            initMap(window.defaultCenter.lng, window.defaultCenter.lat);
+            connectWebChannel();
+            // 从 localStorage 恢复上次保存的区域
+            loadZonesFromStorage();
+        };
+
+        window.updatePosition = function(lat, lng) { updateGroundStation(lat, lng); };
+        window.updateGroundStation = updateGroundStation; window.returnToGroundStation = returnToGroundStation;
+        window.updateDroneMulti = updateDroneMulti; window.updateDrone = updateDrone; window.clearDroneMulti = clearDroneMulti;
+
+        // ================================================================
+        //  经纬度定位
+        // ================================================================
+        (function() {
+            var coordLat = document.getElementById('coordLat');
+            var coordLng = document.getElementById('coordLng');
+            var btnCoordGo = document.getElementById('btnCoordGo');
+            var coordMsg = document.getElementById('coordMsg');
+            var coordMarker = null;
+
+            function showCoordMsg(msg) {
+                coordMsg.textContent = msg;
+                coordMsg.style.display = 'block';
+                clearTimeout(coordMsg._timer);
+                coordMsg._timer = setTimeout(function() { coordMsg.style.display = 'none'; }, 3000);
+            }
+
+            function flyToCoords() {
+                var lat = parseFloat(coordLat.value.trim());
+                var lng = parseFloat(coordLng.value.trim());
+                if (isNaN(lat) || isNaN(lng)) {
+                    showCoordMsg('请输入有效的经纬度数值');
+                    return;
+                }
+                if (lat < -90 || lat > 90) { showCoordMsg('纬度范围: -90 ~ 90'); return; }
+                if (lng < -180 || lng > 180) { showCoordMsg('经度范围: -180 ~ 180'); return; }
+                if (!map || !mapInitialized) { showCoordMsg('地图尚未加载'); return; }
+
+                map.flyTo([lat, lng], 16, { duration: 1.2 });
+
+                if (coordMarker) { map.removeLayer(coordMarker); }
+                var icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: '<div style="font-size:28px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); transform: translate(-50%, -100%);">📍</div>',
+                    iconSize: [0, 0]
+                });
+                coordMarker = L.marker([lat, lng], { icon: icon }).addTo(map);
+                coordMarker.bindPopup('<b>定位点</b><br>' + lat.toFixed(6) + ', ' + lng.toFixed(6)).openPopup();
+            }
+
+            btnCoordGo.addEventListener('click', flyToCoords);
+
+            coordLng.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { coordLat.focus(); coordLat.select(); }
+            });
+            coordLat.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { flyToCoords(); }
+            });
+        })();
+
+        // ================================================================
+        //  区域管理系统
+        // ================================================================
+
+        var ZONE_TYPE_DEFS = {
+            'nofly':    { label: '禁飞区', color: '#F56C6C', fillOpacity: 0.30, weight: 2.5 },
+            'obstacle': { label: '障碍物', color: '#E6A23C', fillOpacity: 0.35, weight: 2.5 },
+            'landing':  { label: '起降区域', color: '#67C23A', fillOpacity: 0.30, weight: 2.5 },
+            'custom':   { label: '自命名区域', color: '#409EFF', fillOpacity: 0.30, weight: 2.5 }
+        };
+
+        var zoneIdCounter = 0;
+        var zones = {};
+        var zonesLayerGroup;
+        var drawState = 'idle';
+        var drawAnchor = null;
+        var drawPreview = null;
+        var pendingShapes = [];
+        var currentZoneType = 'nofly';
+        var selectedZoneId = null;
+        var editingZoneId = null;
+        var deletePendingZoneId = null;
+
+        function initZoneSystem() {
+            if (!map || !mapInitialized) return;
+
+            // 独立 featureGroup，不在 satGroup 内，切换底图不会丢失
+            zonesLayerGroup = L.featureGroup().addTo(map);
+
+            // 类型按钮
+            document.querySelectorAll('.zone-type-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.zone-type-btn').forEach(function(b) { b.classList.remove('active'); });
+                    btn.classList.add('active');
+                    currentZoneType = btn.getAttribute('data-type');
+                });
+            });
+
+            document.getElementById('btnDrawRect').addEventListener('click', function() { startDrawMode('rect'); });
+            document.getElementById('btnDrawCircle').addEventListener('click', function() { startDrawMode('circle'); });
+            document.getElementById('btnUndoShape').addEventListener('click', undoLastShape);
+            document.getElementById('btnConfirmZone').addEventListener('click', confirmZone);
+            document.getElementById('btnCancelDraw').addEventListener('click', cancelDraw);
+
+            // 地图鼠标事件 — 绘制用
+            map.on('mousedown', onMapMouseDown);
+            map.on('mousemove', onMapMouseMove);
+            map.on('mouseup', onMapMouseUp);
+            map.on('dblclick', function(e) { L.DomEvent.stopPropagation(e); });
+
+            // 点击地图空白处隐藏待确认图形的操作弹窗
+            map.on('click', function(e) {
+                if (shapeAction.active) return;
+                if (shapeAction._showing) hideShapeActions();
+            });
+
+            // 已移除旧的旋转±15°按钮和拖拽移动功能（已改为待确认图形内的自由旋转/移动）
+        }
+
+        // ---------- 绘制流程 ----------
+
+        function startDrawMode(mode) {
+            if (!map) return;
+            hideShapeActions();  // 开始绘制新图形时关闭操作弹窗
+            // 切换绘制模式时只清除正在拖拽的预览，保留已绘制的 pendingShapes
+            // 这样矩形和圆形可以交替绘制，组合使用
+            drawAnchor = null;
+            clearPreview();
+            drawState = (mode === 'rect') ? 'drawing-rect' : 'drawing-circle';
+            map.getContainer().style.cursor = 'crosshair';
+            updateDrawUI();
+            var modeText = (mode === 'rect') ? '矩形' : '圆形';
+            var hint = pendingShapes.length > 0 ? '（已累计 ' + pendingShapes.length + ' 个图形）' : '';
+            document.getElementById('drawStatus').textContent = (mode === 'rect') ? '在地图上拖拽绘制矩形...' + hint : '点击地图放置圆心，拖拽设定半径...' + hint;
+        }
+
+        function onMapMouseDown(e) {
+            if (shapeAction.active) return;  // 旋转/移动操作中，不触发绘制
+            if (drawState === 'idle') return;
+            L.DomEvent.stopPropagation(e);
+            L.DomEvent.preventDefault(e);
+            drawAnchor = e.latlng;
+        }
+
+        function onMapMouseMove(e) {
+            // 如果正在旋转/移动待确认图形
+            if (shapeAction.active) {
+                L.DomEvent.stopPropagation(e);
+                handleShapeActionMove(e);
+                return;
+            }
+            if (drawState === 'idle' || !drawAnchor) return;
+            L.DomEvent.stopPropagation(e);
+            clearPreview();
+            var latlng = e.latlng;
+
+            if (drawState === 'drawing-rect') {
+                var bounds = L.latLngBounds(drawAnchor, latlng);
+                var def = ZONE_TYPE_DEFS[currentZoneType];
+                drawPreview = L.rectangle(bounds, {
+                    color: def.color, weight: def.weight, fillColor: def.color,
+                    fillOpacity: def.fillOpacity, dashArray: '8, 4'
+                }).addTo(map);
+            } else if (drawState === 'drawing-circle') {
+                var radius = drawAnchor.distanceTo(latlng);
+                var def = ZONE_TYPE_DEFS[currentZoneType];
+                drawPreview = L.circle(drawAnchor, {
+                    radius: radius, color: def.color, weight: def.weight,
+                    fillColor: def.color, fillOpacity: def.fillOpacity, dashArray: '8, 4'
+                }).addTo(map);
+            }
+        }
+
+        function onMapMouseUp(e) {
+            if (shapeAction.active) return;  // 旋转/移动中，由全局 mouseup 处理
+            if (drawState === 'idle' || !drawAnchor) return;
+            L.DomEvent.stopPropagation(e);
+            clearPreview();
+            var latlng = e.latlng;
+
+            if (drawState === 'drawing-rect') {
+                var bounds = L.latLngBounds(drawAnchor, latlng);
+                if (Math.abs(bounds.getNorth() - bounds.getSouth()) < 0.0001 && Math.abs(bounds.getEast() - bounds.getWest()) < 0.0001) {
+                    drawAnchor = null; return;
+                }
+                pendingShapes.push({
+                    type: 'rect',
+                    south: bounds.getSouth(), north: bounds.getNorth(),
+                    west: bounds.getWest(), east: bounds.getEast(),
+                    rotation: 0
+                });
+            } else if (drawState === 'drawing-circle') {
+                var radius = drawAnchor.distanceTo(latlng);
+                if (radius < 2) { drawAnchor = null; return; }
+                pendingShapes.push({
+                    type: 'circle',
+                    centerLat: drawAnchor.lat, centerLng: drawAnchor.lng,
+                    radiusM: radius
+                });
+            }
+
+            drawAnchor = null;
+            drawState = 'idle';
+            renderPendingShapes();
+            var action = (editingZoneId && zones[editingZoneId]) ? '追加' : '添加';
+            updateDrawUI();
+            document.getElementById('drawStatus').textContent = '已有 ' + pendingShapes.length + ' 个图形待确认';
+        }
+
+        function clearPreview() {
+            if (drawPreview) { map.removeLayer(drawPreview); drawPreview = null; }
+        }
+
+        function renderPendingShapes() {
+            zonesLayerGroup.eachLayer(function(layer) {
+                if (layer._isPending) { zonesLayerGroup.removeLayer(layer); }
+            });
+            var def = ZONE_TYPE_DEFS[currentZoneType];
+            pendingShapes.forEach(function(s, idx) {
+                var layer;
+                if (s.type === 'rect') {
+                    var angle = s.rotation || 0;
+                    if (angle === 0) {
+                        layer = L.rectangle([[s.south, s.west], [s.north, s.east]], {
+                            color: def.color, weight: 2, fillColor: def.color,
+                            fillOpacity: 0.25, dashArray: '6, 3'
+                        });
+                    } else {
+                        var latlngs = getRotatedRectLatLngs(s);
+                        layer = L.polygon(latlngs, {
+                            color: def.color, weight: 2, fillColor: def.color,
+                            fillOpacity: 0.25, dashArray: '6, 3'
+                        });
+                    }
+                } else {
+                    layer = L.circle([s.centerLat, s.centerLng], {
+                        radius: s.radiusM, color: def.color, weight: 2,
+                        fillColor: def.color, fillOpacity: 0.25, dashArray: '6, 3'
+                    });
+                }
+                layer._isPending = true;
+                layer._pendingIdx = idx;
+
+                // 点击待确认图形 → 弹出旋转/移动操作按钮
+                layer.on('click', function(e) {
+                    if (shapeAction.active) return;  // 正在旋转/移动中不响应
+                    if (drawState !== 'idle') return;  // 正在绘制中不响应
+                    L.DomEvent.stopPropagation(e);
+                    showShapeActions(idx, e);
+                });
+
+                layer.addTo(zonesLayerGroup);
+            });
+        }
+
+        function undoLastShape() {
+            if (pendingShapes.length > 0) {
+                pendingShapes.pop();
+                renderPendingShapes();
+                updateDrawUI();
+                document.getElementById('drawStatus').textContent = pendingShapes.length > 0 ? '已有 ' + pendingShapes.length + ' 个图形待确认' : '点击"矩形"或"圆形"继续绘制';
+            }
+        }
+
+        function confirmZone() {
+            // 必须有待确认的图形
+            if (pendingShapes.length === 0) return;
+
+            // 弹出确认对话框，让用户命名并二次确认
+            var defaultName = ZONE_TYPE_DEFS[currentZoneType].label + '-' + (zoneIdCounter + 1);
+            document.getElementById('confirmZoneName').value = defaultName;
+            document.getElementById('confirmShapeCount').textContent = pendingShapes.length;
+
+            // 统计图形类型
+            var rectCount = 0, circleCount = 0;
+            pendingShapes.forEach(function(s) { if (s.type === 'rect') rectCount++; else circleCount++; });
+            var parts = [];
+            if (rectCount > 0) parts.push(rectCount + ' 矩形');
+            if (circleCount > 0) parts.push(circleCount + ' 圆形');
+            document.getElementById('confirmShapeDetail').textContent = parts.join(' + ');
+
+            // 设置类型选择器
+            var sel = document.getElementById('confirmZoneType');
+            sel.innerHTML = '';
+            Object.keys(ZONE_TYPE_DEFS).forEach(function(k) {
+                var opt = document.createElement('option');
+                opt.value = k;
+                opt.textContent = ZONE_TYPE_DEFS[k].label;
+                if (k === currentZoneType) opt.selected = true;
+                sel.appendChild(opt);
+            });
+
+            // 显示"继续绘制"按钮（创建新区域时可用）
+            document.getElementById('btnContinueDraw').style.display = (editingZoneId && zones[editingZoneId]) ? 'none' : 'inline-block';
+
+            document.getElementById('zoneConfirmOverlay').classList.add('show');
+            setTimeout(function() {
+                var inp = document.getElementById('confirmZoneName');
+                inp.focus();
+                inp.select();
+            }, 100);
+        }
+
+        function doConfirmZone() {
+            var name = document.getElementById('confirmZoneName').value.trim();
+            if (!name) { name = ZONE_TYPE_DEFS[currentZoneType].label + '-' + (zoneIdCounter + 1); }
+            var type = document.getElementById('confirmZoneType').value;
+            currentZoneType = type;
+
+            // 更新类型按钮选中状态
+            document.querySelectorAll('.zone-type-btn').forEach(function(b) {
+                b.classList.remove('active');
+                if (b.getAttribute('data-type') === type) b.classList.add('active');
+            });
+
+            document.getElementById('zoneConfirmOverlay').classList.remove('show');
+            hideShapeActions();  // 创建区域后关闭操作弹窗
+
+            if (editingZoneId && zones[editingZoneId]) {
+                // 编辑模式：追加到已有区域
+                var zone = zones[editingZoneId];
+                pendingShapes.forEach(function(s) { zone.shapes.push(cloneShape(s)); });
+                if (zone.type !== type) {
+                    zone.type = type;
+                }
+                removeZoneLayers(zone.id);
+                renderZone(zone);
+                refreshZoneList();
+                saveZonesToStorage();
+                var count = pendingShapes.length;
+                cancelDrawPrompt();
+                toast('已为「' + zone.name + '」追加 ' + count + ' 个图形');
+            } else {
+                // 新建区域
+                var id = 'zone_' + (++zoneIdCounter);
+                var zone = {
+                    id: id, name: name, type: type,
+                    shapes: pendingShapes.map(function(s) { return cloneShape(s); }),
+                    visible: true
+                };
+                zones[id] = zone;
+                renderZone(zone);
+                refreshZoneList();
+                saveZonesToStorage();
+                selectZone(id);
+                var count = pendingShapes.length;
+                cancelDrawPrompt();
+                toast('已创建: ' + name + ' (' + count + ' 个图形)');
+            }
+        }
+
+        function cancelConfirmDialog() {
+            document.getElementById('zoneConfirmOverlay').classList.remove('show');
+        }
+
+        function continueDrawFromDialog() {
+            // 关闭对话框，回到绘制状态继续添加图形
+            document.getElementById('zoneConfirmOverlay').classList.remove('show');
+            drawAnchor = null;
+            clearPreview();
+            drawState = 'idle';
+            map.getContainer().style.cursor = '';
+            updateDrawUI();
+            document.getElementById('drawStatus').textContent = '已有 ' + pendingShapes.length + ' 个图形待确认，点击按钮继续绘制';
+        }
+
+        function cancelDraw() {
+            cancelDrawPrompt();
+            closeEditDialog();
+            cancelConfirmDialog();
+            toast('已取消');
+        }
+
+        function cancelDrawPrompt() {
+            drawState = 'idle';
+            drawAnchor = null;
+            clearPreview();
+            zonesLayerGroup.eachLayer(function(layer) {
+                if (layer._isPending) { zonesLayerGroup.removeLayer(layer); }
+            });
+            pendingShapes = [];
+            editingZoneId = null;
+            hideShapeActions();
+            if (map && map.getContainer()) { map.getContainer().style.cursor = ''; }
+            updateDrawUI();
+            document.getElementById('drawStatus').textContent = '点击"矩形"或"圆形"开始绘制';
+        }
+
+        function updateDrawUI() {
+            var hasPending = pendingShapes.length > 0;
+            var isDrawing = drawState !== 'idle';
+            document.getElementById('btnUndoShape').disabled = !hasPending;
+            document.getElementById('btnConfirmZone').disabled = !hasPending;
+            document.getElementById('btnDrawRect').style.opacity = isDrawing ? '0.5' : '1';
+            document.getElementById('btnDrawCircle').style.opacity = isDrawing ? '0.5' : '1';
+        }
+
+        function cloneShape(s) { return JSON.parse(JSON.stringify(s)); }
+
+        // ---------- 待确认图形操作（旋转/移动） ----------
+
+        var shapeAction = { active: false, shapeIdx: -1, mode: '', startPoint: null, startAngle: 0 };
+
+        function showShapeActions(idx, e) {
+            shapeAction.shapeIdx = idx;
+            shapeAction._showing = true;
+
+            var popup = document.getElementById('shapeActionPopup');
+            // 将点击的经纬度转为容器坐标，弹窗定位在点击处上方
+            var pt = map.latLngToContainerPoint(e.latlng);
+            popup.style.left = Math.max(5, pt.x - 70) + 'px';
+            popup.style.top = Math.max(5, pt.y - 50) + 'px';
+            popup.classList.add('show');
+
+            document.getElementById('btnShapeRotate').classList.remove('active');
+            document.getElementById('btnShapeMove').classList.remove('active');
+        }
+
+        function hideShapeActions() {
+            var popup = document.getElementById('shapeActionPopup');
+            popup.classList.remove('show');
+            shapeAction.shapeIdx = -1;
+            shapeAction._showing = false;
+            shapeAction.active = false;
+            shapeAction.mode = '';
+            shapeAction.startPoint = null;
+            shapeAction._snapshot = null;
+            document.getElementById('btnShapeRotate').classList.remove('active');
+            document.getElementById('btnShapeMove').classList.remove('active');
+        }
+
+        // 更新弹窗位置以跟随图形
+        function updateShapeActionPopupPosition() {
+            var idx = shapeAction.shapeIdx;
+            if (idx < 0 || idx >= pendingShapes.length) return;
+            var center = getShapeCenter(pendingShapes[idx]);
+            var pt = map.latLngToContainerPoint([center.lat, center.lng]);
+            var popup = document.getElementById('shapeActionPopup');
+            popup.style.left = Math.max(5, pt.x - 70) + 'px';
+            popup.style.top = Math.max(5, pt.y - 50) + 'px';
+        }
+
+        function getShapeCenter(s) {
+            if (s.type === 'rect') {
+                return { lat: (s.south + s.north) / 2, lng: (s.west + s.east) / 2 };
+            } else {
+                return { lat: s.centerLat, lng: s.centerLng };
+            }
+        }
+
+        // 旋转/移动按钮的 press-hold 逻辑
+        (function initShapeActionButtons() {
+            var btnRotate = document.getElementById('btnShapeRotate');
+            var btnMove = document.getElementById('btnShapeMove');
+
+            btnRotate.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var idx = shapeAction.shapeIdx;
+                if (idx < 0 || idx >= pendingShapes.length) return;
+
+                shapeAction.active = true;
+                shapeAction.mode = 'rotate';
+                var center = getShapeCenter(pendingShapes[idx]);
+                shapeAction.shapeCenter = center;
+
+                // 转换中心到容器坐标，记录初始鼠标角度
+                var cp = map.latLngToContainerPoint([center.lat, center.lng]);
+                shapeAction._containerCenter = cp;
+                btnRotate.classList.add('active');
+                map.getContainer().style.cursor = 'grabbing';
+            });
+
+            btnMove.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var idx = shapeAction.shapeIdx;
+                if (idx < 0 || idx >= pendingShapes.length) return;
+
+                shapeAction.active = true;
+                shapeAction.mode = 'move';
+                var center = getShapeCenter(pendingShapes[idx]);
+                shapeAction.shapeCenter = center;
+                shapeAction._snapshot = cloneShape(pendingShapes[idx]);
+                // 将屏幕坐标转为相对于地图容器的坐标
+                var mapRect = map.getContainer().getBoundingClientRect();
+                var cx = e.clientX - mapRect.left;
+                var cy = e.clientY - mapRect.top;
+                shapeAction._startLatLng = map.containerPointToLatLng([cx, cy]);
+                btnMove.classList.add('active');
+                map.getContainer().style.cursor = 'grabbing';
+            });
+
+            // 全局 mouseup 结束操作
+            document.addEventListener('mouseup', function(e) {
+                if (!shapeAction.active) return;
+                shapeAction.active = false;
+                shapeAction.mode = '';
+                shapeAction.startPoint = null;
+                shapeAction._snapshot = null;
+                btnRotate.classList.remove('active');
+                btnMove.classList.remove('active');
+                map.getContainer().style.cursor = '';
+            });
+        })();
+
+        // 处理旋转/移动时的鼠标移动
+        function handleShapeActionMove(e) {
+            var idx = shapeAction.shapeIdx;
+            if (idx < 0 || idx >= pendingShapes.length) return;
+            var s = pendingShapes[idx];
+
+            if (shapeAction.mode === 'rotate') {
+                // 从图形中心计算鼠标角度
+                var cp = shapeAction._containerCenter;
+                var mousePt = map.latLngToContainerPoint(e.latlng);
+                var angle = Math.atan2(mousePt.x - cp.x, cp.y - mousePt.y) * 180 / Math.PI;
+                if (angle < 0) angle += 360;
+                // 鼠标顺时针 = 图形顺时针旋转（取负）
+                var rot = Math.round((360 - angle) % 360);
+                if (s.type === 'rect') {
+                    s.rotation = rot;
+                }
+                if (s.type === 'circle') {
+                    s.rotation = rot;
+                }
+                renderPendingShapes();
+                // 移动弹窗跟随图形
+                updateShapeActionPopupPosition();
+            } else if (shapeAction.mode === 'move') {
+                var dLat = e.latlng.lat - shapeAction._startLatLng.lat;
+                var dLng = e.latlng.lng - shapeAction._startLatLng.lng;
+                var snap = shapeAction._snapshot;
+                if (s.type === 'rect') {
+                    s.south = snap.south + dLat;
+                    s.north = snap.north + dLat;
+                    s.west = snap.west + dLng;
+                    s.east = snap.east + dLng;
+                } else {
+                    s.centerLat = snap.centerLat + dLat;
+                    s.centerLng = snap.centerLng + dLng;
+                }
+                renderPendingShapes();
+                updateShapeActionPopupPosition();
+            }
+        }
+
+        // 旋转点 (cx,cy) 为旋转中心（米坐标），(x,y) 为被旋转点
+        function rotatePoint(cx, cy, x, y, angleDeg) {
+            var rad = angleDeg * Math.PI / 180;
+            var cosA = Math.cos(rad), sinA = Math.sin(rad);
+            var dx = x - cx, dy = y - cy;
+            return [cx + dx * cosA - dy * sinA, cy + dx * sinA + dy * cosA];
+        }
+
+        // 矩形旋转后返回 polygon 坐标数组
+        function getRotatedRectLatLngs(rect) {
+            var angle = rect.rotation || 0;
+            if (angle === 0) {
+                return [[rect.south, rect.west], [rect.south, rect.east], [rect.north, rect.east], [rect.north, rect.west]];
+            }
+            var cy = (rect.south + rect.north) / 2;
+            var cx = (rect.west + rect.east) / 2;
+            var mPerDegLat = 111320;
+            var mPerDegLng = 111320 * Math.cos(cy * Math.PI / 180);
+            var hw = (rect.east - rect.west) * mPerDegLng / 2;
+            var hh = (rect.north - rect.south) * mPerDegLat / 2;
+
+            var corners = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
+            var result = [];
+            for (var i = 0; i < corners.length; i++) {
+                var r = rotatePoint(0, 0, corners[i][0], corners[i][1], angle);
+                result.push([cy + r[1] / mPerDegLat, cx + r[0] / mPerDegLng]);
+            }
+            return result;
+        }
+
+        // 拖拽状态
+        var zoneDrag = { active: false, zoneId: null, startLatLng: null, moved: false };
+
+        // ---------- 渲染区域到地图 ----------
+
+        function renderZone(zone) {
+            removeZoneLayers(zone.id);
+            var def = ZONE_TYPE_DEFS[zone.type] || ZONE_TYPE_DEFS['custom'];
+            var isSelected = (zone.id === selectedZoneId);
+            zone._layers = [];
+
+            zone.shapes.forEach(function(s) {
+                var layer;
+                if (s.type === 'rect') {
+                    var angle = s.rotation || 0;
+                    if (angle === 0) {
+                        layer = L.rectangle([[s.south, s.west], [s.north, s.east]], {
+                            color: def.color, weight: def.weight, fillColor: def.color,
+                            fillOpacity: def.fillOpacity, lineJoin: 'round'
+                        });
+                    } else {
+                        var latlngs = getRotatedRectLatLngs(s);
+                        layer = L.polygon(latlngs, {
+                            color: def.color, weight: def.weight, fillColor: def.color,
+                            fillOpacity: def.fillOpacity, lineJoin: 'round'
+                        });
+                    }
+                } else {
+                    layer = L.circle([s.centerLat, s.centerLng], {
+                        radius: s.radiusM, color: def.color, weight: def.weight,
+                        fillColor: def.color, fillOpacity: def.fillOpacity
+                    });
+                }
+                layer._zoneId = zone.id;
+                layer._shapeIndex = zone.shapes.indexOf(s);
+                layer.addTo(zonesLayerGroup);
+
+                if (isSelected && drawState === 'idle') {
+                    layer.setStyle({ dashArray: '6, 3', weight: (def.weight || 2.5) + 1.5 });
+                    var el = layer.getElement ? layer.getElement() : null;
+                    if (el) { el.classList.add('zone-shape-draggable'); }
+                }
+
+                if (zone.visible) {
+                    layer.bindPopup(
+                        '<b>' + zone.name + '</b>' +
+                        '<br><small>类型: ' + def.label + (s.rotation ? ' / 旋转' + s.rotation + '°' : '') + '</small>' +
+                        '<br><small><a href="javascript:void(0)" onclick="window._zoneAction(\'hide\',\'' + zone.id + '\')">' + (zone.visible ? '隐藏' : '显示') + '</a>' +
+                        ' | <a href="javascript:void(0)" style="color:#F56C6C" onclick="window._zoneAction(\'delete\',\'' + zone.id + '\')">删除</a></small>'
+                    );
+                }
+                layer.on('click', function(e) {
+                    if (zoneDrag.moved) { zoneDrag.moved = false; return; }
+                    L.DomEvent.stopPropagation(e);
+                    // 先打开 popup 再 selectZone（selectZone 会重建图层，之后手动打开）
+                    selectZone(zone.id);
+                    // 重建后再打开 popup
+                    setTimeout(function() {
+                        var z = zones[zone.id];
+                        if (z && z._layers && z._layers.length > 0) {
+                            z._layers[0].openPopup();
+                        }
+                    }, 50);
+                });
+                zone._layers.push(layer);
+            });
+
+            if (!zone.visible) {
+                zone._layers.forEach(function(l) { zonesLayerGroup.removeLayer(l); });
+            }
+        }
+
+        function removeZoneLayers(zoneId) {
+            var zone = zones[zoneId];
+            if (!zone || !zone._layers) return;
+            zone._layers.forEach(function(l) { zonesLayerGroup.removeLayer(l); });
+            zone._layers = [];
+        }
+
+        // ---------- 区域列表管理 ----------
+
+        function refreshZoneList() {
+            var body = document.getElementById('zoneListBody');
+            var countEl = document.getElementById('zoneCount');
+            var ids = Object.keys(zones);
+            countEl.textContent = ids.length;
+
+            if (ids.length === 0) {
+                body.innerHTML = '<div class="zone-list-empty">暂无区域，使用上方工具栏绘制</div>';
+                return;
+            }
+
+            body.innerHTML = '';
+            ids.forEach(function(id) {
+                var z = zones[id];
+                var def = ZONE_TYPE_DEFS[z.type] || ZONE_TYPE_DEFS['custom'];
+                var div = document.createElement('div');
+                div.className = 'zone-list-item' + (id === selectedZoneId ? ' selected' : '') + (z.visible ? '' : ' hidden-item');
+                div.setAttribute('data-zone-id', id);
+                div.innerHTML =
+                    '<span class="zone-list-color" style="background:' + def.color + ';"></span>' +
+                    '<span class="zone-list-name" title="' + z.name + '">' + z.name + '</span>' +
+                    '<span class="zone-list-type">' + def.label + '</span>' +
+                    '<button class="zone-list-eye' + (z.visible ? '' : ' hidden') + '" title="' + (z.visible ? '隐藏' : '显示') + '">' + (z.visible ? '👁' : '━') + '</button>' +
+                    '<button class="zone-list-del" title="删除">✕</button>';
+
+                div.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('zone-list-del')) {
+                        e.stopPropagation();
+                        promptDeleteZone(id);
+                    } else if (e.target.classList.contains('zone-list-eye')) {
+                        e.stopPropagation();
+                        toggleZoneVisibility(id);
+                    } else {
+                        selectZone(id);
+                    }
+                });
+
+                div.addEventListener('dblclick', function(e) {
+                    e.stopPropagation();
+                    openEditDialog(id);
+                });
+
+                body.appendChild(div);
+            });
+        }
+
+        function selectZone(id) {
+            if (selectedZoneId === id && id && zones[id]) {
+                // 同一个区域，直接显示 popup 不重建
+                refreshZoneList();
+                setTimeout(function() {
+                    var z = zones[id];
+                    if (z && z._layers && z._layers.length > 0 && z.visible) {
+                        z._layers[0].openPopup();
+                    }
+                }, 50);
+                return;
+            }
+            if (selectedZoneId && zones[selectedZoneId]) {
+                renderZone(zones[selectedZoneId]);
+            }
+            selectedZoneId = id;
+            if (id && zones[id]) {
+                renderZone(zones[id]);
+            }
+            refreshZoneList();
+
+        }
+
+        function getZoneBounds(zone) {
+            var bounds = L.latLngBounds([]);
+            zone.shapes.forEach(function(s) {
+                if (s.type === 'rect') {
+                    bounds.extend([s.south, s.west]);
+                    bounds.extend([s.north, s.east]);
+                } else {
+                    var latDeg = s.radiusM / 111320;
+                    var lngDeg = s.radiusM / (111320 * Math.cos(s.centerLat * Math.PI / 180));
+                    bounds.extend([s.centerLat - latDeg, s.centerLng - lngDeg]);
+                    bounds.extend([s.centerLat + latDeg, s.centerLng + lngDeg]);
+                }
+            });
+            return bounds.isValid() ? bounds : map.getBounds();
+        }
+
+        function deleteZone(id) {
+            if (!zones[id]) return;
+            var name = zones[id].name;
+            removeZoneLayers(id);
+            delete zones[id];
+            if (selectedZoneId === id) selectedZoneId = null;
+            if (editingZoneId === id) cancelDrawPrompt();
+            refreshZoneList();
+            saveZonesToStorage();
+            toast('已删除: ' + name);
+        }
+
+        // ---------- 删除确认流程 ----------
+        function promptDeleteZone(id) {
+            if (!zones[id]) return;
+            deletePendingZoneId = id;
+            document.getElementById('deleteZoneName').textContent = zones[id].name;
+            document.getElementById('zoneDeleteOverlay').classList.add('show');
+        }
+
+        function confirmDeleteZone() {
+            var id = deletePendingZoneId;
+            deletePendingZoneId = null;
+            document.getElementById('zoneDeleteOverlay').classList.remove('show');
+            if (id) { deleteZone(id); }
+        }
+
+        function cancelDeleteDialog() {
+            deletePendingZoneId = null;
+            document.getElementById('zoneDeleteOverlay').classList.remove('show');
+        }
+
+        // 删除弹窗背景点击关闭、Esc取消
+        document.getElementById('zoneDeleteOverlay').addEventListener('click', function(e) {
+            if (e.target === this) cancelDeleteDialog();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                if (document.getElementById('zoneDeleteOverlay').classList.contains('show')) {
+                    e.preventDefault();
+                    cancelDeleteDialog();
+                }
+            }
+        });
+
+        // ---------- 区域显隐切换 ----------
+        function toggleZoneVisibility(id) {
+            if (!zones[id]) return;
+            var z = zones[id];
+            z.visible = !z.visible;
+            removeZoneLayers(id);
+            if (z.visible) { renderZone(z); }
+            refreshZoneList();
+            saveZonesToStorage();
+            toast(z.visible ? '已显示: ' + z.name : '已隐藏: ' + z.name);
+        }
+
+        function openEditDialog(id) {
+            if (!zones[id]) return;
+            var z = zones[id];
+            document.getElementById('editZoneName').value = z.name;
+            var sel = document.getElementById('editZoneType');
+            sel.innerHTML = '';
+            Object.keys(ZONE_TYPE_DEFS).forEach(function(k) {
+                var opt = document.createElement('option');
+                opt.value = k;
+                opt.textContent = ZONE_TYPE_DEFS[k].label;
+                if (k === z.type) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            // 旋转值：取第一个矩形的角度
+            var rot = 0;
+            for (var i = 0; i < z.shapes.length; i++) {
+                if (z.shapes[i].type === 'rect') { rot = z.shapes[i].rotation || 0; break; }
+            }
+            document.getElementById('editZoneRotation').value = rot;
+            document.getElementById('editRotVal').textContent = rot + '°';
+            editingZoneId = id;
+            // 保存快照，用于取消时恢复
+            _editSnapshot = {
+                shapeCopies: z.shapes.map(function(s) { return cloneShape(s); })
+            };
+            pendingShapes = [];
+            updateDrawUI();
+            document.getElementById('drawStatus').textContent = '编辑「' + z.name + '」— 可添加新图形后确认';
+            document.getElementById('zoneEditOverlay').classList.add('show');
+            toast('编辑模式: ' + z.name + '（可绘制新图形后点确认追加）');
+        }
+
+        function closeEditDialog() {
+            document.getElementById('zoneEditOverlay').classList.remove('show');
+            // 恢复原始形状（撤销旋转滑块实时预览的修改）
+            var id = editingZoneId;
+            if (id && zones[id] && _editSnapshot) {
+                zones[id].shapes = _editSnapshot.shapeCopies;
+                renderZone(zones[id]);
+                selectZone(id);
+                _editSnapshot = null;
+            }
+            editingZoneId = null;
+            pendingShapes = [];
+            renderPendingShapes();
+            updateDrawUI();
+
+            document.getElementById('drawStatus').textContent = '点击"矩形"或"圆形"开始绘制';
+        }
+
+        function saveEditDialog() {
+            var id = editingZoneId;
+            if (!id || !zones[id]) return;
+            var z = zones[id];
+            var oldType = z.type;
+            z.name = document.getElementById('editZoneName').value.trim() || z.name;
+            z.type = document.getElementById('editZoneType').value;
+            var rot = parseInt(document.getElementById('editZoneRotation').value) || 0;
+            z.shapes.forEach(function(s) { if (s.type === 'rect') { s.rotation = rot; } });
+            if (z.type !== oldType) {
+                removeZoneLayers(id);
+                renderZone(z);
+            } else {
+                var def = ZONE_TYPE_DEFS[z.type];
+                (z._layers || []).forEach(function(l) {
+                    var shape = z.shapes[0] || {};
+                    l.setPopupContent(
+                        '<b>' + z.name + '</b>' +
+                        '<br><small>类型: ' + def.label + (shape.rotation ? ' / 旋转' + shape.rotation + '°' : '') + '</small>' +
+                        '<br><small><a href="javascript:void(0)" onclick="window._zoneAction(\'hide\',\'' + id + '\')">' + (z.visible ? '隐藏' : '显示') + '</a>' +
+                        ' | <a href="javascript:void(0)" style="color:#F56C6C" onclick="window._zoneAction(\'delete\',\'' + id + '\')">删除</a></small>'
+                    );
+                });
+            }
+            _editSnapshot = null;  // 清除快照，防止 closeEditDialog 恢复旧值
+            closeEditDialog();
+            refreshZoneList();
+            saveZonesToStorage();
+            cancelDrawPrompt();
+            toast('已保存: ' + z.name);
+        }
+
+        // 弹窗背景点击关闭
+        document.getElementById('zoneEditOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeEditDialog();
+        });
+        document.getElementById('zoneConfirmOverlay').addEventListener('click', function(e) {
+            if (e.target === this) cancelConfirmDialog();
+        });
+
+        // 确认对话框键盘支持：Enter 确认，Esc 取消
+        document.getElementById('confirmZoneName').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); doConfirmZone(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancelConfirmDialog(); }
+        });
+
+        // ---------- 面板折叠 ----------
+        function toggleZoneList() {
+            document.getElementById('zoneListPanel').classList.toggle('collapsed');
+        }
+        window.toggleZoneList = toggleZoneList;
+
+        function toggleZonePanel() {
+            var panel = document.getElementById('zonePanel');
+            var btn = document.getElementById('btnToggleZone');
+            var isShowing = panel.classList.contains('show');
+            if (isShowing) {
+                panel.classList.remove('show');
+                btn.classList.remove('active');
+            } else {
+                panel.classList.add('show');
+                btn.classList.add('active');
+            }
+        }
+        window.toggleZonePanel = toggleZonePanel;
+
+        // ---------- 旋转控制 ----------
+        function updateRotateRow() {
+            var row = document.getElementById('rotateRow');
+            if (selectedZoneId && zones[selectedZoneId] && drawState === 'idle') {
+                row.style.display = 'flex';
+                // 显示当前旋转角度（取第一个矩形图形的角度）
+                var z = zones[selectedZoneId];
+                var rectShape = null;
+                for (var i = 0; i < z.shapes.length; i++) {
+                    if (z.shapes[i].type === 'rect') { rectShape = z.shapes[i]; break; }
+                }
+                document.getElementById('drawStatus').textContent = rectShape ? '选中「' + z.name + '」— 旋转: ' + (rectShape.rotation || 0) + '°' : '选中「' + z.name + '」（圆形不支持旋转）';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+
+        function rotateSelectedZone(deltaDeg) {
+            if (!selectedZoneId || !zones[selectedZoneId]) return;
+            var z = zones[selectedZoneId];
+            var hasRect = false;
+            z.shapes.forEach(function(s) {
+                if (s.type === 'rect') {
+                    s.rotation = ((s.rotation || 0) + deltaDeg) % 360;
+                    if (s.rotation < 0) s.rotation += 360;
+                    hasRect = true;
+                }
+            });
+            if (hasRect) {
+                renderZone(z);
+                updateRotateRow();
+                toast('旋转: ' + (z.shapes[0].rotation || 0) + '°');
+            }
+        }
+
+        // 旋转滑块实时预览
+        document.getElementById('editZoneRotation').addEventListener('input', function() {
+            document.getElementById('editRotVal').textContent = this.value + '°';
+            var id = editingZoneId;
+            if (id && zones[id]) {
+                var z = zones[id];
+                z.shapes.forEach(function(s) {
+                    if (s.type === 'rect') { s.rotation = parseInt(this.value) || 0; }
+                }.bind(this));
+                renderZone(z);
+            }
+        });
+
+        // ---------- 拖拽移动 ----------
+        function setupDragHandlers() {
+            if (!map) return;
+            map.on('mousedown', function(e) {
+                if (drawState !== 'idle') return;
+                if (!selectedZoneId || !zones[selectedZoneId]) return;
+                // 检查点击是否在选中区域的图层上
+                var targetLayer = null;
+                zonesLayerGroup.eachLayer(function(l) {
+                    if (l._zoneId === selectedZoneId && l.getLatLng && !targetLayer) {
+                        var ll = l.getLatLng ? l.getLatLng() : null;
+                        // simplified check: use map distance
+                    }
+                });
+                // 直接用 e.latlng 判断是否落在 shape 附近
+                // 简化：只要是选中区域就允许拖拽
+                var z = zones[selectedZoneId];
+                var bounds = getZoneBounds(z).pad(0.05);
+                if (!bounds.contains(e.latlng)) return;
+
+                zoneDrag.active = true;
+                zoneDrag.zoneId = selectedZoneId;
+                zoneDrag.startLatLng = e.latlng;
+                zoneDrag.moved = false;
+                zoneDrag._snapshot = z.shapes.map(function(s) { return cloneShape(s); });
+                map.getContainer().style.cursor = 'grabbing';
+                L.DomEvent.stopPropagation(e);
+            });
+
+            map.on('mousemove', function(e) {
+                if (!zoneDrag.active || drawState !== 'idle') return;
+                var z = zones[zoneDrag.zoneId];
+                if (!z) return;
+                var dLat = e.latlng.lat - zoneDrag.startLatLng.lat;
+                var dLng = e.latlng.lng - zoneDrag.startLatLng.lng;
+                if (Math.abs(dLat) < 0.00002 && Math.abs(dLng) < 0.00002) return;
+                zoneDrag.moved = true;
+
+                // 恢复快照并偏移
+                var snap = zoneDrag._snapshot;
+                z.shapes = snap.map(function(s) {
+                    var c = cloneShape(s);
+                    if (c.type === 'rect') {
+                        c.south += dLat; c.north += dLat;
+                        c.west += dLng; c.east += dLng;
+                    } else {
+                        c.centerLat += dLat; c.centerLng += dLng;
+                    }
+                    return c;
+                });
+                renderZone(z);
+                L.DomEvent.stopPropagation(e);
+            });
+
+            map.on('mouseup', function(e) {
+                if (!zoneDrag.active) return;
+                map.getContainer().style.cursor = '';
+                zoneDrag.active = false;
+                zoneDrag.zoneId = null;
+                map.getContainer().style.cursor = '';
+                // 延迟 reset moved flag 以允许 click 事件先触发
+                setTimeout(function() { zoneDrag.moved = false; }, 50);
+            });
+        }
+
+        // ---------- Toast ----------
+        var toastTimer = null;
+        function toast(msg) {
+            var el = document.getElementById('toastMsg');
+            el.textContent = msg;
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+        }
+
+        // ================================================================
+        //  localStorage 持久化 — 关闭后重新打开保留区域
+        // ================================================================
+        function saveZonesToStorage() {
+            try {
+                var data = [];
+                Object.keys(zones).forEach(function(id) {
+                    var z = zones[id];
+                    data.push({ id: z.id, name: z.name, type: z.type, visible: z.visible, shapes: z.shapes });
+                });
+                localStorage.setItem('gcs_zones', JSON.stringify(data));
+            } catch(e) {}
+        }
+
+        function loadZonesFromStorage() {
+            try {
+                var raw = localStorage.getItem('gcs_zones');
+                if (!raw) return;
+                var data = JSON.parse(raw);
+                if (!data || data.length === 0) return;
+                Object.keys(zones).forEach(function(id) { removeZoneLayers(id); });
+                zones = {};
+                zoneIdCounter = 0;
+                data.forEach(function(z) {
+                    zones[z.id] = z;
+                    if (!z._layers) z._layers = [];
+                    var num = parseInt(z.id.replace('zone_', ''));
+                    if (!isNaN(num) && num > zoneIdCounter) zoneIdCounter = num;
+                    renderZone(z);
+                });
+                refreshZoneList();
+            } catch(e) {}
+        }
+
+        // ================================================================
+        //  暴露给 Python 的 API（供后续通过 QWebChannel bridge 调用）
+        // ================================================================
+        window.getZones = function() {
+            var result = [];
+            Object.keys(zones).forEach(function(id) {
+                var z = zones[id];
+                result.push({
+                    id: z.id, name: z.name, type: z.type, visible: z.visible,
+                    shapes: z.shapes.map(function(s) { return cloneShape(s); })
+                });
+            });
+            return JSON.stringify(result);
+        };
+
+        window.loadZones = function(jsonStr) {
+            try {
+                var data = JSON.parse(jsonStr);
+                Object.keys(zones).forEach(function(id) { removeZoneLayers(id); });
+                zones = {};
+                zoneIdCounter = 0;
+                data.forEach(function(z) {
+                    zones[z.id] = z;
+                    if (!z._layers) z._layers = [];
+                    var num = parseInt(z.id.replace('zone_', ''));
+                    if (!isNaN(num) && num > zoneIdCounter) zoneIdCounter = num;
+                    renderZone(z);
+                });
+                refreshZoneList();
+                toast('已加载 ' + data.length + ' 个区域');
+            } catch (e) { toast('加载区域数据失败'); }
+        };
+
+        window.clearAllZones = function() {
+            Object.keys(zones).forEach(function(id) { removeZoneLayers(id); });
+            zones = {};
+            zoneIdCounter = 0;
+            selectedZoneId = null;
+            cancelDrawPrompt();
+            refreshZoneList();
+            localStorage.removeItem('gcs_zones');
+            toast('已清除所有区域');
+        };
+
+        // 地图弹出层快速操作（隐藏/删除）
+        window._zoneAction = function(action, id) {
+            if (!zones[id]) return;
+            // 先关闭所有弹出层
+            if (map) map.closePopup();
+            if (action === 'hide') {
+                toggleZoneVisibility(id);
+            } else if (action === 'delete') {
+                promptDeleteZone(id);
+            }
+        };
+
+        // ================================================================
+        //  暴露给 Python / runJavaScript 的区域操作 API
+        // ================================================================
+        window.zones = zones;
+        window.renderZone = renderZone;
+        window.saveZonesToStorage = saveZonesToStorage;
+        window.refreshZoneList = refreshZoneList;
+
+    </script>
+</body>
+</html>

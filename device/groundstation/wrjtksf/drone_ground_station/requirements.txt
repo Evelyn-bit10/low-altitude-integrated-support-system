@@ -1,0 +1,25 @@
+# drone_ground_station 依赖（Windows / PyQt5 地面站）
+# 在 drone_ground_station/venv 中安装：
+#   python -m pip install -r requirements.txt
+
+# ---- GUI 框架 ----
+PyQt5
+PyQtWebEngine
+
+# ---- 无人机通信（MAVLink / 串口）----
+pymavlink
+pyserial
+
+# ---- ADS-B 1090MHz 信号解码 ----
+rs1090
+
+# ---- 天气 API ----
+aiohttp
+brotli
+
+# ---- YAML 配置解析 ----
+PyYAML
+
+# ---- 可选：Windows 定位（缺省时自动回退到默认坐标重庆，可不装）----
+# winrt-runtime
+# winrt-Windows.Devices.Geolocation

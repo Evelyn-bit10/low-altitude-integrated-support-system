@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>低空综合保障设备 · 后台管理平台（原型）— 重庆龙兴通用机场示例</title>
+<style>:root{
+  --bg:#03060d; --bg2:#050a16; --panel:rgba(7,16,34,.60); --panel2:#0b1a30;
+  --border:rgba(0,229,255,.30); --border2:#15364f;
+  --txt:#d4e6ff; --muted:#93aaca; --dim:#5d7296;
+  --blue:#3b8bff; --cyan:#00e5ff; --green:#22e07c; --yellow:#ffc21a;
+  --orange:#ff9a3c; --red:#ff3b57; --purple:#b78bff; --magenta:#ff2d95;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Microsoft YaHei","PingFang SC",-apple-system,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(1400px 900px at 15% -10%, rgba(59,139,255,.18) 0%, transparent 55%),
+    radial-gradient(1000px 700px at 100% 110%, rgba(0,229,255,.10) 0%, transparent 50%),
+    radial-gradient(820px 620px at 88% -5%, rgba(255,45,149,.08) 0%, transparent 55%),
+    linear-gradient(rgba(0,229,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,.05) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,auto,40px 40px,40px 40px,auto;
+  background-color:var(--bg);
+  color:var(--txt);font-size:13px;line-height:1.5;
+  overflow-x:hidden;
+}
+/* 缓慢呼吸光晕 */
+.bg-aura{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(1100px 760px at 22% 22%, rgba(59,139,255,.12), transparent 60%),
+    radial-gradient(900px 640px at 78% 82%, rgba(255,45,149,.09), transparent 60%),
+    radial-gradient(760px 540px at 72% 8%, rgba(0,229,255,.10), transparent 60%);
+  animation:aura 15s ease-in-out infinite alternate;
+}
+@keyframes aura{0%{opacity:.55;transform:scale(1)}100%{opacity:1;transform:scale(1.14)}}
+/* 粒子层 */
+#particles{position:fixed;inset:0;z-index:0;pointer-events:none}
+/* 侧边 HUD 装饰条 */
+.hud-side{position:fixed;top:0;bottom:0;width:3px;z-index:46;pointer-events:none;
+  background:linear-gradient(180deg, transparent, rgba(0,229,255,.55) 18%, rgba(0,229,255,.55) 82%, transparent);
+  box-shadow:0 0 12px rgba(0,229,255,.6)}
+.hud-side.l{left:0}.hud-side.r{right:0}
+/* 全屏扫描线 + 扫描扫过 */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:44;
+  background:repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,229,255,.028) 3px 4px);
+}
+body::after{
+  content:"";position:fixed;left:0;right:0;top:-160px;height:160px;pointer-events:none;z-index:45;
+  background:linear-gradient(180deg, transparent, rgba(0,229,255,.06), rgba(255,45,149,.03), transparent);
+  animation:scanmove 7s linear infinite;
+}
+@keyframes scanmove{0%{transform:translateY(0)}100%{transform:translateY(calc(100vh + 320px))}}
+
+/* ===== 顶部标题栏（HUD） ===== */
+.topbar{
+  height:58px;display:flex;align-items:center;gap:16px;padding:0 24px;
+  background:linear-gradient(180deg, rgba(6,14,30,.94), rgba(4,9,20,.96));
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;
+  box-shadow:0 1px 24px rgba(0,0,0,.6),0 1px 0 rgba(0,229,255,.28) inset,0 -1px 20px rgba(0,229,255,.08);
+  backdrop-filter:blur(10px);
+  clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo .mark{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--cyan));
+  display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:16px;
+  box-shadow:0 0 18px rgba(59,139,255,.7),0 0 36px rgba(0,229,255,.4),inset 0 0 8px rgba(255,255,255,.3);
+  clip-path:polygon(0 0,100% 0,100% 72%,72% 100%,0 100%);
+  animation:markpulse 3s ease-in-out infinite}
+@keyframes markpulse{0%,100%{box-shadow:0 0 18px rgba(59,139,255,.7),0 0 36px rgba(0,229,255,.4)}50%{box-shadow:0 0 26px rgba(0,229,255,.9),0 0 48px rgba(59,139,255,.6)}}
+.logo .ttl{font-size:17px;font-weight:700;letter-spacing:2px;text-shadow:0 0 18px rgba(0,229,255,.8),0 0 34px rgba(59,139,255,.5)}
+.logo .sub{font-size:11px;color:var(--muted);letter-spacing:.5px}
+.topbar .sp{flex:1}
+.site-tag{display:flex;align-items:center;gap:8px;padding:5px 13px;border:1px solid var(--border2);border-radius:4px;background:rgba(11,26,48,.6);font-size:12px;box-shadow:inset 0 0 12px rgba(0,229,255,.08);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.site-tag .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green),0 0 20px rgba(34,224,124,.6);animation:pulse 2s infinite}
+.clock{font-family:Consolas,monospace;color:var(--cyan);font-size:14px;min-width:160px;text-align:right;text-shadow:0 0 14px rgba(0,229,255,.7);letter-spacing:1px}
+.user{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.user .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--magenta));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;box-shadow:0 0 12px rgba(255,45,149,.55)}
+
+/* ===== 导航 ===== */
+.navbar{
+  display:flex;gap:2px;padding:0 20px;background:rgba(5,11,24,.92);border-bottom:1px solid var(--border);
+  position:sticky;top:58px;z-index:49;overflow-x:auto;backdrop-filter:blur(8px);
+}
+.navbar .nav{
+  padding:13px 18px;cursor:pointer;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;
+  font-size:13px;transition:.15s;position:relative;letter-spacing:.5px;
+}
+.navbar .nav:hover{color:var(--txt);text-shadow:0 0 12px rgba(0,229,255,.5)}
+.navbar .nav.active{color:#fff;border-bottom-color:var(--cyan);font-weight:600;text-shadow:0 0 14px rgba(0,229,255,.9)}
+.navbar .nav.active::after{content:"";position:absolute;left:12px;right:12px;bottom:-2px;height:2px;background:var(--cyan);box-shadow:0 0 12px var(--cyan),0 0 22px var(--cyan)}
+.navbar .nav .tag{position:absolute;top:6px;right:8px;font-size:9px;color:var(--red);font-weight:700;text-shadow:0 0 8px rgba(255,59,87,.8)}
+.navbar .nav.active .tag{animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ===== 主体 ===== */
+.main{padding:18px 22px 34px;max-width:1600px;margin:0 auto;position:relative;z-index:1}
+.view{display:none}
+.view.active{display:block;animation:fadein .4s}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* 面板：HUD 切角 + 玻璃拟态 + 霓虹边框 */
+.panel{
+  background:linear-gradient(160deg, rgba(13,26,48,.72), rgba(6,14,30,.82));
+  border:1px solid var(--border);border-radius:2px;margin-bottom:14px;overflow:hidden;
+  position:relative;backdrop-filter:blur(10px);
+  box-shadow:0 10px 34px rgba(0,0,0,.5),0 0 24px rgba(0,229,255,.05),inset 0 1px 0 rgba(255,255,255,.05);
+  clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  animation:panelIn .5s cubic-bezier(.2,.7,.3,1) both;
+}
+@keyframes panelIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.panel:hover{box-shadow:0 12px 40px rgba(0,0,0,.55),0 0 30px rgba(0,229,255,.14),inset 0 1px 0 rgba(255,255,255,.06)}
+.panel::before{content:"";position:absolute;top:0;left:0;width:22px;height:22px;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan);opacity:.9;pointer-events:none;filter:drop-shadow(0 0 6px rgba(0,229,255,.7))}
+.panel::after{content:"";position:absolute;bottom:0;right:0;width:22px;height:22px;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan);opacity:.9;pointer-events:none;filter:drop-shadow(0 0 6px rgba(0,229,255,.7))}
+.panel .hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;letter-spacing:.5px;background:linear-gradient(180deg, rgba(0,229,255,.05), transparent)}
+.panel .hd .bar{width:4px;height:16px;background:var(--cyan);border-radius:1px;box-shadow:0 0 10px var(--cyan),0 0 20px var(--cyan)}
+.panel .hd .tip{font-size:11px;color:var(--dim);font-weight:400}
+.panel .bd{padding:14px 16px}
+.panel .hd .sp{flex:1}
+
+/* KPI 大字号发光 */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:14px}
+.kpi{background:linear-gradient(160deg, rgba(13,26,48,.72), rgba(6,14,30,.85));border:1px solid var(--border);border-radius:2px;padding:18px 16px 16px;position:relative;overflow:hidden;backdrop-filter:blur(10px);box-shadow:0 8px 26px rgba(0,0,0,.45),0 0 20px rgba(0,229,255,.05);transition:transform .2s,box-shadow .2s;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  animation:kpiIn .5s ease both}
+@keyframes kpiIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.kpi:nth-child(2){animation-delay:.06s}.kpi:nth-child(3){animation-delay:.12s}.kpi:nth-child(4){animation-delay:.18s}.kpi:nth-child(5){animation-delay:.24s}
+.kpi:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,.55),0 0 34px rgba(0,229,255,.22)}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi .lb{font-size:12px;color:var(--muted);letter-spacing:1px}
+.kpi .val{font-size:44px;font-weight:700;font-family:Consolas,monospace;margin:8px 0 2px;line-height:1}
+.kpi .val.flash{animation:valflash .6s}
+@keyframes valflash{0%{text-shadow:0 0 8px currentColor,0 0 24px currentColor,0 0 48px currentColor}100%{text-shadow:0 0 14px currentColor,0 0 32px currentColor}}
+.kpi .unit{font-size:13px;color:var(--dim);margin-left:3px}
+.kpi .meta{font-size:11px;color:var(--dim);letter-spacing:.3px}
+.kpi .spark{position:absolute;right:14px;top:18px;opacity:.95}
+.kpi .ring{position:absolute;right:14px;top:14px;opacity:.95}
+.kpi.c-blue{box-shadow:0 8px 26px rgba(0,0,0,.45),0 0 22px rgba(59,139,255,.14),inset 0 0 0 1px rgba(59,139,255,.16)}
+.kpi.c-blue::before{background:var(--blue);box-shadow:0 0 14px var(--blue),0 0 28px var(--blue)} .kpi.c-blue .val{color:var(--blue);text-shadow:0 0 18px rgba(59,139,255,.9),0 0 36px rgba(59,139,255,.5)}
+.kpi.c-green{box-shadow:0 8px 26px rgba(0,0,0,.45),0 0 22px rgba(34,224,124,.14),inset 0 0 0 1px rgba(34,224,124,.16)}
+.kpi.c-green::before{background:var(--green);box-shadow:0 0 14px var(--green),0 0 28px var(--green)} .kpi.c-green .val{color:var(--green);text-shadow:0 0 18px rgba(34,224,124,.9),0 0 36px rgba(34,224,124,.5)}
+.kpi.c-yellow{box-shadow:0 8px 26px rgba(0,0,0,.45),0 0 22px rgba(255,194,26,.14),inset 0 0 0 1px rgba(255,194,26,.16)}
+.kpi.c-yellow::before{background:var(--yellow);box-shadow:0 0 14px var(--yellow),0 0 28px var(--yellow)} .kpi.c-yellow .val{color:var(--yellow);text-shadow:0 0 18px rgba(255,194,26,.9),0 0 36px rgba(255,194,26,.5)}
+.kpi.c-red{box-shadow:0 8px 26px rgba(0,0,0,.45),0 0 22px rgba(255,59,87,.16),inset 0 0 0 1px rgba(255,59,87,.18)}
+.kpi.c-red::before{background:var(--red);box-shadow:0 0 14px var(--red),0 0 28px var(--red)} .kpi.c-red .val{color:var(--red);text-shadow:0 0 18px rgba(255,59,87,.9),0 0 36px rgba(255,59,87,.5)}
+.kpi.c-cyan{box-shadow:0 8px 26px rgba(0,0,0,.45),0 0 22px rgba(0,229,255,.16),inset 0 0 0 1px rgba(0,229,255,.18)}
+.kpi.c-cyan::before{background:var(--cyan);box-shadow:0 0 14px var(--cyan),0 0 28px var(--cyan)} .kpi.c-cyan .val{color:var(--cyan);text-shadow:0 0 18px rgba(0,229,255,.95),0 0 36px rgba(0,229,255,.55)}
+
+/* 网格 */
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+.g21{grid-template-columns:2fr 1fr}
+.g12{grid-template-columns:1fr 2fr}
+.g31{grid-template-columns:3fr 1fr}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g3,.g21,.g12,.g31{grid-template-columns:1fr}}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:10px 10px;background:linear-gradient(180deg,#0d1f3c,#0a1830);color:var(--cyan);font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);letter-spacing:.5px;text-shadow:0 0 8px rgba(0,229,255,.4)}
+td{padding:9px 10px;border-bottom:1px solid rgba(0,229,255,.10);color:var(--txt);white-space:nowrap}
+tr:hover td{background:rgba(0,229,255,.06);text-shadow:0 0 8px rgba(0,229,255,.35)}
+tbody tr:last-child td{border-bottom:none}
+.mono{font-family:Consolas,monospace;font-size:11.5px;color:var(--cyan);text-shadow:0 0 6px rgba(0,229,255,.3)}
+.num{font-family:Consolas,monospace}
+
+/* 徽章：分级发光 */
+.badge{display:inline-block;padding:2px 9px;border-radius:3px;font-size:11px;line-height:1.6;font-weight:500;letter-spacing:.3px}
+.b-green{background:rgba(34,224,124,.14);color:var(--green);border:1px solid rgba(34,224,124,.5);box-shadow:0 0 10px rgba(34,224,124,.25),inset 0 0 6px rgba(34,224,124,.08)}
+.b-yellow{background:rgba(255,194,26,.14);color:var(--yellow);border:1px solid rgba(255,194,26,.5);box-shadow:0 0 10px rgba(255,194,26,.25)}
+.b-orange{background:rgba(255,154,60,.14);color:var(--orange);border:1px solid rgba(255,154,60,.5);box-shadow:0 0 10px rgba(255,154,60,.25)}
+.b-red{background:rgba(255,59,87,.14);color:var(--red);border:1px solid rgba(255,59,87,.55);box-shadow:0 0 12px rgba(255,59,87,.35)}
+.b-blue{background:rgba(59,139,255,.14);color:var(--blue);border:1px solid rgba(59,139,255,.5);box-shadow:0 0 10px rgba(59,139,255,.25)}
+.b-cyan{background:rgba(0,229,255,.13);color:var(--cyan);border:1px solid rgba(0,229,255,.5);box-shadow:0 0 10px rgba(0,229,255,.28)}
+.b-gray{background:rgba(147,170,202,.13);color:var(--muted);border:1px solid rgba(147,170,202,.4)}
+.b-purple{background:rgba(183,139,255,.14);color:var(--purple);border:1px solid rgba(183,139,255,.5);box-shadow:0 0 10px rgba(183,139,255,.25)}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:3px;border:1px solid var(--border2);
+  background:var(--panel2);color:var(--txt);cursor:pointer;font-size:12px;transition:.15s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+.btn:hover{border-color:var(--cyan);color:#fff;box-shadow:0 0 16px rgba(0,229,255,.5);text-shadow:0 0 8px rgba(255,255,255,.6)}
+.btn.sm{padding:3px 9px;font-size:11px}
+.btn.primary{background:linear-gradient(135deg,var(--blue),#1f6fff);border-color:var(--blue);color:#fff;box-shadow:0 0 14px rgba(59,139,255,.5)}
+.btn.primary:hover{background:linear-gradient(135deg,#4d97ff,#2f7dff);box-shadow:0 0 20px rgba(59,139,255,.7)}
+.btn.danger{background:rgba(255,59,87,.15);border-color:rgba(255,59,87,.55);color:var(--red)}
+.btn.danger:hover{background:rgba(255,59,87,.28);box-shadow:0 0 16px rgba(255,59,87,.55)}
+.btn.ok{background:rgba(34,224,124,.15);border-color:rgba(34,224,124,.55);color:var(--green)}
+.btn.ok:hover{background:rgba(34,224,124,.28);box-shadow:0 0 16px rgba(34,224,124,.55)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* chips */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:6px 15px;border-radius:2px;border:1px solid var(--border2);background:var(--panel2);color:var(--muted);cursor:pointer;font-size:12px;transition:.15s;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.chip:hover{border-color:var(--cyan);color:var(--txt);box-shadow:0 0 12px rgba(0,229,255,.35)}
+.chip.active{background:linear-gradient(135deg,var(--blue),#2f7dff);border-color:var(--blue);color:#fff;box-shadow:0 0 16px rgba(59,139,255,.6)}
+.chip .n{margin-left:4px;font-family:Consolas,monospace;font-size:11px}
+
+/* 滚动列表 */
+.scroll{max-height:230px;overflow-y:auto}
+.scroll::-webkit-scrollbar{width:6px}
+.scroll::-webkit-scrollbar-thumb{background:rgba(0,229,255,.35);border-radius:3px}
+.item{display:flex;gap:10px;padding:9px 4px;border-bottom:1px dashed rgba(0,229,255,.22);cursor:pointer;transition:.12s}
+.item:hover{background:rgba(0,229,255,.05);box-shadow:inset 2px 0 0 var(--cyan)}
+.item:last-child{border-bottom:none}
+.item .lv{width:4px;border-radius:2px;flex:none}
+.item .lv.e{background:var(--red);box-shadow:0 0 8px var(--red)} .item .lv.i{background:var(--yellow);box-shadow:0 0 8px var(--yellow)} .item .lv.n{background:var(--blue);box-shadow:0 0 8px var(--blue)}
+.item .body{flex:1;min-width:0}
+.item .t{font-size:12px;color:var(--txt)}
+.item .d{font-size:11px;color:var(--dim);margin-top:2px}
+
+/* 图例 */
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.legend .li{display:flex;align-items:center;gap:5px}
+.legend .sw{width:10px;height:10px;border-radius:2px;box-shadow:0 0 6px rgba(0,229,255,.4)}
+
+/* 流程 */
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0}
+.flow .node{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;border:1px solid var(--border2);border-radius:3px;background:var(--panel2);min-width:92px;transition:.15s;clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.flow .node:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.45)}
+.flow .node .ic{font-size:18px;filter:drop-shadow(0 0 6px rgba(0,229,255,.5))}
+.flow .node .tx{font-size:11px;color:var(--txt)}
+.flow .node.hot{border-color:var(--red);box-shadow:0 0 18px rgba(255,59,87,.55);animation:hotpulse 1.6s ease-in-out infinite}
+@keyframes hotpulse{0%,100%{box-shadow:0 0 12px rgba(255,59,87,.4)}50%{box-shadow:0 0 24px rgba(255,59,87,.75)}}
+.flow .node.ok{border-color:var(--green);box-shadow:0 0 12px rgba(34,224,124,.4)}
+.flow .arrow{color:var(--cyan);font-size:16px;text-shadow:0 0 8px rgba(0,229,255,.7)}
+
+/* toast */
+#toast{position:fixed;right:20px;top:72px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{background:rgba(7,16,34,.96);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:4px;
+  padding:11px 16px;font-size:12px;color:var(--txt);box-shadow:0 8px 28px rgba(0,0,0,.6),0 0 20px rgba(0,229,255,.2);animation:slidein .3s;max-width:340px;backdrop-filter:blur(8px);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.toast.warn{border-left-color:var(--red);box-shadow:0 8px 28px rgba(0,0,0,.6),0 0 20px rgba(255,59,87,.3)}
+.toast.ok{border-left-color:var(--green);box-shadow:0 8px 28px rgba(0,0,0,.6),0 0 20px rgba(34,224,124,.3)}
+@keyframes slidein{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+
+/* 边界提示 */
+.boundary{margin-top:16px;padding:12px 16px;border:1px dashed rgba(255,59,87,.5);border-radius:4px;background:rgba(255,59,87,.05);font-size:11px;color:#d99aa5;display:flex;gap:8px;align-items:flex-start;box-shadow:inset 0 0 20px rgba(255,59,87,.05)}
+.boundary b{color:var(--red);text-shadow:0 0 8px rgba(255,59,87,.6)}
+.footer{color:var(--dim);font-size:11px;text-align:center;padding:8px 0 20px}
+
+/* SVG 相关 */
+svg text{font-family:"Microsoft YaHei",sans-serif}
+.fly{animation:fly 9s linear infinite}
+@keyframes fly{0%{opacity:.95}50%{opacity:.55}100%{opacity:.95}}
+.blink{animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.2}}
+.pulse-red{animation:pulsered 1.4s ease-out infinite;transform-origin:center;transform-box:fill-box}
+@keyframes pulsered{0%{transform:scale(.6);opacity:.95}70%{transform:scale(2.8);opacity:0}100%{transform:scale(2.8);opacity:0}}
+.pulse-g{animation:pulseg 2.2s ease-out infinite;transform-origin:center;transform-box:fill-box}
+@keyframes pulseg{0%{transform:scale(.7);opacity:.75}70%{transform:scale(2);opacity:0}100%{transform:scale(2);opacity:0}}
+/* 雷达扩散圈 */
+.radar-ping{animation:radarping 3s ease-out infinite;transform-origin:0 0;transform-box:fill-box}
+@keyframes radarping{0%{transform:scale(.25);opacity:.7}70%{transform:scale(1);opacity:0}100%{transform:scale(1);opacity:0}}
+/* 目标点脉冲环（发光） */
+.tgt-ring{animation:tgtring 2.2s ease-out infinite;transform-origin:center;transform-box:fill-box}
+@keyframes tgtring{0%{transform:scale(.4);opacity:.7}70%{transform:scale(2.2);opacity:0}100%{transform:scale(2.2);opacity:0}}
+/* 描边流动（净空边界 / 航线） */
+.flow-dash{animation:flowdash 1.8s linear infinite}
+@keyframes flowdash{to{stroke-dashoffset:-30}}
+
+/* 详情抽屉 */
+.overlay{position:fixed;inset:0;background:rgba(2,4,10,.72);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.overlay.show{display:flex;animation:fadein .2s}
+.modal{background:linear-gradient(160deg, rgba(13,26,48,.98), rgba(5,11,24,.99));border:1px solid var(--border);border-radius:4px;width:560px;max-width:94vw;max-height:82vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.7),0 0 40px rgba(0,229,255,.15);
+  clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px)}
+.modal .mhd{padding:15px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;letter-spacing:.5px;background:linear-gradient(180deg, rgba(0,229,255,.06), transparent)}
+.modal .mhd .sp{flex:1}
+.modal .mbd{padding:16px 18px}
+.modal .mft{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.kv{display:grid;grid-template-columns:88px 1fr;gap:8px 12px;font-size:12px;margin-bottom:12px}
+.kv .k{color:var(--cyan);text-shadow:0 0 6px rgba(0,229,255,.3)}
+.kv .v{color:var(--txt);word-break:break-all}
+.suggest{border:1px solid rgba(255,194,26,.45);background:rgba(255,194,26,.06);border-radius:4px;padding:12px;margin-bottom:12px;box-shadow:inset 0 0 16px rgba(255,194,26,.04)}
+.suggest .st{font-size:12px;color:var(--yellow);font-weight:600;margin-bottom:6px;letter-spacing:.3px;text-shadow:0 0 8px rgba(255,194,26,.5)}
+.suggest p{font-size:12px;color:var(--txt);line-height:1.7}
+
+.hint{font-size:11px;color:var(--dim);line-height:1.7}
+.title-lg{font-size:16px;font-weight:700;margin-bottom:4px;letter-spacing:2px;color:#fff;text-shadow:0 0 14px rgba(0,229,255,.7)}
+.subtitle{font-size:12px;color:var(--muted);margin-bottom:16px}</style>
+</head>
+<body><canvas id="particles"></canvas><div class="bg-aura"></div><div class="hud-side l"></div><div class="hud-side r"></div>
+
+<!-- ================= 顶部标题栏 ================= -->
+<div class="topbar">
+  <div class="logo">
+    <div class="mark">低</div>
+    <div>
+      <div class="ttl">低空综合保障设备 · 后台管理平台</div>
+      <div class="sub">空管核 + 补能核 · 三级架构（节点 → 组网 → 对接）</div>
+    </div>
+  </div>
+  <div class="sp"></div>
+  <div class="site-tag"><span class="dot"></span> 重庆龙兴通用机场 · A1级 · 节点在线</div>
+  <div class="site-tag" style="border-color:rgba(0,229,255,.6)"><span style="color:var(--cyan)">UOM</span> 已对接</div>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="user"><div class="av">王</div> 王侃捷 · 管理员</div>
+</div>
+
+<!-- ================= 导航 ================= -->
+<div class="navbar" id="navbar">
+  <div class="nav active" data-v="overview">总览大屏</div>
+  <div class="nav" data-v="map">地图监控</div>
+  <div class="nav" data-v="site">起降点管理</div>
+  <div class="nav" data-v="device">设备管理</div>
+  <div class="nav" data-v="alert">告警中心<span class="tag">3</span></div>
+  <div class="nav" data-v="procedure">飞行程序管理</div>
+  <div class="nav" data-v="energy">补能管理</div>
+  <div class="nav" data-v="workorder">黑飞处置工单<span class="tag">2</span></div>
+</div>
+
+<div class="main">
+
+<!-- ========== 1. 总览大屏 ========== -->
+<section class="view active" id="view-overview">
+  <div class="kpis">
+    <div class="kpi c-blue"><div class="lb">今日起降架次</div><div class="val"><span id="k-flights">47</span></div><div class="meta">同比 +12% · 含通航/无人机/eVTOL</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,18 12,14 24,16 36,11 48,12 60,7 76,4" fill="none" stroke="rgba(59,139,255,.18)" stroke-width="5"/><polyline points="0,18 12,14 24,16 36,11 48,12 60,7 76,4" fill="none" stroke="#3b8bff" stroke-width="2"/><circle cx="76" cy="4" r="2.4" fill="#7fb4ff"/></svg></div>
+    <div class="kpi c-green"><div class="lb">在线设备</div><div class="val"><span id="k-dev">86</span><span class="unit">/ 92</span></div><div class="meta">在线率 93.5%</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,11 12,10 24,11 36,9 48,10 60,9 76,9" fill="none" stroke="rgba(34,224,124,.16)" stroke-width="5"/><polyline points="0,11 12,10 24,11 36,9 48,10 60,9 76,9" fill="none" stroke="#2ce88a" stroke-width="2"/><circle cx="76" cy="9" r="2.4" fill="#8cf5c0"/></svg></div>
+    <div class="kpi c-yellow"><div class="lb">今日告警</div><div class="val"><span id="k-alert">23</span></div><div class="meta">紧急 3 · 重要 9 · 一般 11</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,8 12,15 24,7 36,14 48,6 60,12 76,9" fill="none" stroke="rgba(255,194,26,.16)" stroke-width="5"/><polyline points="0,8 12,15 24,7 36,14 48,6 60,12 76,9" fill="none" stroke="#ffc21a" stroke-width="2"/><circle cx="76" cy="9" r="2.4" fill="#ffd479"/></svg></div>
+    <div class="kpi c-red"><div class="lb">黑飞告警</div><div class="val"><span id="k-bf">2</span></div><div class="meta">非协作式探测 · 1 起处置中</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,15 12,16 24,13 36,17 48,13 60,16 76,14" fill="none" stroke="rgba(255,59,87,.16)" stroke-width="5"/><polyline points="0,15 12,16 24,13 36,17 48,13 60,16 76,14" fill="none" stroke="#ff3b57" stroke-width="2"/><circle cx="76" cy="14" r="2.4" fill="#ff9aa8"/></svg></div>
+    <div class="kpi c-cyan"><div class="lb">补能状态</div><div class="val"><span id="k-chg">8</span><span class="unit">桩</span></div><div class="meta">储能 SOC 78% · 功率池 2.4MW</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,6 12,8 24,9 36,12 48,14 60,17 76,19" fill="none" stroke="rgba(0,229,255,.18)" stroke-width="5"/><polyline points="0,6 12,8 24,9 36,12 48,14 60,17 76,19" fill="none" stroke="#00e5ff" stroke-width="2"/><circle cx="76" cy="19" r="2.4" fill="#b8fbff"/></svg></div>
+  </div>
+
+  <div class="grid g31">
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>态势总览 · 龙兴机场<span class="tip">坐标示意，待核实</span><span class="sp"></span><button class="btn sm" onclick="showView('map')">进入地图监控 →</button></div>
+      <div class="bd" style="padding:0">
+        <svg id="ov-map" viewBox="0 0 1200 440" width="100%" height="440"></svg>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <div class="hd"><span class="bar"></span>最新告警</div>
+        <div class="bd scroll" style="padding:8px 14px">
+          <div class="item" onclick="showView('alert')"><div class="lv e"></div><div class="body"><div class="t">净空保护区发现黑飞目标（非合作）</div><div class="d">低空探测雷达 · 09:42 · 紧急 · 已转工单</div></div><span class="badge b-red">紧急</span></div>
+          <div class="item" onclick="showView('alert')"><div class="lv i"></div><div class="body"><div class="t">冲突预警：eVTOL-03 与 UAS-物流-07 预计 3 分钟接近</div><div class="d">态势融合 · 09:38 · 重要 · 待人工确认</div></div><span class="badge b-yellow">重要</span></div>
+          <div class="item" onclick="showView('alert')"><div class="lv i"></div><div class="body"><div class="t">自动气象站 AWS-02 瞬时风速超限</div><div class="d">气象 · 09:35 · 重要 · 建议切换程序</div></div><span class="badge b-yellow">重要</span></div>
+          <div class="item" onclick="showView('alert')"><div class="lv n"></div><div class="body"><div class="t">充电桩 CP-05 枪线温度偏高</div><div class="d">补能 · 09:30 · 一般 · 已推送</div></div><span class="badge b-blue">一般</span></div>
+          <div class="item" onclick="showView('alert')"><div class="lv n"></div><div class="body"><div class="t">UOM 接口心跳超时</div><div class="d">对接 · 09:28 · 一般 · 已重连</div></div><span class="badge b-blue">一般</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="hd"><span class="bar"></span>补能实时</div>
+        <div class="bd">
+          <div class="kv"><span class="k">功率池</span><span class="v num">2.40 MW（额定 2.8）</span></div>
+          <div class="kv"><span class="k">储能</span><span class="v num">SOC 78% · SOH 96% · 磷酸铁锂</span></div>
+          <div class="kv"><span class="k">在充</span><span class="v">CP-02（eVTOL-03）· CP-04（物流无人机）</span></div>
+          <div class="hint" style="margin-top:6px">充放电策略走「建议＋人工确认」，不自动执行功率切换。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="boundary"><b>边界提示：</b>本平台不做飞行控制（冲突解脱/程序切换/充放电策略一律「建议＋人工确认」，不产生对飞行器的自动控制指令）；不做反制处置（黑飞仅「探测 → 告警 → 推送 → 工单」闭环，不驱离、不击落）。</div>
+</section>
+
+<!-- ========== 2. 地图监控 ========== -->
+<section class="view" id="view-map">
+  <div class="panel">
+    <div class="hd">
+      <span class="bar"></span>地图监控 · 重庆龙兴通用机场
+      <span class="tip">示意图（非真实坐标）· 机场精确坐标待核实</span>
+      <span class="sp"></span>
+      <span class="legend" id="map-legend-ctrl" style="cursor:default">
+        <label class="li"><input type="checkbox" checked onchange="toggleLayer('main-map-clear',this)"><span class="sw" style="background:rgba(47,129,247,.35);border:1px dashed var(--blue)"></span>净空保护区</label>
+        <label class="li"><input type="checkbox" checked onchange="toggleLayer('main-map-route',this)"><span class="sw" style="background:var(--cyan)"></span>航路航线</label>
+        <label class="li"><input type="checkbox" checked onchange="toggleLayer('main-map-target',this)"><span class="sw" style="background:var(--green)"></span>飞行目标</label>
+        <label class="li"><input type="checkbox" checked onchange="toggleLayer('main-map-bf',this)"><span class="sw" style="background:var(--red)"></span>黑飞告警</label>
+      </span>
+    </div>
+    <div class="bd" style="padding:0">
+      <svg id="main-map" viewBox="0 0 1200 620" width="100%" height="620"></svg>
+    </div>
+  </div>
+
+  <div class="grid g21">
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>实时飞行目标<span class="tip">多源融合态势（ADS-B / RID / 雷达 / 频谱 / 光电）</span></div>
+      <div class="bd" style="padding:0">
+        <table>
+          <thead><tr><th>目标</th><th>识别号</th><th>类型</th><th>高度</th><th>速度</th><th>可信度</th><th>来源</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge b-green">协作</span></td><td class="mono">CS-XIANG1</td><td>有人机/通航</td><td class="num">450 m</td><td class="num">86 kt</td><td class="num">0.96</td><td>ADS-B</td></tr>
+            <tr><td><span class="badge b-cyan">协作</span></td><td class="mono">UAS-LOG-07</td><td>物流无人机</td><td class="num">120 m</td><td class="num">15 m/s</td><td class="num">0.92</td><td>RID</td></tr>
+            <tr><td><span class="badge b-purple">协作</span></td><td class="mono">EVTOL-PAX-03</td><td>eVTOL</td><td class="num">300 m</td><td class="num">42 kt</td><td class="num">0.94</td><td>RID+雷达</td></tr>
+            <tr><td><span class="badge b-blue">协作</span></td><td class="mono">UAS-EMS-01</td><td>应急无人机</td><td class="num">200 m</td><td class="num">18 m/s</td><td class="num">0.91</td><td>RID</td></tr>
+            <tr><td><span class="badge b-red">非协作</span></td><td class="mono">UNKNOWN-01</td><td>黑飞（疑似）</td><td class="num">90 m</td><td class="num">8 m/s</td><td class="num">0.71</td><td>雷达+频谱</td></tr>
+            <tr><td><span class="badge b-red">非协作</span></td><td class="mono">UNKNOWN-02</td><td>黑飞（疑似）</td><td class="num">150 m</td><td class="num">11 m/s</td><td class="num">0.68</td><td>雷达+光电</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>黑飞告警点<span class="tip">非协作式主动探测</span></div>
+      <div class="bd">
+        <div class="suggest">
+          <div class="st">⚠ 净空保护区黑飞（非合作目标）</div>
+          <p><b>UNKNOWN-01</b>：位于净空保护区东北侧，距跑道中心约 1.8 km（示意），高度 90 m，未广播 RID/ADS-B。探测源：低空探测雷达 + 无线电频谱侦测。</p>
+          <p style="margin-top:6px">处置链路：告警 → 通讯推送 → 任务工单。不驱离、不击落。</p>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn sm primary" onclick="toast('已推送至后台并生成黑飞处置工单（示例交互）','ok');document.querySelector('[data-v=workorder]').click()">生成处置工单</button>
+            <button class="btn sm" onclick="toast('已记录人工确认（示例交互）','ok')">确认告警</button>
+          </div>
+        </div>
+        <div class="suggest" style="border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.05)">
+          <div class="st" style="color:var(--red)">⚠ 黑飞告警点 UNKNOWN-02</div>
+          <p>光电红外已锁定目标影像，无线电频谱侦测检测到 2.4G 遥控信号。距跑道西南侧约 2.1 km（示意）。</p>
+        </div>
+        <div class="hint">黑飞不广播 ADS-B/RID，协作式被动接收无法发现，须依赖低空探测雷达 / 无线电频谱侦测 / 光电红外的非协作式主动探测。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 3. 起降点管理 ========== -->
+<section class="view" id="view-site">
+  <div class="title-lg">起降点管理</div>
+  <div class="subtitle">统一管理低空起降点台账、运行状态、净空与气象适配状态（字段级：site_id / site_name / location / region / site_type / level / status / owner / devices）。</div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>起降点台账<span class="sp"></span><button class="btn sm primary">+ 新增起降点</button><button class="btn sm">批量导入</button><button class="btn sm">导出</button></div>
+    <div class="bd" style="padding:0;overflow-x:auto">
+      <table>
+        <thead><tr><th>编号</th><th>名称</th><th>位置（WGS84）</th><th>区域</th><th>类型</th><th>等级</th><th>状态</th><th>在线设备</th><th>净空</th><th>气象</th><th>责任人</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">SITE-001</td><td>龙兴机场起降点</td><td class="mono">29.69°N, 106.80°E*</td><td>渝北区</td><td>通用</td><td>A1</td><td><span class="badge b-green">运行</span></td><td class="num">92/92</td><td><span class="badge b-green">合规</span></td><td><span class="badge b-green">适配</span></td><td>赵某</td><td><button class="btn sm">详情</button></td></tr>
+          <tr><td class="mono">SITE-002</td><td>应急救援起降点</td><td class="mono">29.70°N, 106.81°E*</td><td>渝北区</td><td>有人机/无人机</td><td>B</td><td><span class="badge b-green">运行</span></td><td class="num">18/18</td><td><span class="badge b-green">合规</span></td><td><span class="badge b-green">适配</span></td><td>钱某</td><td><button class="btn sm">详情</button></td></tr>
+          <tr><td class="mono">SITE-003</td><td>两江物流无人机起降点</td><td class="mono">29.68°N, 106.82°E*</td><td>两江新区</td><td>无人机</td><td>C</td><td><span class="badge b-green">运行</span></td><td class="num">12/12</td><td><span class="badge b-yellow">隐患1</span></td><td><span class="badge b-green">适配</span></td><td>孙某</td><td><button class="btn sm">详情</button></td></tr>
+          <tr><td class="mono">SITE-004</td><td>eVTOL 载人起降点</td><td class="mono">29.69°N, 106.79°E*</td><td>渝北区</td><td>eVTOL/有人机</td><td>B</td><td><span class="badge b-yellow">维护</span></td><td class="num">14/16</td><td><span class="badge b-green">合规</span></td><td><span class="badge b-yellow">风速偏高</span></td><td>李某</td><td><button class="btn sm">详情</button></td></tr>
+          <tr><td class="mono">SITE-005</td><td>通航固定翼起降点</td><td class="mono">29.71°N, 106.80°E*</td><td>渝北区</td><td>有人机</td><td>B</td><td><span class="badge b-gray">停用</span></td><td class="num">0/6</td><td><span class="badge b-gray">—</span></td><td><span class="badge b-gray">—</span></td><td>周某</td><td><button class="btn sm">详情</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>运维台账<span class="tip">巡检 / 维保 / 整改</span></div>
+    <div class="bd" style="padding:0">
+      <table>
+        <thead><tr><th>日期</th><th>起降点</th><th>类型</th><th>内容</th><th>结果</th><th>执行人</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">2026-09-30</td><td>龙兴机场起降点</td><td><span class="badge b-blue">巡检</span></td><td>设备例行巡检、补能系统检查</td><td><span class="badge b-green">正常</span></td><td>赵某</td></tr>
+          <tr><td class="mono">2026-09-28</td><td>两江物流起降点</td><td><span class="badge b-orange">整改</span></td><td>净空区新增临时吊装设备（隐患上报）</td><td><span class="badge b-yellow">整改中</span></td><td>孙某</td></tr>
+          <tr><td class="mono">2026-09-20</td><td>eVTOL 载人起降点</td><td><span class="badge b-blue">维保</span></td><td>充电桩 CP-06 液冷模块维护</td><td><span class="badge b-green">完成</span></td><td>李某</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="hint">* 坐标为示意图取值，机场精确坐标待核实（铁律：不编造数据）。</div>
+</section>
+
+<!-- ========== 4. 设备管理 ========== -->
+<section class="view" id="view-device">
+  <div class="title-lg">设备管理</div>
+  <div class="subtitle">设备抽象层（插件化，统一接口 init/start/stop/stream/config/health）统一接入台账：监视（协作式）/ 探测（非协作式·黑飞核心）/ 气象 / 补能 / 反制（仅管理）。</div>
+
+  <div class="chips" id="dev-chips">
+    <div class="chip active" onclick="devFilter('all',this)">全部 <span class="n">18</span></div>
+    <div class="chip" onclick="devFilter('adsb',this)">监视（ADS-B/RID）</div>
+    <div class="chip" onclick="devFilter('detect',this)">探测（雷达/频谱/光电）</div>
+    <div class="chip" onclick="devFilter('wx',this)">气象</div>
+    <div class="chip" onclick="devFilter('energy',this)">补能</div>
+    <div class="chip" onclick="devFilter('counter',this)">反制（仅台账）</div>
+  </div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>设备台账<span class="sp"></span><button class="btn sm primary">+ 接入设备</button></div>
+    <div class="bd" style="padding:0;overflow-x:auto">
+      <table id="dev-table">
+        <thead><tr><th>设备编号</th><th>名称</th><th>类别</th><th>类型</th><th>厂商</th><th>所属起降点</th><th>状态</th><th>固件</th><th>最后心跳</th><th>健康</th></tr></thead>
+        <tbody>
+          <tr data-cat="adsb"><td class="mono">ADS-B-01</td><td>ADS-B 接收站</td><td>监视·协作式</td><td>1090ES 接收</td><td>—</td><td>SITE-001</td><td><span class="badge b-green">在线</span></td><td class="mono">v2.1.0</td><td class="mono">2s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="adsb"><td class="mono">RID-01</td><td>RID 接收（远程识别）</td><td>监视·协作式</td><td>远程识别接收</td><td>—</td><td>SITE-001</td><td><span class="badge b-green">在线</span></td><td class="mono">v1.8.3</td><td class="mono">2s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="detect"><td class="mono">RADAR-01</td><td>低空探测雷达</td><td>探测·非协作式</td><td>低空监视雷达</td><td>待核实</td><td>SITE-001</td><td><span class="badge b-green">在线</span></td><td class="mono">v3.0.1</td><td class="mono">1s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="detect"><td class="mono">SPEC-01</td><td>无线电频谱侦测</td><td>探测·非协作式</td><td>频谱监测</td><td>待核实</td><td>SITE-001</td><td><span class="badge b-green">在线</span></td><td class="mono">v1.5.0</td><td class="mono">3s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="detect"><td class="mono">EOIR-01</td><td>光电红外</td><td>探测·非协作式</td><td>光电/红外跟踪</td><td>待核实</td><td>SITE-001</td><td><span class="badge b-yellow">维护</span></td><td class="mono">v1.2.0</td><td class="mono">—</td><td><span class="badge b-yellow">维护中</span></td></tr>
+          <tr data-cat="wx"><td class="mono">AWS-01</td><td>自动气象站</td><td>气象</td><td>自动观测</td><td>—</td><td>SITE-001</td><td><span class="badge b-green">在线</span></td><td class="mono">v2.4.0</td><td class="mono">2s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="wx"><td class="mono">AWS-02</td><td>自动气象站</td><td>气象</td><td>自动观测</td><td>—</td><td>SITE-004</td><td><span class="badge b-green">在线</span></td><td class="mono">v2.4.0</td><td class="mono">2s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="energy"><td class="mono">CP-01 ~ CP-08</td><td>充电桩（ChaoJi）</td><td>补能</td><td>直流大功率</td><td>待核实</td><td>SITE-001/004</td><td><span class="badge b-green">8 在线</span></td><td class="mono">v1.9.0</td><td class="mono">1s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="energy"><td class="mono">ESS-01</td><td>储能（磷酸铁锂）</td><td>补能</td><td>储能缓冲</td><td>待核实</td><td>SITE-001</td><td><span class="badge b-green">在线</span></td><td class="mono">v2.0.2</td><td class="mono">2s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="energy"><td class="mono">FIRE-01</td><td>消防联动</td><td>补能</td><td>热失控/灭火联动</td><td>待核实</td><td>SITE-001</td><td><span class="badge b-green">在线</span></td><td class="mono">v1.1.0</td><td class="mono">3s 前</td><td><span class="badge b-green">正常</span></td></tr>
+          <tr data-cat="counter"><td class="mono">JAM-01</td><td>无线电干扰（预留）</td><td>反制·仅管理</td><td>反制设备</td><td>—</td><td>—</td><td><span class="badge b-gray">未部署</span></td><td class="mono">—</td><td class="mono">—</td><td><span class="badge b-gray">—</span></td></tr>
+          <tr data-cat="counter"><td class="mono">LASER-01</td><td>激光（预留）</td><td>反制·仅管理</td><td>反制设备</td><td>—</td><td>—</td><td><span class="badge b-gray">未部署</span></td><td class="mono">—</td><td class="mono">—</td><td><span class="badge b-gray">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>设备抽象层（插件化）</div>
+      <div class="bd">
+        <div class="hint" style="font-family:Consolas,monospace;color:var(--cyan)">init · start · stop · stream · config · health</div>
+        <div class="hint" style="margin-top:8px">任何设备类型（含预留）实现同一接口，新增设备 = 新增驱动插件，不改平台主体。反制设备仅作为被管理对象（台账/状态/运维），平台不做反制处置。</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>黑飞探测核心（非协作式）</div>
+      <div class="bd">
+        <div class="hint">黑飞不广播 ADS-B/RID，协作式被动接收无法发现。黑飞探测核心实装：<b>低空探测雷达 / 无线电频谱侦测 / 光电红外</b>（非协作式主动探测）。链路：非协作式为主 + 协作式为辅 → 多源融合 → 黑飞识别 → 告警 → 推送 → 工单。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 5. 告警中心 ========== -->
+<section class="view" id="view-alert">
+  <div class="title-lg">告警中心</div>
+  <div class="subtitle">统一接入设备 / 气象 / 冲突 / 净空黑飞 / 接口五类告警，分级（紧急 / 重要 / 一般），分级推送；冲突与程序切换类告警走「建议＋人工确认」。</div>
+
+  <div class="chips" id="alert-chips">
+    <div class="chip active" onclick="alertFilter('all',this)">全部 <span class="n">23</span></div>
+    <div class="chip" onclick="alertFilter('设备',this)">设备 <span class="n">4</span></div>
+    <div class="chip" onclick="alertFilter('气象',this)">气象 <span class="n">5</span></div>
+    <div class="chip" onclick="alertFilter('冲突',this)">冲突 <span class="n">6</span></div>
+    <div class="chip" onclick="alertFilter('净空黑飞',this)">净空黑飞 <span class="n">2</span></div>
+    <div class="chip" onclick="alertFilter('接口',this)">接口 <span class="n">6</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>告警列表<span class="sp"></span><button class="btn sm">导出</button></div>
+    <div class="bd" style="padding:0;overflow-x:auto">
+      <table id="alert-table">
+        <thead><tr><th>时间</th><th>级别</th><th>类别</th><th>来源</th><th>内容</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr data-cat="净空黑飞"><td class="mono">09:42</td><td><span class="badge b-red">紧急</span></td><td>净空黑飞</td><td>低空探测雷达</td><td>净空保护区东北侧发现黑飞目标 UNKNOWN-01（未广播 RID）</td><td><span class="badge b-orange">已转工单</span></td><td><button class="btn sm" onclick="openAlert(0)">详情</button></td></tr>
+          <tr data-cat="冲突"><td class="mono">09:38</td><td><span class="badge b-yellow">重要</span></td><td>冲突</td><td>态势融合</td><td>eVTOL-03 与 UAS-物流-07 预计 3 分钟接近（冲突预警）</td><td><span class="badge b-yellow">待确认</span></td><td><button class="btn sm" onclick="openAlert(1)">建议+确认</button></td></tr>
+          <tr data-cat="气象"><td class="mono">09:35</td><td><span class="badge b-yellow">重要</span></td><td>气象</td><td>AWS-02</td><td>瞬时风速 12.5 m/s 超限，建议切换气象程序</td><td><span class="badge b-yellow">待确认</span></td><td><button class="btn sm" onclick="openAlert(2)">建议+确认</button></td></tr>
+          <tr data-cat="设备"><td class="mono">09:30</td><td><span class="badge b-blue">一般</span></td><td>设备</td><td>CP-05</td><td>充电枪线温度 62℃ 偏高</td><td><span class="badge b-blue">已推送</span></td><td><button class="btn sm" onclick="openAlert(3)">详情</button></td></tr>
+          <tr data-cat="接口"><td class="mono">09:28</td><td><span class="badge b-blue">一般</span></td><td>接口</td><td>UOM 对接</td><td>UOM 接口心跳超时（默认周期 5s），已重连</td><td><span class="badge b-green">已闭环</span></td><td><button class="btn sm" onclick="openAlert(4)">详情</button></td></tr>
+          <tr data-cat="净空黑飞"><td class="mono">09:15</td><td><span class="badge b-red">紧急</span></td><td>净空黑飞</td><td>雷达+光电</td><td>净空保护区西南侧发现黑飞目标 UNKNOWN-02</td><td><span class="badge b-orange">处置中</span></td><td><button class="btn sm" onclick="openAlert(5)">详情</button></td></tr>
+          <tr data-cat="气象"><td class="mono">08:50</td><td><span class="badge b-blue">一般</span></td><td>气象</td><td>AWS-01</td><td>能见度下降至 4.5 km</td><td><span class="badge b-green">已闭环</span></td><td><button class="btn sm" onclick="openAlert(0)">详情</button></td></tr>
+          <tr data-cat="冲突"><td class="mono">08:31</td><td><span class="badge b-blue">一般</span></td><td>冲突</td><td>态势融合</td><td>航路交汇点目标密度升高（战略预探测）</td><td><span class="badge b-green">已闭环</span></td><td><button class="btn sm" onclick="openAlert(1)">详情</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="hint">分级推送：紧急告警强制推送（站内/消息/短信）；冲突解脱、气象程序切换为「系统建议 + 人工确认」，全程留痕。</div>
+</section>
+
+<!-- ========== 6. 飞行程序管理 ========== -->
+<section class="view" id="view-procedure">
+  <div class="title-lg">飞行程序管理</div>
+  <div class="subtitle">进离场 / 盘旋 / 备降程序台账，字段级：procedure_id / site_id / procedure_type / altitude_layers / route / speed_limit / landing_standard / aircraft_types / weather_threshold / status。切换结果仅作建议，人工确认。</div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>程序台账<span class="sp"></span><button class="btn sm primary">+ 新增程序</button></div>
+    <div class="bd" style="padding:0;overflow-x:auto">
+      <table>
+        <thead><tr><th>程序编号</th><th>起降点</th><th>类型</th><th>高度层</th><th>速度限制</th><th>适配机型</th><th>气象阈值（风/能见度）</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">PROC-001</td><td>SITE-001</td><td><span class="badge b-cyan">进近</span></td><td class="num">300 m</td><td class="num">≤ 45 kt</td><td>eVTOL/通航</td><td>风≤8 m/s / 能见度≥5 km</td><td><span class="badge b-green">生效</span></td><td><button class="btn sm">查看</button></td></tr>
+          <tr><td class="mono">PROC-002</td><td>SITE-001</td><td><span class="badge b-cyan">离场</span></td><td class="num">450 m</td><td class="num">≤ 60 kt</td><td>有人机/通航</td><td>风≤10 m/s / 能见度≥5 km</td><td><span class="badge b-green">生效</span></td><td><button class="btn sm">查看</button></td></tr>
+          <tr><td class="mono">PROC-003</td><td>SITE-001</td><td><span class="badge b-purple">盘旋</span></td><td class="num">350 m</td><td class="num">≤ 40 kt</td><td>eVTOL</td><td>风≤6 m/s</td><td><span class="badge b-green">生效</span></td><td><button class="btn sm">查看</button></td></tr>
+          <tr><td class="mono">PROC-004</td><td>SITE-002</td><td><span class="badge b-purple">备降</span></td><td class="num">250 m</td><td class="num">≤ 35 kt</td><td>应急无人机</td><td>风≤8 m/s</td><td><span class="badge b-yellow">待审核</span></td><td><button class="btn sm">查看</button></td></tr>
+          <tr><td class="mono">PROC-005</td><td>SITE-004</td><td><span class="badge b-cyan">进近</span></td><td class="num">400 m</td><td class="num">≤ 50 kt</td><td>eVTOL</td><td>风≤8 m/s / 能见度≥4 km</td><td><span class="badge b-gray">废止</span></td><td><button class="btn sm">查看</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>气象程序切换建议<span class="tip">木桶原则 · 防震荡 · 建议＋人工确认</span></div>
+      <div class="bd">
+        <div class="suggest">
+          <div class="st">建议切换：PROC-001 进近程序 → 大侧风程序</div>
+          <p>实测瞬时风速 12.5 m/s，超过 PROC-001 准入阈值（风≤8 m/s）。按木桶原则判定可用最高程序等级，建议切换至大侧风进近程序，并联动在飞目标处置。</p>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn sm ok" onclick="toast('已记录人工确认：采纳切换建议（示例交互）','ok')">采纳（人工确认）</button>
+            <button class="btn sm" onclick="toast('已记录人工确认：暂不切换（示例交互）','ok')">暂不切换</button>
+          </div>
+        </div>
+        <div class="hint">系统仅推送建议，不自动切换程序、不产生对飞行器的控制指令；全程留痕可回溯。</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>冲突解脱建议<span class="tip">水平/垂直/时序 · 建议＋人工确认</span></div>
+      <div class="bd">
+        <div class="suggest">
+          <div class="st">建议解脱：eVTOL-03 与 UAS-物流-07</div>
+          <p>预计 3 分钟后在航路交汇点接近，最小间隔将低于阈值（水平 500 m / 垂直 100 m，待核定）。建议 eVTOL-03 高度保持、UAS-物流-07 右偏绕飞；预计解除时间 2 分钟。</p>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn sm ok" onclick="toast('已记录人工确认：采纳解脱建议（示例交互）','ok')">采纳（人工确认）</button>
+            <button class="btn sm" onclick="toast('已记录人工确认：忽略建议（示例交互）','ok')">忽略</button>
+          </div>
+        </div>
+        <div class="hint">平台不做飞行控制，不自动下发解脱指令；一级预警仅推送强制告警。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 7. 补能管理 ========== -->
+<section class="view" id="view-energy">
+  <div class="title-lg">补能管理</div>
+  <div class="subtitle">补能双核之一：ChaoJi 大功率直流充电（GB/T 20234.4-2023，兼容 GB/T 20234）+ 磷酸铁锂储能缓冲 + 消防联动。充放电策略走「建议＋人工确认」。</div>
+
+  <div class="kpis">
+    <div class="kpi c-cyan"><div class="lb">功率池</div><div class="val">2.40<span class="unit">MW</span></div><div class="meta">额定 2.8 MW · 削峰分配中</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,16 12,13 24,15 36,11 48,12 60,8 76,6" fill="none" stroke="rgba(0,229,255,.18)" stroke-width="5"/><polyline points="0,16 12,13 24,15 36,11 48,12 60,8 76,6" fill="none" stroke="#00e5ff" stroke-width="2"/><circle cx="76" cy="6" r="2.4" fill="#b8fbff"/></svg></div>
+    <div class="kpi c-green"><div class="lb">在线充电桩</div><div class="val">8<span class="unit">/ 8</span></div><div class="meta">ChaoJi 直流 · 液冷</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,10 12,10 24,10 36,10 48,10 60,10 76,10" fill="none" stroke="rgba(34,224,124,.16)" stroke-width="5"/><polyline points="0,10 12,10 24,10 36,10 48,10 60,10 76,10" fill="none" stroke="#2ce88a" stroke-width="2"/><circle cx="76" cy="10" r="2.4" fill="#8cf5c0"/></svg></div>
+    <div class="kpi c-green"><div class="lb">储能 SOC</div><div class="val">78<span class="unit">%</span></div><div class="meta">磷酸铁锂 · SOH 96%</div><svg class="ring" width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="17" fill="none" stroke="rgba(34,197,94,.14)" stroke-width="4"/><circle cx="22" cy="22" r="17" fill="none" stroke="#2ce88a" stroke-width="4" stroke-linecap="round" stroke-dasharray="106.8" stroke-dashoffset="23.5" transform="rotate(-90 22 22)" style="filter:drop-shadow(0 0 4px rgba(34,197,94,.7))"/></svg></div>
+    <div class="kpi c-yellow"><div class="lb">今日充电量</div><div class="val">1,240<span class="unit">kWh</span></div><div class="meta">32 笔订单</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,18 12,15 24,16 36,12 48,10 60,7 76,4" fill="none" stroke="rgba(255,194,26,.16)" stroke-width="5"/><polyline points="0,18 12,15 24,16 36,12 48,10 60,7 76,4" fill="none" stroke="#ffc21a" stroke-width="2"/><circle cx="76" cy="4" r="2.4" fill="#ffd479"/></svg></div>
+    <div class="kpi c-blue"><div class="lb">在充</div><div class="val">2<span class="unit">台</span></div><div class="meta">CP-02 / CP-04</div><svg class="spark" width="76" height="24" viewBox="0 0 76 24"><polyline points="0,12 12,10 24,13 36,9 48,12 60,10 76,11" fill="none" stroke="rgba(59,139,255,.18)" stroke-width="5"/><polyline points="0,12 12,10 24,13 36,9 48,12 60,10 76,11" fill="none" stroke="#3b8bff" stroke-width="2"/><circle cx="76" cy="11" r="2.4" fill="#7fb4ff"/></svg></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="panel">
+      <div class="hd"><span class="bar"></span>充电桩状态<span class="tip">ChaoJi（GB/T 20234.4）</span></div>
+      <div class="bd" style="padding:0;overflow-x:auto">
+        <table>
+          <thead><tr><th>桩号</th><th>接口</th><th>额定</th><th>状态</th><th>输出电压</th><th>输出电流</th><th>功率</th><th>枪线温度</th><th>绝缘</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">CP-01</td><td>ChaoJi</td><td class="num">800V/400kW</td><td><span class="badge b-green">空闲</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">32℃</td><td class="num">正常</td></tr>
+            <tr><td class="mono">CP-02</td><td>ChaoJi</td><td class="num">800V/400kW</td><td><span class="badge b-cyan">充电中</span></td><td class="num">780V</td><td class="num">320A</td><td class="num">250kW</td><td class="num">45℃</td><td class="num">正常</td></tr>
+            <tr><td class="mono">CP-03</td><td>ChaoJi</td><td class="num">800V/500kW</td><td><span class="badge b-green">空闲</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">31℃</td><td class="num">正常</td></tr>
+            <tr><td class="mono">CP-04</td><td>ChaoJi</td><td class="num">800V/300kW</td><td><span class="badge b-cyan">充电中</span></td><td class="num">740V</td><td class="num">180A</td><td class="num">133kW</td><td class="num">40℃</td><td class="num">正常</td></tr>
+            <tr><td class="mono">CP-05</td><td>ChaoJi</td><td class="num">800V/400kW</td><td><span class="badge b-yellow">温度偏高</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">62℃</td><td class="num">正常</td></tr>
+            <tr><td class="mono">CP-06</td><td>ChaoJi</td><td class="num">800V/400kW</td><td><span class="badge b-gray">维护</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+            <tr><td class="mono">CP-07</td><td>ChaoJi</td><td class="num">800V/400kW</td><td><span class="badge b-green">空闲</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">32℃</td><td class="num">正常</td></tr>
+            <tr><td class="mono">CP-08</td><td>ChaoJi</td><td class="num">800V/400kW</td><td><span class="badge b-green">空闲</span></td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">33℃</td><td class="num">正常</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="hd"><span class="bar"></span>储能系统（磷酸铁锂）</div>
+        <div class="bd">
+          <div class="kv"><span class="k">SOC</span><span class="v num">78% · SOH 96%</span></div>
+          <div class="kv"><span class="k">电压/电流</span><span class="v num">652V / 92A（放电）</span></div>
+          <div class="kv"><span class="k">电池温度</span><span class="v num">28℃（正常）</span></div>
+          <div class="kv"><span class="k">循环次数</span><span class="v num">1,024</span></div>
+          <div class="kv"><span class="k">策略</span><span class="v">削峰填谷 · 电网平滑 · 应急备用</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="hd"><span class="bar"></span>充放电策略建议<span class="tip">建议＋人工确认</span></div>
+        <div class="bd">
+          <div class="suggest">
+            <div class="st">建议：补能高峰启用储能缓冲</div>
+            <p>当前功率池负载 86%，建议由磷酸铁锂储能释放 400 kW 缓冲，平抑电网负荷。系统仅建议，不自动执行功率切换。</p>
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <button class="btn sm ok" onclick="toast('已记录人工确认：启用储能缓冲（示例交互）','ok')">采纳（人工确认）</button>
+              <button class="btn sm" onclick="toast('已记录人工确认：暂不执行（示例交互）','ok')">暂不执行</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>充电订单</div>
+    <div class="bd" style="padding:0;overflow-x:auto">
+      <table>
+        <thead><tr><th>订单号</th><th>桩号</th><th>机型/目标</th><th>开始</th><th>结束</th><th>电量</th><th>时长</th><th>金额</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">ORD-2401</td><td class="mono">CP-02</td><td>EVTOL-PAX-03</td><td class="mono">09:20</td><td class="mono">充电中</td><td class="num">41.2 kWh</td><td class="num">12 min</td><td class="num">¥86.5</td><td><span class="badge b-cyan">充电中</span></td></tr>
+          <tr><td class="mono">ORD-2400</td><td class="mono">CP-04</td><td>UAS-LOG-07</td><td class="mono">09:12</td><td class="mono">充电中</td><td class="num">18.7 kWh</td><td class="num">8 min</td><td class="num">¥39.3</td><td><span class="badge b-cyan">充电中</span></td></tr>
+          <tr><td class="mono">ORD-2398</td><td class="mono">CP-01</td><td>CS-XIANG1</td><td class="mono">08:05</td><td class="mono">08:32</td><td class="num">128.0 kWh</td><td class="num">27 min</td><td class="num">¥268.8</td><td><span class="badge b-green">完成</span></td></tr>
+          <tr><td class="mono">ORD-2396</td><td class="mono">CP-07</td><td>UAS-EMS-01</td><td class="mono">07:40</td><td class="mono">08:01</td><td class="num">22.4 kWh</td><td class="num">21 min</td><td class="num">¥47.0</td><td><span class="badge b-green">完成</span></td></tr>
+          <tr><td class="mono">ORD-2394</td><td class="mono">CP-03</td><td>EVTOL-PAX-02</td><td class="mono">07:05</td><td class="mono">07:35</td><td class="num">96.5 kWh</td><td class="num">30 min</td><td class="num">¥202.6</td><td><span class="badge b-green">完成</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 8. 黑飞处置工单 ========== -->
+<section class="view" id="view-workorder">
+  <div class="title-lg">黑飞处置工单</div>
+  <div class="subtitle">黑飞告警 → 通讯推送 → 任务工单（派单 / 跟踪 / 验收）闭环。仅核查与通报，不驱离、不击落、不做反制处置。</div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>闭环流转</div>
+    <div class="bd">
+      <div class="flow">
+        <div class="node hot"><div class="ic">📡</div><div class="tx">非协作探测告警</div></div>
+        <div class="arrow">→</div>
+        <div class="node ok"><div class="ic">🔔</div><div class="tx">生成工单</div></div>
+        <div class="arrow">→</div>
+        <div class="node"><div class="ic">📋</div><div class="tx">派单</div></div>
+        <div class="arrow">→</div>
+        <div class="node"><div class="ic">🔍</div><div class="tx">处置跟踪</div></div>
+        <div class="arrow">→</div>
+        <div class="node"><div class="ic">✅</div><div class="tx">验收闭环</div></div>
+      </div>
+      <div class="hint" style="margin-top:8px">处置动作仅限：现场核查 / 报执法机关 / 通报机场管理机构 / 记录取证。平台无「反制 / 驱离 / 击落」入口。</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>工单列表<span class="sp"></span><button class="btn sm primary" onclick="toast('新建黑飞处置工单（示例交互）','ok')">+ 新建工单</button></div>
+    <div class="bd" style="padding:0;overflow-x:auto">
+      <table id="wo-table">
+        <thead><tr><th>工单号</th><th>告警来源</th><th>黑飞位置（示意）</th><th>发现时间</th><th>探测源</th><th>状态</th><th>责任人</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr id="wo-1">
+            <td class="mono">WO-20261001-001</td><td>净空黑飞告警 UNKNOWN-01</td><td>跑道东北侧约 1.8 km</td><td class="mono">09:42</td><td>雷达 + 频谱</td>
+            <td><span class="badge b-orange" id="wo1-st">待派单</span></td><td>—</td>
+            <td><button class="btn sm primary" id="wo1-btn" onclick="woNext(1)">派单</button></td>
+          </tr>
+          <tr id="wo-2">
+            <td class="mono">WO-20261001-002</td><td>净空黑飞告警 UNKNOWN-02</td><td>跑道西南侧约 2.1 km</td><td class="mono">09:15</td><td>雷达 + 光电</td>
+            <td><span class="badge b-blue" id="wo2-st">处置中</span></td><td>机场安保-陈某</td>
+            <td><button class="btn sm" id="wo2-btn" onclick="woNext(2)">跟踪</button></td>
+          </tr>
+          <tr id="wo-3">
+            <td class="mono">WO-20260928-014</td><td>净空黑飞告警（历史）</td><td>跑道南侧约 2.4 km</td><td class="mono">09-28 16:20</td><td>频谱</td>
+            <td><span class="badge b-green" id="wo3-st">已验收</span></td><td>机场安保-刘某</td>
+            <td><button class="btn sm" onclick="toast('查看历史工单详情（示例交互）','ok')">查看</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hd"><span class="bar"></span>工单详情 · WO-20261001-001</div>
+    <div class="bd">
+      <div class="kv"><span class="k">告警内容</span><span class="v">净空保护区东北侧发现黑飞目标 UNKNOWN-01，高度 90 m，未广播 RID/ADS-B</span></div>
+      <div class="kv"><span class="k">探测源</span><span class="v">低空探测雷达 + 无线电频谱侦测（非协作式主动探测）</span></div>
+      <div class="kv"><span class="k">通讯推送</span><span class="v">已推送至后台管理模块 / 站内消息（09:42:12）</span></div>
+      <div class="kv"><span class="k">处置建议</span><span class="v">现场核查 · 报执法机关 · 通报机场管理机构（不做反制处置）</span></div>
+      <div class="hint" style="color:#d99aa5">铁律：本平台不做反制处置，黑飞闭环止于「核查 / 通报 / 取证」，无驱离、无击落入口。</div>
+    </div>
+  </div>
+</section>
+
+<div class="footer">低空综合保障设备 · 后台管理平台原型 v0.1（重庆龙兴通用机场示例场景）· 挺中科技 72-应用研发部 · 用于董事长评审系统形态</div>
+</div>
+
+<!-- 弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="mhd"><span class="badge" id="mo-lv">重要</span><span class="badge" id="mo-cat">冲突</span><span class="sp"></span><button class="btn sm" onclick="closeModal()">✕</button></div>
+    <div class="mbd" id="mo-body"></div>
+    <div class="mft"><button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" onclick="toast('已记录人工确认（示例交互）','ok');closeModal()">确认处理</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ===== 导航切换 ===== */
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('.navbar .nav').forEach(n=>n.classList.toggle('active', n.dataset.v===id));
+  if(id==='overview') drawMap('ov-map', 1200, 440, true);
+  if(id==='map') drawMap('main-map', 1200, 620, false);
+  window.scrollTo({top:0});
+}
+document.querySelectorAll('.navbar .nav').forEach(n=>n.addEventListener('click',()=>showView(n.dataset.v)));
+
+/* ===== 时钟 ===== */
+function tickClock(){
+  const d=new Date();
+  const p=n=>String(n).padStart(2,'0');
+  document.getElementById('clock').textContent=
+    `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+setInterval(tickClock,1000);tickClock();
+
+/* ===== KPI 模拟（数字滚动动画） ===== */
+function rollNum(el,to,dur){
+  const from=parseFloat(String(el.textContent).replace(/[^0-9.\-]/g,''))||0;
+  if(from===to){ el.textContent=Math.round(to); return; }
+  const t0=performance.now();
+  function step(t){
+    const k=Math.min(1,(t-t0)/dur);
+    const e=1-Math.pow(1-k,3);
+    el.textContent=Math.round(from+(to-from)*e);
+    if(k<1){ requestAnimationFrame(step); }
+    else{ el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+  }
+  requestAnimationFrame(step);
+}
+setInterval(()=>{
+  const f=document.getElementById('k-flights');
+  if(f && Math.random()>0.6) rollNum(f, Number(f.textContent)+1, 900);
+},4000);
+
+/* ===== Toast ===== */
+function toast(msg,type){
+  const t=document.createElement('div');
+  t.className='toast '+(type||'');
+  t.textContent=msg;
+  document.getElementById('toast').appendChild(t);
+  setTimeout(()=>t.remove(),3200);
+}
+
+/* ===== 弹窗 ===== */
+const ALERTS=[
+  {lv:'紧急',cls:'b-red',cat:'净空黑飞',body:'<div class="kv"><span class="k">来源</span><span class="v">低空探测雷达 · 非协作式主动探测</span></div><div class="kv"><span class="k">内容</span><span class="v">净空保护区东北侧发现黑飞目标 UNKNOWN-01，高度 90 m，未广播 RID/ADS-B</span></div><div class="suggest"><div class="st">处置链路</div><p>告警 → 通讯推送 → 任务工单（派单/跟踪/验收）。不做反制处置，不驱离、不击落。</p></div>'},
+  {lv:'重要',cls:'b-yellow',cat:'冲突',body:'<div class="kv"><span class="k">来源</span><span class="v">态势融合 · 战略+战术双层探测</span></div><div class="kv"><span class="k">内容</span><span class="v">eVTOL-03 与 UAS-物流-07 预计 3 分钟接近，最小间隔将低于阈值（水平 500 m / 垂直 100 m，待核定）</span></div><div class="suggest"><div class="st">解脱建议（仅建议，需人工确认）</div><p>eVTOL-03 高度保持、UAS-物流-07 右偏绕飞；预计解除时间 2 分钟。平台不做飞行控制，不自动下发解脱指令。</p></div>'},
+  {lv:'重要',cls:'b-yellow',cat:'气象',body:'<div class="kv"><span class="k">来源</span><span class="v">AWS-02 自动气象站</span></div><div class="kv"><span class="k">内容</span><span class="v">瞬时风速 12.5 m/s 超限，超过 PROC-001 进近程序准入阈值</span></div><div class="suggest"><div class="st">建议切换程序（仅建议，需人工确认）</div><p>按木桶原则建议切换至大侧风进近程序，联动在飞目标处置。不自动切换、不产生控制指令。</p></div>'},
+  {lv:'一般',cls:'b-blue',cat:'设备',body:'<div class="kv"><span class="k">来源</span><span class="v">CP-05 充电桩（ChaoJi）</span></div><div class="kv"><span class="k">内容</span><span class="v">充电枪线温度 62℃ 偏高，建议关注并安排巡检</span></div>'},
+  {lv:'一般',cls:'b-blue',cat:'接口',body:'<div class="kv"><span class="k">来源</span><span class="v">UOM 对接接口</span></div><div class="kv"><span class="k">内容</span><span class="v">UOM 接口心跳超时（默认周期 5s），已自动重连并补传</span></div>'},
+  {lv:'紧急',cls:'b-red',cat:'净空黑飞',body:'<div class="kv"><span class="k">来源</span><span class="v">低空探测雷达 + 光电红外</span></div><div class="kv"><span class="k">内容</span><span class="v">净空保护区西南侧发现黑飞目标 UNKNOWN-02，光电红外已锁定影像，频谱检测到 2.4G 遥控信号</span></div><div class="suggest"><div class="st">处置链路</div><p>已转工单处置中。仅核查 / 通报 / 取证，不做反制处置。</p></div>'}
+];
+function openAlert(i){
+  const a=ALERTS[i];
+  document.getElementById('mo-lv').textContent=a.lv;
+  document.getElementById('mo-lv').className='badge '+a.cls;
+  document.getElementById('mo-cat').textContent=a.cat;
+  document.getElementById('mo-body').innerHTML=a.body;
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){document.getElementById('overlay').classList.remove('show');}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+
+/* ===== 告警/设备 筛选 ===== */
+function alertFilter(cat,el){
+  document.querySelectorAll('#alert-chips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('#alert-table tbody tr').forEach(tr=>{
+    tr.style.display=(cat==='all'||tr.dataset.cat===cat)?'':'none';
+  });
+}
+function devFilter(cat,el){
+  document.querySelectorAll('#dev-chips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('#dev-table tbody tr').forEach(tr=>{
+    tr.style.display=(cat==='all'||tr.dataset.cat===cat)?'':'none';
+  });
+}
+
+/* ===== 黑飞工单流转演示 ===== */
+const WO_STATUS=['待派单','处置中','待验收','已验收'];
+const WO_BADGE=['b-orange','b-blue','b-yellow','b-green'];
+const WO_BTN=['派单','跟踪','验收','查看'];
+function woNext(i){
+  const st=document.getElementById('wo'+i+'-st');
+  const btn=document.getElementById('wo'+i+'-btn');
+  const idx=WO_STATUS.indexOf(st.textContent);
+  if(idx<3){
+    const n=idx+1;
+    st.textContent=WO_STATUS[n];
+    st.className='badge '+WO_BADGE[n];
+    btn.textContent=WO_BTN[n];
+    toast('工单 WO-20261001-00'+i+' 状态流转：'+WO_STATUS[n]+'（示例交互）','ok');
+  }else{
+    toast('工单已闭环验收，不可再流转（示例交互）','warn');
+  }
+}
+
+/* ===== 地图绘制（纯 SVG 自绘 · 滚轮缩放/拖拽平移/图层分级 · 零 CDN） ===== */
+const MAPS = {};   // svgId -> map 状态（缩放/平移/图层）
+
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+function drawMap(sel,W,H,mini){
+  const svg = document.getElementById(sel);
+  svg.innerHTML = '';
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag,attrs){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+  const map = {
+    sel, W, H, mini,
+    z0:1, z:1, tx:0, ty:0,
+    layers:{}, markers:[], vp:null, readout:null, pan:null,
+    MIN_R:0.5, MAX_R:8          // 相对默认倍率的缩放范围（0.5x–8x）
+  };
+  MAPS[sel] = map;
+
+  // 背景底色
+  svg.appendChild(el('rect',{x:0,y:0,width:W,height:H,fill:'#03060d'}));
+
+  // 渐变定义（雷达扇形径向发光）
+  const defs = el('defs',{});
+  const rg = el('radialGradient',{id:sel+'-sweep',cx:'0',cy:'0',r:'150',gradientUnits:'userSpaceOnUse'});
+  rg.appendChild(el('stop',{offset:'0%','stop-color':'rgba(0,229,255,.42)'}));
+  rg.appendChild(el('stop',{offset:'55%','stop-color':'rgba(0,229,255,.14)'}));
+  rg.appendChild(el('stop',{offset:'100%','stop-color':'rgba(255,45,149,0)'}));
+  defs.appendChild(rg);
+  svg.appendChild(defs);
+
+  // 视口变换组（平移 + 缩放，作用于其内所有世界坐标元素）
+  const vp = el('g',{});
+  map.vp = vp;
+  svg.appendChild(vp);
+
+  // 背景网格（世界坐标，随缩放/平移移动；描边不随缩放变粗）
+  const grid = el('g',{});
+  for(let x=-1200;x<=1200;x+=40){ grid.appendChild(el('line',{x1:x,y1:-1200,x2:x,y2:1200,stroke:'#0d1f3c','stroke-width':1,'vector-effect':'non-scaling-stroke'})); }
+  for(let y=-1200;y<=1200;y+=40){ grid.appendChild(el('line',{x1:-1200,y1:y,x2:1200,y2:y,stroke:'#0d1f3c','stroke-width':1,'vector-effect':'non-scaling-stroke'})); }
+  vp.appendChild(grid);
+
+  /* —— 图层注册（世界坐标：机场/跑道中心在原点 (0,0)）——
+     minR = 相对默认倍率 r(=z/z0) 的显隐阈值；manual = 用户图例勾选开关。
+     低倍率显大元素（净空区/跑道/起降点），高倍率显细节（航线/目标/黑飞/距离标注）。 */
+  function regLayer(id, minR){ const g=el('g',{id:sel+'-'+id}); vp.appendChild(g); map.layers[id]={g,minR,manual:true}; return g; }
+  const radarG  = regLayer('radar', 0);
+  const clearG  = regLayer('clear', 0);
+  const runwayG = regLayer('runway', 0);
+  const sitesG  = regLayer('sites', 0);
+  const routeG  = regLayer('route', 1.5);
+  const targetG = regLayer('target', 1.8);
+  const bfG     = regLayer('bf', 2.0);
+
+  /* 反缩放标记：图标/文字保持屏幕像素级大小，只随缩放拉开间距（放大不变大） */
+  function marker(parent, wx, wy, draw){ const g=el('g',{}); draw(g); parent.appendChild(g); map.markers.push({g,wx,wy}); return g; }
+
+  /* ===== 雷达扫描（机场中心 (0,0) · 底层 HUD · 旋转扇形 + 扩散圈） ===== */
+  radarG.appendChild(el('circle',{cx:0,cy:0,r:150,fill:'none',stroke:'rgba(0,229,255,.38)','stroke-width':1,'vector-effect':'non-scaling-stroke'}));
+  radarG.appendChild(el('circle',{cx:0,cy:0,r:105,fill:'none',stroke:'rgba(0,229,255,.22)','stroke-width':1,'vector-effect':'non-scaling-stroke'}));
+  radarG.appendChild(el('circle',{cx:0,cy:0,r:52,fill:'none',stroke:'rgba(0,229,255,.30)','stroke-width':1,'vector-effect':'non-scaling-stroke'}));
+  const ping = el('circle',{cx:0,cy:0,r:150,fill:'none',stroke:'rgba(0,229,255,.6)','stroke-width':1.4,'vector-effect':'non-scaling-stroke','class':'radar-ping'});
+  radarG.appendChild(ping);
+  const sweep = el('path',{d:'M0,0 L0,-150 A150,150 0 0,1 106,-106 Z',fill:'url('+sel+'-sweep)'});
+  const sweepAnim = el('animateTransform',{attributeName:'transform',type:'rotate',from:'0 0 0',to:'360 0 0',dur:'4s',repeatCount:'indefinite'});
+  sweep.appendChild(sweepAnim);
+  radarG.appendChild(sweep);
+  radarG.appendChild(el('circle',{cx:0,cy:0,r:3,fill:'#00e5ff'}));
+  radarG.appendChild(el('circle',{cx:0,cy:0,r:6,fill:'rgba(34,211,238,.25)'}));
+  marker(radarG, 0, 168, g=>{ const t=el('text',{x:0,y:0,fill:'#8adfef','font-size':(mini?10:11),'text-anchor':'middle'}); t.textContent='低空探测雷达 · 扫描覆盖（示意）'; g.appendChild(t); });
+
+  /* ===== 净空保护区（低倍率可见 · 始终 · 发光边界双层） ===== */
+  const clearPts = [
+    -330,-150, -150,-130, -40,-95, 40,-95, 150,-130, 330,-150,
+    340,20, 180,70, 40,70, -40,70, -180,70, -340,20
+  ].join(' ');
+  clearG.appendChild(el('polygon',{points:clearPts, fill:'rgba(59,139,255,0.10)', stroke:'rgba(59,139,255,.32)','stroke-width':10,'vector-effect':'non-scaling-stroke','style':'filter:drop-shadow(0 0 16px rgba(59,139,255,.6))'}));
+  clearG.appendChild(el('polygon',{points:clearPts, fill:'rgba(59,139,255,0.06)', stroke:'#4da3ff','stroke-width':1.8,'stroke-dasharray':'9 6','vector-effect':'non-scaling-stroke','class':'flow-dash','style':'filter:drop-shadow(0 0 8px rgba(77,163,255,.95))'}));
+  marker(clearG, -330, -165, g=>{
+    const t = el('text',{x:0,y:0,fill:'#6aa5ef','font-size':(mini?13:15),'font-weight':'600'});
+    t.textContent = '净空保护区（示意范围）';
+    g.appendChild(t);
+  });
+
+  /* ===== 跑道（低倍率可见 · 始终） ===== */
+  runwayG.appendChild(el('rect',{x:-150,y:-20,width:300,height:40,rx:6,fill:'#16253f',stroke:'#33527f','stroke-width':1.5,'vector-effect':'non-scaling-stroke'}));
+  runwayG.appendChild(el('line',{x1:-140,y1:0,x2:140,y2:0,stroke:'#5f7aa8','stroke-width':1.5,'stroke-dasharray':'14 8','vector-effect':'non-scaling-stroke'}));
+  for(const side of [-1,1]){
+    for(let i=0;i<4;i++){
+      runwayG.appendChild(el('line',{x1:side*135, y1:-16+i*8, x2:side*150, y2:-16+i*8, stroke:'#eaf2ff','stroke-width':2,'vector-effect':'non-scaling-stroke'}));
+    }
+  }
+  marker(runwayG, -120, 8, g=>{ const t=el('text',{x:0,y:0,fill:'#eaf2ff','font-size':(mini?12:14),'font-weight':'700'}); t.textContent='06'; g.appendChild(t); });
+  marker(runwayG, 104, 8, g=>{ const t=el('text',{x:0,y:0,fill:'#eaf2ff','font-size':(mini?12:14),'font-weight':'700'}); t.textContent='24'; g.appendChild(t); });
+  marker(runwayG, 0, 42, g=>{ const t=el('text',{x:0,y:0,fill:'#f2f7ff','font-size':(mini?13:15),'font-weight':'700','text-anchor':'middle'}); t.textContent='重庆龙兴通用机场（A1级）'; g.appendChild(t); });
+  marker(runwayG, 0, 58, g=>{ const t=el('text',{x:0,y:0,fill:'#93aaca','font-size':(mini?10:11),'text-anchor':'middle'}); t.textContent='西南首个A1级 · 主城唯一航空应急救援基地'; g.appendChild(t); });
+  runwayG.appendChild(el('rect',{x:70,y:-70,width:36,height:18,rx:3,fill:'#14233c',stroke:'#33527f','stroke-width':1,'vector-effect':'non-scaling-stroke'}));
+  runwayG.appendChild(el('rect',{x:-40,y:-62,width:24,height:14,rx:3,fill:'#14233c',stroke:'#33527f','stroke-width':1,'vector-effect':'non-scaling-stroke'}));
+
+  /* ===== 起降点（低倍率可见 · 始终） ===== */
+  const sites=[
+    {x:-150,y:40,n:'龙兴机场起降点'},
+    {x:-260,y:-60,n:'应急救援起降点'},
+    {x:210,y:-40,n:'两江物流无人机起降点'},
+    {x:-60,y:120,n:'eVTOL 载人起降点'},
+  ];
+  sites.forEach(p=>{
+    marker(sitesG, p.x, p.y, g=>{
+      g.appendChild(el('circle',{cx:0,cy:0,r:9,fill:'rgba(0,229,255,.22)',stroke:'#00e5ff','stroke-width':1.6,'style':'filter:drop-shadow(0 0 4px rgba(34,211,238,.5))'}));
+      g.appendChild(el('circle',{cx:0,cy:0,r:3.5,fill:'#00e5ff'}));
+      const t=el('text',{x:12,y:4,fill:'#a9c6e8','font-size':(mini?11:12)});
+      t.textContent=p.n; g.appendChild(t);
+    });
+  });
+
+  /* ===== 航路航线（中倍率可见 · 发光 + 数据流动点） ===== */
+  const routes=[
+    {x1:-150,y1:40,x2:-260,y2:-60,n:'龙兴—应急救援航线'},
+    {x1:-150,y1:40,x2:210,y2:-40,n:'龙兴—两江物流航线'},
+    {x1:70,y1:-70,x2:-150,y2:-200,n:'离场航线（示意）'},
+  ];
+  routes.forEach((r,ri)=>{
+    routeG.appendChild(el('line',{x1:r.x1,y1:r.y1,x2:r.x2,y2:r.y2,stroke:'rgba(0,229,255,.24)','stroke-width':5,'vector-effect':'non-scaling-stroke','style':'filter:drop-shadow(0 0 9px rgba(0,229,255,.65))'}));
+    routeG.appendChild(el('line',{x1:r.x1,y1:r.y1,x2:r.x2,y2:r.y2,stroke:'#00e5ff','stroke-width':1.6,'stroke-dasharray':'5 4','opacity':.9,'vector-effect':'non-scaling-stroke','class':'flow-dash'}));
+    const ang=Math.atan2(r.y2-r.y1,r.x2-r.x1);
+    const mx=(r.x1+r.x2)/2, my=(r.y1+r.y2)/2;
+    routeG.appendChild(el('polygon',{points:(mx+6*Math.cos(ang))+','+(my+6*Math.sin(ang))+' '+(mx-4*Math.cos(ang-0.5))+','+(my-4*Math.sin(ang-0.5))+' '+(mx-4*Math.cos(ang+0.5))+','+(my-4*Math.sin(ang+0.5)),fill:'#00e5ff','opacity':.85}));
+    marker(routeG, mx+8, my-6, g=>{ const t=el('text',{x:0,y:0,fill:'#8adfef','font-size':(mini?10:11)}); t.textContent=r.n; g.appendChild(t); });
+    const flow = el('circle',{r:2.2,fill:'#b8fbff','style':'filter:drop-shadow(0 0 3px rgba(34,211,238,.9))'});
+    const fm = el('animateMotion',{dur:(2.2+ri*0.7)+'s',repeatCount:'indefinite',path:'M'+r.x1+','+r.y1+' L'+r.x2+','+r.y2});
+    flow.appendChild(fm);
+    routeG.appendChild(flow);
+  });
+
+  /* ===== 飞行目标（高倍率可见 · 图标不随缩放变大 · 脉冲环） ===== */
+  const targets=[
+    {x:-60,y:-130,c:'#2ce88a',n:'CS-XIANG1'},
+    {x:130,y:-90,c:'#00e5ff',n:'UAS-LOG-07'},
+    {x:40,y:-160,c:'#b78bff',n:'EVTOL-PAX-03'},
+    {x:-220,y:-40,c:'#3b8bff',n:'UAS-EMS-01'},
+  ];
+  targets.forEach(p=>{
+    const g = marker(targetG, p.x, p.y, d=>{
+      d.appendChild(el('circle',{cx:0,cy:0,r:8,fill:p.c,'opacity':.25}));
+      d.appendChild(el('circle',{cx:0,cy:0,r:5,fill:'none',stroke:p.c,'stroke-width':1.5,'class':'tgt-ring'}));
+      d.appendChild(el('circle',{cx:0,cy:0,r:3.5,fill:p.c,'style':'filter:drop-shadow(0 0 4px '+p.c+')'}));
+      const t=el('text',{x:8,y:-6,fill:p.c,'font-size':(mini?10:11),'font-weight':'600'});
+      t.textContent=p.n; d.appendChild(t);
+    });
+    g.setAttribute('class','fly');
+  });
+
+  /* ===== 黑飞告警点（最高倍率可见 · 含距离标注） ===== */
+  const bfs=[
+    {x:180,y:-110,n:'UNKNOWN-01',d:'距跑道 ≈1.8 km（示意）'},
+    {x:-220,y:60,n:'UNKNOWN-02',d:'距跑道 ≈2.1 km（示意）'},
+  ];
+  bfs.forEach(p=>{
+    marker(bfG, p.x, p.y, g=>{
+      g.appendChild(el('circle',{cx:0,cy:0,r:7,fill:'none',stroke:'#ff3b57','stroke-width':2,'class':'pulse-red'}));
+      g.appendChild(el('circle',{cx:0,cy:0,r:5,fill:'#ff3b57','class':'blink','style':'filter:drop-shadow(0 0 5px rgba(255,77,79,.9))'}));
+      const t=el('text',{x:10,y:-8,fill:'#ff9aa8','font-size':(mini?10:11),'font-weight':'700'});
+      t.textContent='黑飞 '+p.n; g.appendChild(t);
+      const d=el('text',{x:10,y:6,fill:'#d99aa5','font-size':(mini?9:10)});
+      d.textContent=p.d; g.appendChild(d);
+    });
+  });
+
+  /* ===== 固定屏幕元素（不随缩放/平移 · 画在视口组之外） ===== */
+  const comp=el('g',{opacity:.8});
+  comp.appendChild(el('line',{x1:W-40,y1:50,x2:W-40,y2:18,stroke:'#93aaca','stroke-width':1.5}));
+  comp.appendChild(el('polygon',{points:(W-40)+',14 '+(W-46)+',24 '+(W-34)+',24',fill:'#93aaca'}));
+  const nt=el('text',{x:W-40,y:70,fill:'#93aaca','font-size':'11','text-anchor':'middle'}); nt.textContent='N';
+  comp.appendChild(nt); svg.appendChild(comp);
+
+  const note=el('text',{x:16,y:H-16,fill:'#5d7296','font-size':'11'});
+  note.textContent='示意图 · 非真实坐标 · 滚轮缩放 / 拖拽平移'; svg.appendChild(note);
+
+  // 缩放控件（右下角，固定屏幕）
+  const ui=el('g',{});
+  const bPlus=el('rect',{x:W-46,y:H-80,width:30,height:30,rx:6,fill:'#0c1a30',stroke:'#1a3a5c','stroke-width':1,'cursor':'pointer','data-ui':'1'});
+  const bMinus=el('rect',{x:W-46,y:H-46,width:30,height:30,rx:6,fill:'#0c1a30',stroke:'#1a3a5c','stroke-width':1,'cursor':'pointer','data-ui':'1'});
+  const tPlus=el('text',{x:W-31,y:H-59,fill:'#d4e6ff','font-size':'18','text-anchor':'middle','cursor':'pointer','data-ui':'1'}); tPlus.textContent='+';
+  const tMinus=el('text',{x:W-31,y:H-25,fill:'#d4e6ff','font-size':'18','text-anchor':'middle','cursor':'pointer','data-ui':'1'}); tMinus.textContent='−';
+  const rd=el('text',{x:W-31,y:H-88,fill:'#93aaca','font-size':'11','text-anchor':'middle','cursor':'pointer','data-ui':'1'}); rd.textContent='100%';
+  map.readout=rd;
+  ui.appendChild(bPlus); ui.appendChild(bMinus); ui.appendChild(tPlus); ui.appendChild(tMinus); ui.appendChild(rd);
+  svg.appendChild(ui);
+  bPlus.addEventListener('click',()=>zoomAt(map,1.4,map.W/2,map.H/2));
+  bMinus.addEventListener('click',()=>zoomAt(map,1/1.4,map.W/2,map.H/2));
+  rd.addEventListener('click',()=>resetView(map));
+
+  /* ===== 交互：滚轮缩放（以鼠标为中心）/ 拖拽平移 ===== */
+  function toSVGPoint(ev){
+    const pt=svg.createSVGPoint(); pt.x=ev.clientX; pt.y=ev.clientY;
+    const ctm=svg.getScreenCTM(); if(!ctm) return {x:0,y:0};
+    return pt.matrixTransform(ctm.inverse());
+  }
+  svg.addEventListener('wheel', function(ev){
+    ev.preventDefault();
+    const p=toSVGPoint(ev);
+    zoomAt(map, ev.deltaY<0?1.4:1/1.4, p.x, p.y);
+  }, {passive:false});
+
+  svg.style.cursor='grab';
+  svg.style.userSelect='none';
+  svg.style.touchAction='none';
+  svg.addEventListener('pointerdown', function(ev){
+    if(ev.button!==0) return;
+    if(ev.target && ev.target.closest && ev.target.closest('[data-ui]')) return;
+    const p=toSVGPoint(ev);
+    map.pan={sx:p.x-map.tx, sy:p.y-map.ty, active:true};
+    svg.setPointerCapture(ev.pointerId);
+    svg.style.cursor='grabbing';
+  });
+  function endPan(){ if(map.pan) map.pan.active=false; svg.style.cursor='grab'; }
+  svg.addEventListener('pointermove', function(ev){
+    if(!map.pan||!map.pan.active) return;
+    const p=toSVGPoint(ev);
+    map.tx=p.x-map.pan.sx; map.ty=p.y-map.pan.sy;
+    clampPan(map); apply(map);
+  });
+  svg.addEventListener('pointerup', endPan);
+  svg.addEventListener('pointercancel', endPan);
+  svg.addEventListener('dblclick', ()=>resetView(map));
+
+  /* ===== 初始视口：适配「净空区 + 跑道 + 起降点」，细节图层默认隐藏 ===== */
+  map.z0 = Math.min(W/700, H/290) * 0.92;
+  map.z  = map.z0;
+  map.tx = W/2;
+  map.ty = H/2 + 15*map.z0;   // 适配框中心世界 y≈-15
+  apply(map);
+
+  /* ===== 缩放 / 复位 / 平移钳制 / 应用 ===== */
+  function zoomAt(m,f,px,py){
+    const old=m.z;
+    const z=clamp(old*f, m.MIN_R*m.z0, m.MAX_R*m.z0);
+    if(z===old) return;
+    const k=z/old;
+    m.tx = px - (px-m.tx)*k;
+    m.ty = py - (py-m.ty)*k;
+    m.z = z;
+    clampPan(m); apply(m);
+  }
+  function resetView(m){ m.z=m.z0; m.tx=m.W/2; m.ty=m.H/2+15*m.z0; apply(m); }
+  function clampPan(m){
+    const mx=420, my=260;
+    m.tx=clamp(m.tx, m.W/2-mx*m.z, m.W/2+mx*m.z);
+    m.ty=clamp(m.ty, m.H/2-my*m.z, m.H/2+my*m.z);
+  }
+  function apply(m){
+    m.vp.setAttribute('transform','translate('+m.tx+' '+m.ty+') scale('+m.z+')');
+    for(const mk of m.markers){ mk.g.setAttribute('transform','translate('+mk.wx+' '+mk.wy+') scale('+(1/m.z)+')'); }
+    applyLayers(m);
+    if(m.readout) m.readout.textContent = Math.round(m.z/m.z0*100)+'%';
+  }
+  function applyLayers(m){
+    const r=m.z/m.z0;
+    for(const id in m.layers){ const L=m.layers[id]; L.g.style.display = (L.manual && r>=L.minR) ? '' : 'none'; }
+  }
+}
+
+/* 图层显隐（图例勾选 · 与缩放分级叠加：勾选 且 达到倍率阈值 才显示） */
+function toggleLayer(id,cb){
+  const i=id.lastIndexOf('-');
+  const sel=id.slice(0,i), lid=id.slice(i+1);
+  const m=MAPS[sel];
+  if(!m||!m.layers[lid]) return;
+  m.layers[lid].manual=cb.checked;
+  const r=m.z/m.z0;
+  m.layers[lid].g.style.display=(m.layers[lid].manual && r>=m.layers[lid].minR)?'':'none';
+}
+
+/* ===== 动态粒子背景（原生 canvas · 零依赖） ===== */
+(function(){
+  const c=document.getElementById('particles');
+  if(!c||!c.getContext) return;
+  const ctx=c.getContext('2d');
+  let W,H,dpr;
+  function resize(){ dpr=Math.min(window.devicePixelRatio||1,2); W=c.width=Math.floor(innerWidth*dpr); H=c.height=Math.floor(innerHeight*dpr); c.style.width=innerWidth+'px'; c.style.height=innerHeight+'px'; }
+  resize(); addEventListener('resize',resize);
+  const N=Math.min(90, Math.floor(innerWidth/18));
+  const ps=[];
+  for(let i=0;i<N;i++) ps.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,r:Math.random()*1.5+.4,c:(Math.random()<.78?'0,229,255':(Math.random()<.5?'59,139,255':'255,45,149'))});
+  function step(){
+    ctx.clearRect(0,0,W,H);
+    for(const p of ps){
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0||p.x>innerWidth) p.vx*=-1;
+      if(p.y<0||p.y>innerHeight) p.vy*=-1;
+      ctx.beginPath(); ctx.arc(p.x*dpr,p.y*dpr,p.r*dpr,0,Math.PI*2);
+      ctx.fillStyle='rgba('+p.c+','+(0.25+Math.random()*0.4)+')';
+      ctx.shadowBlur=8*dpr; ctx.shadowColor='rgba('+p.c+',.9)';
+      ctx.fill();
+      ctx.shadowBlur=0;
+    }
+    requestAnimationFrame(step);
+  }
+  step();
+})();
+
+/* ===== 首次加载：KPI 数字滚动入场 ===== */
+['k-flights','k-dev','k-alert','k-bf','k-chg'].forEach(function(id){
+  const el=document.getElementById(id);
+  if(el){ const t=Number(el.textContent); el.textContent='0'; setTimeout(function(){ rollNum(el,t,1200); },300); }
+});
+
+/* 初始绘制 */
+drawMap('ov-map',1200,440,true);
+</script>
+</body>
+</html>

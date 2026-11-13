@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>航道匹配 · 点击放置无人机</title>
+<style>
+  :root{--bg:#070c18;--panel:#0e1526;--line:#1e2b45;--txt:#e6edf7;--dim:#8ea0bd;
+        --dim2:#5f728f;--cyan:#22d3ee;--green:#49e3ae;--amber:#fbbf24;--red:#ff8f9a;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.6 "Microsoft YaHei",system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);background:#0b1322}
+  h1{font-size:16px;margin:0}
+  h1 small{font-weight:400;color:var(--dim2);font-size:12px;margin-left:8px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+        border:1px solid var(--line);color:var(--dim);font-size:12px;background:#0b1424}
+  .pill i{width:7px;height:7px;border-radius:50%;background:var(--dim2)}
+  .pill.ok{border-color:#14523f;color:#7ee2b8}.pill.ok i{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .pill.bad{border-color:#5b2330;color:#f3a3ac}.pill.bad i{background:var(--red)}
+  main{display:grid;grid-template-columns:300px 1fr;gap:14px;padding:14px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  section h2{margin:0;padding:10px 14px;font-size:13px;color:#b9c8de;background:#121b30;
+             border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+  section h2 em{font-style:normal;margin-left:auto;font-size:11px;color:var(--dim2)}
+  .body{padding:12px 14px}
+  .row{display:grid;grid-template-columns:44px 1fr 66px;gap:8px;align-items:center;margin:7px 0;
+       font-size:12px;color:var(--dim)}
+  input[type=range]{-webkit-appearance:none;width:100%;height:16px;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:#1d4ed8}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:#e6f7ff;border:2px solid var(--cyan);margin-top:-4px}
+  output{font:11px Consolas,monospace;color:var(--cyan);text-align:right}
+  #map{display:block;width:100%;height:calc(100vh - 150px);background:#06101c;cursor:crosshair}
+  .logs{height:210px;overflow:auto;padding:8px 12px;font:11px/1.7 Consolas,monospace;color:#86a0bb}
+  .logs .ok{color:var(--green)}.logs .warn{color:var(--amber)}.logs .err{color:var(--red)}
+  .hint{font-size:11px;color:var(--dim2);line-height:1.7}
+  .btn{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0b1424;
+       color:var(--dim);cursor:pointer;font-size:12px;margin-top:6px}
+  .btn:hover{border-color:var(--cyan);color:var(--txt)}
+  .btn.primary{background:linear-gradient(90deg,#1d4ed8,#0ea5e9);color:#fff;border:none}
+  .legend{display:flex;gap:14px;padding:0 14px 10px;font-size:11px;color:var(--dim2);flex-wrap:wrap}
+  .legend b{display:inline-block;width:24px;height:0;border-top:2px dashed;vertical-align:middle;margin-right:5px}
+  .dl{display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:12px}
+  .dl span:nth-child(odd){color:var(--dim2)}
+  .dl span:nth-child(even){font-family:Consolas,monospace;text-align:right}
+</style>
+</head>
+<body>
+<header>
+  <h1>航道匹配<small>点击俯视图放置无人机 → 自动匹配航道模板</small></h1>
+  <span style="flex:1"></span>
+  <span class="pill" id="pill-api"><i></i>连接中…</span>
+  <span class="pill" id="pill-fleet">未放置</span>
+</header>
+
+<main>
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <section>
+      <h2>环境与状态</h2>
+      <div class="body">
+        <div class="row"><label>风速</label><input type="range" id="w-wind" min="0" max="20" step="0.5" value="5"><output id="v-wind">5.0 m/s</output></div>
+        <div class="row"><label>风向</label><input type="range" id="w-dir" min="0" max="359" step="1" value="0"><output id="v-dir">0°</output></div>
+        <div class="row"><label>降水</label><input type="range" id="w-rain" min="0" max="20" step="0.5" value="0"><output id="v-rain">0 mm/h</output></div>
+        <div class="row"><label>电量</label><input type="range" id="w-batt" min="10" max="100" step="1" value="100"><output id="v-batt">100%</output></div>
+        <button class="btn primary" id="btn-run">▶ 开始飞行</button>
+        <button class="btn" id="btn-clear">清空无人机</button>
+        <div class="hint" style="margin-top:8px">在右侧点一下 → 无人机出现在那里，并按当前风/雨/电量匹配航道<br>改滑杆后可用「重新评估」重选</div>
+        <button class="btn" id="btn-reeval">↻ 按新环境重新评估</button>
+        <div class="row" style="margin-top:10px"><label>倍速</label>
+          <span id="speed-btns" style="display:flex;gap:6px">
+            <button class="btn spd" data-x="1">1×</button>
+            <button class="btn spd" data-x="4">4×</button>
+            <button class="btn spd active" data-x="8">8×</button>
+            <button class="btn spd" data-x="16">16×</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>无人机<em>点击列表中一行可高亮</em></h2>
+      <div class="body" id="fleet" style="padding:6px 12px">
+        <div class="hint">还没有放置无人机</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>现场日志</h2>
+      <div class="logs" id="log"></div>
+    </section>
+  </div>
+
+  <section>
+    <h2>俯视图<em id="mapinfo">—</em></h2>
+    <canvas id="map" width="1000" height="760"></canvas>
+    <div class="legend">
+      <span><b style="border-color:#ffd666"></b>接续段（无人机 → 航道入口，虚线）</span>
+      <span><b style="border-color:#49e3ae;border-top-style:solid"></b>航道模板（实线）</span>
+      <span><b style="border-color:#fbbf24;border-style:dashed"></b>等待中（黄色虚线圈，慢飞）</span>
+      <span><b style="border-color:#5f728f;border-top-style:solid"></b>已落地（灰色航迹，2 秒后移除）</span>
+      <span>◇ 起降点　● 障碍物　▭ 限飞区</span>
+    </div>
+    <div id="stats" style="margin-top:8px;display:flex;gap:18px;font-size:12px;color:#9fb6d4;font-family:Consolas,monospace">
+      <span>已落地 <b id="st-land" style="color:#4ade80">0</b> 架</span>
+      <span>平均间隔 <b id="st-gap" style="color:#7cc4ff">—</b></span>
+      <span>跑道占用 <b id="st-occ" style="color:#ffd666">0%</b></span>
+      <span>最小间距 <b id="st-sep" style="color:#f472b6">—</b></span>
+    </div>
+    <div class="hint" style="margin-top:6px;color:#8fa6c4;font-size:12px;line-height:1.7">
+      ① 在雷达图任意位置点一下 → 自动选方向并接续到航道　
+      ② 点「▶ 开始飞行」→ 跑道一次只落一架，其余在入口/航道上慢飞排队　
+      ③ 落地后绿色变灰、2 秒后航迹自动移除
+    </div>
+  </section>
+</main>
+
+<script>
+const API = (location.protocol === 'file:' ? 'http://127.0.0.1:8080' : location.origin);
+const $ = s => document.querySelector(s);
+const COLORS = ['#ffd666', '#49e3ae', '#7cc7ff', '#c084fc', '#ff9f6e', '#f472b6'];
+
+let snap = null;
+let drones = [];
+let running = false;
+let lastT = 0;
+let highlight = null;
+const SEP_SEC = 45;          // 最小落地间隔（模型秒）
+let TIME_SCALE = 8;          // 演示加速（可用界面按钮 1/4/8/16 切换）
+const V_BASE = 0.06;         // 正常进近速度（进度/秒）
+const V_SLOW = 0.015;        // 等待时慢飞（0.25 倍）
+const V_FAST = 0.14;         // 获准后加速落地（约 2.3 倍）
+let simT = 0;                // 仿真时钟（秒）
+const stats = { landed: 0, lastLand: null, gapSum: 0, gapN: 0, minSep: Infinity };
+let runwayFreeAt = 0;        // 跑道下次可用时刻
+
+function log(text, cls) {
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = new Date().toLocaleTimeString('zh-CN', {hour12:false}) + '  ' + text;
+  const box = $('#log'); box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+
+async function api(path, opts) {
+  const r = await fetch(API + path, Object.assign({cache:'no-store'}, opts || {}));
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+function enu(lat, lon) {
+  const a = snap.airport, k = 111320 * Math.cos(a.lat * Math.PI / 180);
+  return [(lon - a.lon) * k, (lat - a.lat) * 111320];
+}
+
+/* ---------------- 绘制 ---------------- */
+const cv = $('#map'), ctx = cv.getContext('2d');
+let view = { S: 1, cx: 0, cy: 0 };
+
+function routeAt(wps, frac) {                 // 航段上 frac 处的坐标 + 切线方向
+  const joinFrac = 0.15;
+  if (frac < joinFrac) return null;
+  const t = (frac - joinFrac) / (1 - joinFrac);
+  const k = Math.min(0.9999, t) * (wps.length - 1);
+  const i0 = Math.floor(k), f = k - i0;
+  const a = wps[i0], b = wps[Math.min(i0 + 1, wps.length - 1)];
+  const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+  let dx = b.x - a.x, dy = b.y - a.y;
+  const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+  return { x, y, dx, dy };
+}
+
+const HOLD_EXIT = 0.97;      // 只有极端情况才需要脱离中心线（正常一路慢飞到跑道口）
+function dronePos(d) {
+  const wps = d.route || [];
+  if (!wps.length) return { x: d.x, y: d.y };
+  const joinFrac = 0.15;
+  if (d.prog < joinFrac) {
+    const t = d.prog / joinFrac;
+    return { x: d.x + (wps[0].x - d.x) * t, y: d.y + (wps[0].y - d.y) * t };
+  }
+  // 等待中且已到脱离点 → 停在中线侧面的等待圈（不再占用中心线）
+  if (d.holding && d.prog >= HOLD_EXIT) {
+    const r0 = routeAt(wps, HOLD_EXIT);
+    if (r0) {
+      const off = d.holdOffset || 320;                  // 侧向偏离
+      const bx = r0.x - r0.dy * off, by = r0.y + r0.dx * off;
+      const a = (performance.now() / 1000) * 0.55 + (d.order || 0);
+      return { x: bx + Math.cos(a) * 110, y: by + Math.sin(a) * 110 };
+    }
+  }
+  const t = (d.prog - joinFrac) / (1 - joinFrac);
+  const k = Math.min(0.999, t) * (wps.length - 1);
+  const i0 = Math.floor(k), f = k - i0;
+  const a = wps[i0], b = wps[Math.min(i0 + 1, wps.length - 1)];
+  return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+}
+
+function draw() {
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const S = Math.min(W, H) / 4800;
+  const cx = W / 2, cy = H / 2;
+  view = { S, cx, cy };
+  const px = x => cx + x * S, py = y => cy - y * S;
+
+  ctx.strokeStyle = 'rgba(117,163,215,.10)'; ctx.lineWidth = 1;
+  for (let r = 500; r <= 2000; r += 500) {
+    ctx.beginPath(); ctx.arc(cx, cy, r * S, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(95,114,143,.55)'; ctx.font = '10px Consolas';
+    ctx.fillText((r / 1000) + ' km', cx + 4, cy - r * S - 3);
+  }
+  ctx.beginPath(); ctx.moveTo(px(-2300), cy); ctx.lineTo(px(2300), cy);
+  ctx.moveTo(cx, py(-2300)); ctx.lineTo(cx, py(2300)); ctx.stroke();
+
+  if (snap) {
+    (snap.obstacles || []).forEach(o => {
+      const [x, y] = enu(o.lat, o.lon);
+      ctx.beginPath(); ctx.arc(px(x), py(y), Math.max(4, (o.radius || 20) * S), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,138,92,.16)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,138,92,.5)'; ctx.stroke();
+    });
+    (snap.airspaces || []).forEach(a => {
+      ctx.beginPath();
+      a.polygon.forEach(([lat, lon], i) => {
+        const [x, y] = enu(lat, lon);
+        i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y));
+      });
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(124,92,255,.10)'; ctx.fill();
+      ctx.setLineDash([5,4]); ctx.strokeStyle = 'rgba(124,92,255,.55)'; ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  drones.forEach(d => {
+    const wps = d.route || [];
+    if (wps.length < 2) return;
+    const dim = highlight && highlight !== d.id;
+    const alpha = dim ? 0.15 : 1;
+
+    const edgeColor = d.ghost ? '#5f728f' : d.color;
+    if (d.ghost) {           // 幽灵只画模板航段，不画接续段
+      ctx.beginPath();
+      wps.forEach((w, i) => i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)));
+      ctx.globalAlpha = 0.45; ctx.lineWidth = 2.2;
+      ctx.strokeStyle = '#5f728f'; ctx.stroke(); ctx.globalAlpha = 1;
+      return;
+    }
+    // 接续段（虚线）
+    ctx.beginPath();
+    ctx.moveTo(px(d.x), py(d.y)); ctx.lineTo(px(wps[0].x), py(wps[0].y));
+    ctx.strokeStyle = d.ghost ? '#5f728f' : (d.joinsafe === false ? '#ff8f9a' : d.color);
+    ctx.globalAlpha = alpha * 0.9; ctx.setLineDash([7, 5]); ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 模板航段（实线）
+    ctx.beginPath();
+    wps.forEach((w, i) => i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)));
+    ctx.globalAlpha = (d.ghost ? 0.45 : alpha * 0.85); ctx.lineWidth = 2.2;
+    ctx.strokeStyle = edgeColor; ctx.stroke();
+    if (d.ghost) { ctx.globalAlpha = 1; return; }
+
+    // 箭头
+    const stepN = Math.max(3, Math.floor(wps.length / 4));
+    for (let i = stepN; i < wps.length; i += stepN) {
+      const a = wps[i - 1], b = wps[i];
+      const AX = px(a.x), AY = py(a.y), BX = px(b.x), BY = py(b.y);
+      const ang = Math.atan2(BY - AY, BX - AX);
+      ctx.beginPath();
+      ctx.moveTo(BX, BY);
+      ctx.lineTo(BX - 9 * Math.cos(ang) + 5 * Math.sin(ang), BY - 9 * Math.sin(ang) - 5 * Math.cos(ang));
+      ctx.lineTo(BX - 9 * Math.cos(ang) - 5 * Math.sin(ang), BY - 9 * Math.sin(ang) + 5 * Math.cos(ang));
+      ctx.closePath(); ctx.globalAlpha = alpha; ctx.fillStyle = d.color; ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // 无人机
+    const pos = dronePos(d);
+    ctx.beginPath(); ctx.arc(px(pos.x), py(pos.y), 6, 0, Math.PI * 2);
+    ctx.fillStyle = d.dead ? '#5f7794' : d.color; ctx.fill();
+    ctx.strokeStyle = '#0b1424'; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = d.dead ? '#5f7794' : d.color;
+    ctx.font = 'bold 11px Microsoft YaHei'; ctx.textAlign = 'center';
+    ctx.fillText(d.id + ' ' + d.dir, px(pos.x), py(pos.y) - 12);
+    ctx.font = '10px Consolas'; ctx.fillStyle = 'rgba(200,215,235,.9)';
+    ctx.fillText(Math.round(d.battery * 100) + '%', px(pos.x), py(pos.y) + 19);
+    if (d.holding && !d.dead) {
+      ctx.beginPath(); ctx.arc(px(pos.x), py(pos.y), 13, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fbbf24'; ctx.globalAlpha = .7; ctx.lineWidth = 1.4;
+      ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fbbf24'; ctx.font = '10px Microsoft YaHei';
+      ctx.fillText('等待', px(pos.x), py(pos.y) + 32);
+    }
+    ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  });
+
+  ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx - 6, cy + 6); ctx.lineTo(cx + 6, cy + 6);
+  ctx.closePath(); ctx.fillStyle = '#eaf4ff'; ctx.fill();
+  ctx.fillStyle = '#8fa5c0'; ctx.font = '11px Microsoft YaHei';
+  ctx.fillText('起降点', cx + 10, cy + 4);
+
+  drawWindChip(ctx, W, H);      // 左上角风向标
+}
+
+/* 左上角风向标：箭头指向"风吹去的方向" */
+function drawWindChip(g, W, H) {
+  var dirEl = document.getElementById('w-dir'), spdEl = document.getElementById('w-wind');
+  if (!dirEl || !spdEl) return;
+  var wdir = parseFloat(dirEl.value) || 0;        // 风的来向
+  var wspd = parseFloat(spdEl.value) || 0;
+  var x0 = 24, y0 = 26, R = 16;
+  // 底框
+  g.fillStyle = 'rgba(8,16,30,.72)'; g.strokeStyle = '#1e3a5f'; g.lineWidth = 1;
+  g.beginPath(); g.roundRect ? g.roundRect(x0 - 12, y0 - 16, 132, 52, 8)
+                             : g.rect(x0 - 12, y0 - 16, 132, 52);
+  g.fill(); g.stroke();
+  // 圆环
+  g.beginPath(); g.arc(x0 + R, y0 + 6, R, 0, Math.PI * 2);
+  g.strokeStyle = 'rgba(34,211,238,.35)'; g.stroke();
+  // 箭头：风吹向 = 来向 + 180；屏幕 y 轴向下，北为 -y
+  var to = (wdir + 180) * Math.PI / 180;
+  var ax = Math.sin(to) * R * 0.85, ay = -Math.cos(to) * R * 0.85;
+  g.beginPath();
+  g.moveTo(x0 + R - ax, y0 + 6 - ay);
+  g.lineTo(x0 + R + ax, y0 + 6 + ay);
+  g.strokeStyle = '#22d3ee'; g.lineWidth = 2; g.stroke();
+  var ang = Math.atan2(ay, ax);
+  g.beginPath();
+  g.moveTo(x0 + R + ax, y0 + 6 + ay);
+  g.lineTo(x0 + R + ax - 8 * Math.cos(ang) + 4.5 * Math.sin(ang),
+           y0 + 6 + ay - 8 * Math.sin(ang) - 4.5 * Math.cos(ang));
+  g.lineTo(x0 + R + ax - 8 * Math.cos(ang) - 4.5 * Math.sin(ang),
+           y0 + 6 + ay - 8 * Math.sin(ang) + 4.5 * Math.cos(ang));
+  g.closePath(); g.fillStyle = '#22d3ee'; g.fill();
+  // 文字
+  g.fillStyle = '#8ea0bd'; g.font = '10px Microsoft YaHei'; g.textAlign = 'left';
+  g.fillText('风向 ' + Math.round(wdir) + '°', x0 + 2 * R + 8, y0 + 2);
+  g.fillStyle = '#22d3ee'; g.font = 'bold 11px Consolas';
+  g.fillText(wspd.toFixed(1) + ' m/s', x0 + 2 * R + 8, y0 + 18);
+  g.textAlign = 'left';
+}
+
+/* 把滑杆上的环境参数同步到后端，否则后端算的还是旧气象 */
+let lastEnvKey = '';
+async function syncMeteo() {
+  const wind = parseFloat($('#w-wind').value);
+  const dir = parseFloat($('#w-dir').value);
+  const rain = parseFloat($('#w-rain').value);
+  const key = wind + '|' + dir + '|' + rain;
+  if (key === lastEnvKey) return true;      // 环境没变，不重复触发后端重算
+  lastEnvKey = key;
+  try {
+    await api('/api/env/meteo', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({wind_speed: wind, wind_dir: dir, precipitation: rain})
+    });
+    return true;
+  } catch (e) { lastEnvKey = ''; log('环境同步失败：' + e.message, 'err'); return false; }
+}
+
+/* ---------------- 接续段几何检查 ---------------- */
+function segClear(p, q) {          // 接续直线是否避开所有障碍/限飞区
+  const obs = (snap && snap.obstacles) || [];
+  const asp = (snap && snap.airspaces) || [];
+  const N = Math.max(6, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 40));
+  for (let i = 0; i <= N; i++) {
+    const x = p.x + (q.x - p.x) * i / N, y = p.y + (q.y - p.y) * i / N;
+    for (const o of obs) {
+      if (o.active === false) continue;
+      // 注意：障碍物是经纬度，必须换算成 ENU，之前直接用 o.x/o.y 恒为 NaN，检查形同虚设
+      const [ox, oy] = enu(o.lat, o.lon);
+      const r = (o.radius || 0) + (o.buffer || 0) + 30;
+      if (Math.hypot(x - ox, y - oy) < r) return false;
+    }
+    for (const a of asp) {
+      if (a.active === false) continue;
+      let poly = (a.polygon || []).map(pt => {
+        const la = pt[0], lo = pt[1];
+        if (Math.abs(la) > 10) { const e = enu(la, lo); return { x: e[0], y: e[1] }; }
+        return { x: la, y: lo };
+      });
+      if (poly.length < 3) continue;
+      let inside = false;
+      for (let j = 0, k = poly.length - 1; j < poly.length; k = j++) {
+        const xi = poly[j].x, yi = poly[j].y, xk = poly[k].x, yk = poly[k].y;
+        if ((yi > y) !== (yk > y) && x < (xk - xi) * (y - yi) / (yk - yi) + xi) inside = !inside;
+      }
+      if (inside) return false;
+    }
+  }
+  return true;
+}
+
+/* ---------------- 放置无人机 ---------------- */
+async function place(ex, ey) {
+  const batt = parseFloat($('#w-batt').value);
+  log('匹配中…（按环境评估候选方向）', '');
+  await syncMeteo();
+  let r;
+  const url = '/api/program/join?x=' + ex.toFixed(1) + '&y=' + ey.toFixed(1) + '&battery=' + batt;
+  try {
+    r = await api(url);
+  } catch (e) {
+    // 后端刚被气象变更触发重算时会慢，重试一次
+    log('后端响应慢（' + e.message + '），重试一次…', 'warn');
+    try { r = await api(url); }
+    catch (e2) { log('匹配失败：' + e2.message + '（后端未就绪？等 40 秒预热完成）', 'err'); return; }
+  }
+
+  // 出生即重叠保护：同方向、且接续点相距 < 600 m 时拒绝（否则两架从同一位置出发必然叠在一起）
+  const near = drones.filter(d => !d.ghost && !d.dead && d.dir === r.direction).find(d => {
+    const w0 = (r.waypoints || [])[r.join_index || 0];
+    return w0 && Math.hypot(w0.x - (d.route[0] || {x: d.x}).x,
+                            w0.y - (d.route[0] || {y: d.y}).y) < 600;
+  });
+  if (near) log('该位置离 ' + near.id + ' 较近 → 将在入口排队，不会同时进航道', 'warn');
+  const all = r.waypoints || [];
+  let idx = r.join_index || 0, wps = all.slice(idx), legOK = true;
+  // 接续直线若穿障碍，沿航迹逐个往后试（最多 12 个点）
+  if (all.length > idx + 2) {
+    legOK = segClear({ x: ex, y: ey }, all[idx]);
+    for (let k = idx; !legOK && k < Math.min(idx + 12, all.length - 1); k++) {
+      if (segClear({ x: ex, y: ey }, all[k])) { idx = k; wps = all.slice(k); legOK = true; }
+    }
+  }
+  // 点在跑道附近时后端会给出"最后一个航路点"作为接续点，只剩 1 个点无法飞行
+  // → 退化为使用最后两个航路点，保证任何位置都能投放
+  if (wps.length < 2) {
+    wps = all.slice(Math.max(0, all.length - 2));
+    idx = Math.max(0, all.length - 2);
+    log('接续点已在跑道口，改用最后一段航道', 'warn');
+  }
+  if (wps.length < 2) { log('该方向没有可用航段（后端未返回航迹）', 'err'); return; }
+
+  const d = {
+    id: 'U' + (drones.length + 1),
+    x: ex, y: ey, route: wps, dir: r.direction,
+    joinsafe: (r.join_safe !== false) && legOK, joinDist: r.join_distance, joinIndex: idx,
+    color: COLORS[drones.length % COLORS.length],
+    battery: batt / 100, prog: 0, dead: false,
+    len: Math.hypot((wps[0]||{x:ex,y:ey}).x - ex, (wps[0]||{x:ex,y:ey}).y - ey)
+         + wps.reduce((acc, w, i) => i ? acc + Math.hypot(w.x - wps[i-1].x, w.y - wps[i-1].y) : 0, 0),
+  };
+  claimSlot(d);            // 进场即预定时隙：能否直落、要等多久，从一开始就确定
+  drones.push(d);
+  renderFleet(); draw();
+  log(d.id + ' 在 (' + Math.round(ex) + ', ' + Math.round(ey) + ') → 匹配 '
+      + r.direction + ' 模板，接续 ' + Math.round(r.join_distance) + ' m'
+      + (legOK ? '' : '（⚠ 接续段穿障碍，已无更优接续点）'), legOK ? 'ok' : 'warn');
+  if (r.candidates && r.candidates.length) {
+    const top = r.candidates.slice(0, 3).map(c =>
+      c.dir + (c.ok ? ' ' + c.score.toFixed(2) : '(不可用)')).join('  ');
+    log('  方向排名：' + top, '');
+  }
+}
+
+cv.addEventListener('click', ev => {
+  const rect = cv.getBoundingClientRect();
+  // 画布 CSS 尺寸和内部像素尺寸**长宽比不同**（width:100% 但 height:calc(...)），
+  // 所以 x/y 必须各自换算，否则点哪儿都会偏
+  const kx = cv.width / rect.width, ky = cv.height / rect.height;
+  const mx = (ev.clientX - rect.left) * kx, my = (ev.clientY - rect.top) * ky;
+  const ex = (mx - view.cx) / view.S, ey = (view.cy - my) / view.S;
+  place(ex, ey);
+});
+
+/* 到达等待点(90%)时一次性申请落地时隙；之后不再改动，避免时刻抖动 */
+let slotCounter = 0;
+function claimSlot(d) {
+  d.slotAt = Math.max(simT, runwayFreeAt);   // 跑道最早可用时刻
+  d.order = ++slotCounter;
+  d.holdOffset = 300 + ((d.order - 1) % 4) * 200;   // 等待圈依次外推
+  runwayFreeAt = d.slotAt + SEP_SEC;         // 预占 SEP_SEC
+  log(d.id + ' 申请落地时隙 #' + d.order
+      + '（' + Math.max(0, Math.round((d.slotAt - simT) / TIME_SCALE)) + ' 秒后）', 'warn');
+}
+
+/* ---------------- 列表 ---------------- */
+function renderFleet() {
+  const box = $('#fleet');
+  if (!drones.length) { box.innerHTML = '<div class="hint">还没有放置无人机</div>'; return; }
+  box.innerHTML = drones.map(d =>
+    '<div class="dl" style="border-bottom:1px solid #16233a;padding:6px 0;cursor:pointer" data-id="' + d.id + '">' +
+    '<span style="color:' + d.color + '"><b>' + d.id + '</b> → ' + d.dir + '</span>' +
+    '<span>' + Math.round(d.battery * 100) + '%</span>' +
+    '<span style="color:#5f728f">接续</span><span>' + Math.round(d.joinDist || 0) + ' m</span>' +
+    '<span style="color:#5f728f">状态</span><span>' + (d.dead ? '失联'
+        : (d.slotAt === undefined ? '进场'
+        : (d.entryHold ? '<span style="color:#ff8f9a">入口等待 #' + d.order + '</span>'
+        : (simT < d.slotAt ? '<span style="color:#fbbf24">等待 #' + d.order + ' ('
+              + Math.max(0, Math.round((d.slotAt - simT) / TIME_SCALE)) + 's)</span>'
+                           : '<span style="color:#4ade80">进近 #' + d.order + '</span>')))) + '</span>' +
+    '</div>').join('');
+  box.querySelectorAll('[data-id]').forEach(el => {
+    el.onmouseenter = () => { highlight = el.dataset.id; draw(); };
+    el.onmouseleave = () => { highlight = null; draw(); };
+  });
+  $('#pill-fleet').textContent = drones.length + ' 架';
+}
+
+/* ---------------- 动画 ---------------- */
+function tick(ts) {
+  requestAnimationFrame(tick);
+  if (!running || !drones.length) return;
+  if (ts - lastT < 120) return;
+  const dt = Math.min(0.5, (ts - lastT) / 1000);
+  lastT = ts;
+  const wind = parseFloat($('#w-wind').value), rain = parseFloat($('#w-rain').value);
+  const drain = (0.012 + wind * 0.0014 + rain * 0.0020) * dt;
+
+  simT += dt * TIME_SCALE;      // 时钟加速，45s 间隔 ≈ 5.6s 真实时间
+
+  // 先清理到期的幽灵轨迹（在绘制之前，保证这一帧就是干净的）
+  const nowMs = performance.now();
+  const gone = drones.filter(d => d.ghost && nowMs >= d.ghostUntil);
+  if (gone.length) {
+    drones = drones.filter(d => !(d.ghost && nowMs >= d.ghostUntil));
+    gone.forEach(d => log(d.id + ' 航迹已移除', ''));
+    highlight = null;
+    if (!drones.length) { slotCounter = 0; runwayFreeAt = 0; }   // 清空后重置排位
+  }
+
+  // 排队纵深：按落地顺序，每架必须比前一架落后 GAP 的进度，避免汇合处相撞
+  const GAP = 0.055;
+  const alive = drones.filter(d => !d.ghost && !d.dead)
+                       .sort((a, b) => (a.order || 999) - (b.order || 999));
+  const capOf = new Map();
+  const SEP_M = 320;                        // 前后机最小间距（米），与航迹长短无关
+  const distRW = d => Math.max(0, (d.len || 1500) * (1 - d.prog));
+  alive.forEach((d, i) => {
+    // 队首可落地；其余在跑道口外 SEP_M 米处排队（短航迹时不能只靠 96.5%）
+    let cap = (i === 0) ? 1.0 : Math.min(0.965, 1 - SEP_M / (d.len || 1500));
+    for (let j = 0; j < i; j++) {
+      // 只有"同一方向"才是同一条航路，才需要按米排队；不同方向各飞各的，
+      // 只在跑道口 320m 保护圈里可能相遇，由上面的 cap 保证只有队首能进圈
+      if (alive[j].dir !== d.dir) continue;
+      const need = distRW(alive[j]) + SEP_M;
+      cap = Math.min(cap, 1 - need / (d.len || 1500));
+    }
+    capOf.set(d, Math.max(0, cap));
+  });
+
+  // 同方向排队：自己必须比前机远 ENTRY_GAP 米才能进入航道（否则在入口等）
+  const ENTRY_GAP = 600;
+  const aheadDist = new Map();
+  alive.forEach((d, i) => {
+    let m = Infinity;
+    for (let j = 0; j < i; j++) {
+      if (alive[j].dir !== d.dir) continue;
+      m = Math.min(m, distRW(alive[j]));
+    }
+    aheadDist.set(d, m);
+  });
+
+  drones.forEach(d => {
+    if (d.dead || d.landed || d.ghost) return;
+    d.battery -= drain;
+    const cap = capOf.has(d) ? capOf.get(d) : 0.965;
+
+    // 入口放行门限：前机还没拉开距离，就在接续点外等着，不进航道
+    const ad = aheadDist.has(d) ? aheadDist.get(d) : Infinity;
+    if (ad !== Infinity && distRW(d) - ad < ENTRY_GAP) {
+      d.entryHold = true;
+      d.holding = true;
+      return;                       // 进度冻结在入口
+    }
+    if (d.entryHold) { d.entryHold = false; log(d.id + ' 入口放行，进入 ' + d.dir + ' 航道', 'ok'); }
+
+    // 还未轮到自己 → 从航道起点到降落点一路慢飞
+    const myTurn = d.slotAt !== undefined && simT >= d.slotAt;
+    d.holding = !myTurn;                 // 供绘制"等待"标记
+    if (d.holding) {
+      d.wasHolding = true;
+      // 慢飞；到 55% 脱离中心线，进侧向等待圈
+      d.prog = Math.min(HOLD_EXIT, d.prog + V_SLOW * dt);   // 到脱离点即停，让出中心线
+      return;
+    }
+    if (d.wasHolding) { log(d.id + ' 获准落地 → 加速进近', 'ok'); d.wasHolding = false; }
+    d.wasHolding = false;
+
+    d.prog = Math.min(cap, d.prog + (myTurn ? V_FAST : V_BASE) * dt);
+    if (d.battery <= 0) { d.battery = 0; d.dead = true; log(d.id + ' 电量耗尽', 'err'); return; }
+    if (d.prog >= 1) {
+      stats.landed += 1;
+      if (stats.lastLand !== null) { stats.gapSum += (simT - stats.lastLand); stats.gapN += 1; }
+      stats.lastLand = simT;
+      log(d.id + ' 落地（剩余 ' + Math.round(d.battery * 100) + '%）→ 航迹移除，跑道占用 '
+          + SEP_SEC + 's', 'ok');
+      d.ghost = true;                         // 变灰幽灵轨迹
+      d.ghostUntil = performance.now() + 2000; // 保留 2 秒
+    }
+  });
+  // 统计：在飞无人机之间的最小距跑道差
+  const flying = alive.filter(d => !d.ghost);
+  for (let i = 0; i < flying.length; i++) {
+    for (let j = i + 1; j < flying.length; j++) {
+      const sep = Math.abs(distRW(flying[i]) - distRW(flying[j]));
+      if (sep < stats.minSep) stats.minSep = sep;
+    }
+  }
+  const landEl = $('#st-land'), gapEl = $('#st-gap'), occEl = $('#st-occ'), sepEl = $('#st-sep');
+  if (landEl) {
+    landEl.textContent = stats.landed;
+    gapEl.textContent = stats.gapN ? (stats.gapSum / stats.gapN / TIME_SCALE).toFixed(1) + ' s' : '—';
+    const busy = (simT > 0 && runwayFreeAt > simT) ? (runwayFreeAt - simT) : 0;
+    occEl.textContent = Math.min(100, Math.round(busy / SEP_SEC * 100)) + '%';
+    sepEl.textContent = isFinite(stats.minSep) ? Math.round(stats.minSep) + ' m' : '—';
+  }
+  renderFleet(); draw();
+}
+
+/* ---------------- 重新评估 ---------------- */
+$('#btn-reeval').onclick = async () => {
+  if (!drones.length) { log('还没有无人机', 'warn'); return; }
+  const okSync = await syncMeteo();
+  if (!okSync) return;
+  const batt = parseFloat($('#w-batt').value);
+  log('已同步环境：风 ' + $('#w-wind').value + ' m/s / 风向 ' + $('#w-dir').value
+      + '° / 雨 ' + $('#w-rain').value + ' mm/h，重新评估中…', 'warn');
+  for (const d of drones) {
+    try {
+      const r = await api('/api/program/join?x=' + d.x.toFixed(1) + '&y=' + d.y.toFixed(1)
+                          + '&battery=' + batt);
+      const top = (r.candidates || []).slice(0, 3)
+        .map(c => c.dir + (c.ok ? ' ' + c.score.toFixed(2) : '(不可用)')).join('  ');
+      if (r.direction && r.direction !== d.dir) {
+        const old = d.dir;
+        d.dir = r.direction;
+        d.route = (r.waypoints || []).slice(r.join_index);
+        d.joinsafe = r.join_safe; d.joinDist = r.join_distance;
+        d.prog = 0;
+        log(d.id + ' 环境变化 → ' + old + ' 改选 ' + d.dir, 'warn');
+        log('  新排名：' + top, '');
+      } else {
+        // 没变也要说明"评估过了、为什么没变"
+        log(d.id + ' 保持 ' + d.dir + '（当前环境仍最优）', '');
+        log('  新排名：' + top, '');
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+  renderFleet(); draw();
+};
+
+/* ---------------- 控件 ---------------- */
+[['w-wind','v-wind',v=>v.toFixed(1)+' m/s'],['w-dir','v-dir',v=>v+'°'],
+ ['w-rain','v-rain',v=>v.toFixed(1)+' mm/h'],['w-batt','v-batt',v=>v+'%']]
+ .forEach(([id, out, fmt]) => {
+   const el = document.getElementById(id), o = document.getElementById(out);
+   const upd = () => { o.textContent = fmt(parseFloat(el.value)); };
+   el.addEventListener('input', upd); upd();
+ });
+
+$('#btn-run').onclick = () => {
+  running = !running;
+  $('#btn-run').textContent = running ? '■ 暂停' : '▶ 开始飞行';
+  lastT = performance.now();
+  log(running ? '开始飞行' : '已暂停');
+};
+$('#btn-clear').onclick = () => { drones = []; simT = 0; runwayFreeAt = 0; slotCounter = 0;
+  stats.landed = 0; stats.lastLand = null; stats.gapSum = 0; stats.gapN = 0; stats.minSep = Infinity; renderFleet(); draw(); log('已清空'); };
+
+/* ---------------- 初始化 ---------------- */
+(async () => {
+  try {
+    snap = await api('/api/sync/snapshot');
+    $('#pill-api').className = 'pill ok';
+    $('#pill-api').lastElementChild.textContent = '已连接 8080';
+    $('#mapinfo').textContent = '视野 ±2.4 km';
+  } catch (e) {
+    $('#pill-api').className = 'pill bad';
+    $('#pill-api').lastElementChild.textContent = '未连接';
+    log('无法连接后端：' + e.message, 'err');
+  }
+  document.querySelectorAll('.spd').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.spd').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      TIME_SCALE = parseFloat(btn.dataset.x);
+      log('演示倍速 → ' + TIME_SCALE + '×', '');
+    };
+  });
+  log('页面版本 v4：状态机 + 统计条 + 倍速切换', '');
+  renderFleet(); draw(); requestAnimationFrame(tick);
+})();
+window.addEventListener('resize', draw);
+</script>
+
+<div id="boot-bar" style="position:fixed;left:0;right:0;top:0;z-index:9999;
+  background:#1e293b;border-bottom:1px solid #334155;color:#93b4d8;
+  font:13px/1.6 'Microsoft YaHei',sans-serif;padding:6px 14px;text-align:center">
+  正在连接后端服务… <span id="boot-t">0</span>s（首次启动需预热约 40 秒）
+</div>
+<script>
+(function () {
+  var bar = document.getElementById('boot-bar'), t = 0, timer = null;
+  function tick() { t++; var e = document.getElementById('boot-t'); if (e) e.textContent = t; }
+  timer = setInterval(tick, 1000);
+  function done() { clearInterval(timer); if (bar) { bar.style.background = '#14532d';
+      bar.style.color = '#86efac'; bar.innerHTML = '后端已就绪 · http://127.0.0.1:8080';
+      setTimeout(function () { bar.style.display = 'none'; }, 2500); } }
+  function check() {
+    fetch('http://127.0.0.1:8080/api/health', { cache: 'no-store' })
+      .then(function (r) { if (r.ok) done(); else setTimeout(check, 1500); })
+      .catch(function () { setTimeout(check, 1500); });
+  }
+  check();
+})();
+</script>
+
+
+<div id="nav-bar" style="position:fixed;right:14px;bottom:14px;z-index:9998;display:flex;gap:6px;font:12px/1 'Microsoft YaHei',sans-serif">
+  <a href="demo.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">① 主演示台</a>
+  <a href="demo_p1.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">② 航道总览</a>
+  <a href="demo_p1_place.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#2563eb;color:#fff;border:1px solid #3b82f6">③ 航道匹配</a>
+  <a href="rl_lab.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">④ RL 实验室</a>
+</div>
+</body>
+</html>

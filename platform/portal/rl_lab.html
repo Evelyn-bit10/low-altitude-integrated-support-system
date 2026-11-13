@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>RL 关联实验室 · 低空综合保障系统</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{
+    --bg:#070c18; --panel:#0e1526; --panel2:#121b30; --line:#1e2b45;
+    --txt:#e6edf7; --dim:#8ea0bd; --dim2:#5f728f;
+    --cyan:#22d3ee; --blue:#4f9cf9; --green:#34d399; --amber:#fbbf24; --red:#f87171; --violet:#a78bfa;
+    --mono:"Cascadia Mono","JetBrains Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 15% -10%,#10203a 0%,var(--bg) 55%);
+    color:var(--txt);font:14px/1.55 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;min-height:100vh}
+  header{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(20,32,56,.9),rgba(10,16,28,.6));position:sticky;top:0;z-index:9;backdrop-filter:blur(8px)}
+  h1{font-size:17px;margin:0;letter-spacing:.5px;font-weight:600}
+  h1 small{font-weight:400;color:var(--dim);font-size:12px;margin-left:10px;letter-spacing:0}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+    border:1px solid var(--line);background:#0b1424;color:var(--dim);font-size:12px}
+  .pill i{width:7px;height:7px;border-radius:50%;background:var(--dim2);display:block}
+  .pill.ok{border-color:#14523f;color:#7ee2b8}.pill.ok i{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .pill.bad{border-color:#5b2330;color:#f3a3ac}.pill.bad i{background:var(--red)}
+  .spacer{flex:1}
+  main{display:grid;grid-template-columns:336px minmax(0,1fr);gap:14px;padding:14px 18px 18px;align-items:start}
+  .rcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .rtop{display:grid;grid-template-columns:minmax(0,1fr) 322px;gap:14px}
+  .bottom3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:14px}
+  @media(max-width:1280px){.rtop{grid-template-columns:1fr}.bottom3{grid-template-columns:1fr}}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  section>h2{margin:0;padding:10px 14px;font-size:13px;font-weight:600;color:#b9c8de;
+    border-bottom:1px solid var(--line);background:var(--panel2);display:flex;align-items:center;gap:8px}
+  section>h2 em{font-style:normal;color:var(--dim2);font-weight:400;font-size:11px;margin-left:auto}
+  .body{padding:12px 14px}
+  /* 滑杆 */
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+  .presets button{cursor:pointer;padding:7px 4px;border-radius:8px;border:1px solid var(--line);
+    background:#0b1424;color:var(--dim);font-size:12px;transition:.15s}
+  .presets button:hover{border-color:var(--cyan);color:var(--txt)}
+  .presets button.div{border-color:#3b2f14;color:#c9a227}
+  .presets button.div:hover{border-color:var(--amber);color:#fde68a}
+  .grp{margin:9px 0 3px;font-size:11px;letter-spacing:1px;color:var(--dim2);text-transform:uppercase;
+    display:flex;align-items:center;gap:8px}
+  .grp:after{content:"";flex:1;height:1px;background:var(--line)}
+  .row{display:grid;grid-template-columns:1fr 52px;gap:8px;align-items:center;margin:2px 0}
+  .row label{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row output{font:12px var(--mono);color:var(--cyan);text-align:right}
+  input[type=range]{-webkit-appearance:none;width:100%;height:14px;background:transparent;grid-column:1/-1;margin:-3px 0 0}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+    background:linear-gradient(90deg,#1d4ed8,#22d3ee)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:#e6f7ff;border:2px solid var(--cyan);margin-top:-4.5px;cursor:pointer;box-shadow:0 0 8px rgba(34,211,238,.6)}
+  input[type=range].bin::-webkit-slider-runnable-track{background:#24344f}
+  /* 网络 */
+  #net{display:block;width:100%;height:430px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;padding:0 14px 10px;font-size:11px;color:var(--dim2)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .legend b{width:9px;height:9px;border-radius:50%;display:inline-block}
+  /* 结果 */
+  .gauge{display:flex;align-items:center;gap:16px}
+  .dial{position:relative;width:132px;height:132px;flex:0 0 auto}
+  .dial svg{transform:rotate(-90deg)}
+  .dial .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .dial .val b{font:600 30px/1 var(--mono)}
+  .dial .val small{font-size:10px;color:var(--dim2);letter-spacing:1px}
+  .verdict{flex:1}
+  .verdict .big{font-size:15px;font-weight:600;margin-bottom:6px;white-space:nowrap}
+  .verdict .why{font-size:12px;color:var(--dim);line-height:1.7}
+  .bar{margin:11px 0}
+  .bar .t{display:flex;justify-content:space-between;font-size:11px;color:var(--dim2);margin-bottom:4px}
+  .bar .t i{font-style:normal;color:var(--amber);font:10px var(--mono);margin-left:6px}
+  .bar .track{position:relative;height:8px;border-radius:4px;background:#16233a}
+  .bar .fill{height:100%;border-radius:4px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+  .mark{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--amber);border-radius:2px;box-shadow:0 0 6px rgba(251,191,36,.8)}
+  .chain{margin-top:12px;padding:10px;border-radius:8px;background:#0a1120;border:1px solid var(--line);
+    font:12px/1.9 var(--mono);color:var(--dim)}
+  .chain b{color:var(--cyan);font-weight:400}
+  .chain .no{color:var(--red)}
+  /* 底部 */
+  .bottom{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px;padding:0 18px 18px}
+  canvas.chart{width:100%;height:190px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left;color:var(--dim)}
+  thead th{color:var(--dim2);font-weight:500;font-size:11px}
+  td.win{color:var(--green);font-weight:600}
+  td.lose{color:var(--dim2)}
+  .imp{display:grid;grid-template-columns:96px 1fr 44px;gap:8px;align-items:center;font-size:11px;margin:5px 0}
+  .imp .n{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .imp .t{height:9px;background:#16233a;border-radius:5px;overflow:hidden}
+  .imp .f{height:100%;background:linear-gradient(90deg,#4f9cf9,#a78bfa);border-radius:5px}
+  .imp .v{text-align:right;font:11px var(--mono);color:var(--dim2)}
+  /* 实时影子流 */
+  .livewrap{margin-top:0}
+  .livechips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .chip{padding:3px 9px;border:1px solid var(--line);border-radius:999px;font:11px var(--mono);color:var(--dim);background:#0b1424}
+  .chip b{color:var(--cyan);font-weight:600}
+  .chip.good b{color:var(--green)}
+  .chip.warn b{color:var(--amber)}
+  .livetable-wrap{max-height:250px;overflow:auto;border-radius:8px;border:1px solid var(--line)}
+  #livetable{font-size:12px}
+  #livetable thead th{position:sticky;top:0;background:var(--panel2);z-index:1}
+  #livetable tbody tr{cursor:pointer}
+  #livetable tbody tr:hover{background:#132038}
+  #livetable td{font-family:var(--mono);font-size:11.5px}
+  #livetable tr.flash{animation:flash .9s ease-out}
+  @keyframes flash{from{background:rgba(34,211,238,.28)}to{background:transparent}}
+  .ok{color:var(--green)}.bad{color:var(--red)}.mute{color:var(--dim2)}
+  .err{padding:10px 14px;background:#2a1420;border-bottom:1px solid #5b2330;color:#f3a3ac;font-size:12px}
+  .hide{display:none}
+  @media(max-width:1180px){main{grid-template-columns:1fr}.bottom{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>RL 关联实验室<small>强化学习航迹去重 · 飞桨训练 / 浏览器推理</small></h1>
+  <span class="spacer"></span>
+  <span class="pill" id="pill-api"><i></i><span>连接中…</span></span>
+  <span class="pill" id="pill-model"><i></i><span>模型 —</span></span>
+</header>
+<div class="err hide" id="err"></div>
+
+<main>
+  <!-- 左：特征输入 -->
+  <section>
+    <h2>特征输入<em>19 维 · 一条候选边</em></h2>
+    <div class="body">
+      <div class="presets">
+        <button data-preset="same">同一架（稀疏）</button>
+        <button data-preset="cross">交叉飞行</button>
+        <button data-preset="swarm">蜂群密集</button>
+        <button data-preset="conflict">ua_id 冲突</button>
+        <button data-preset="extra" class="div">分歧：策略多并</button>
+        <button data-preset="missed" class="div">分歧：策略少并</button>
+      </div>
+      <div id="sliders"></div>
+    </div>
+  </section>
+
+  <div class="rcol">
+  <div class="rtop">
+  <!-- 网络结构 -->
+  <section>
+    <h2>策略网络<em id="netinfo">18 → 64 → 64 → 1</em></h2>
+    <canvas id="net"></canvas>
+    <div class="legend">
+      <span><b style="background:#22d3ee"></b>激活强（正）</span>
+      <span><b style="background:#4f9cf9"></b>激活中</span>
+      <span><b style="background:#26344d"></b>激活弱</span>
+      <span><b style="background:#f87171"></b>负激活</span>
+      <span>连线亮度 = |权重|</span>
+    </div>
+  </section>
+
+  <!-- 结果 -->
+  <section>
+    <h2>判定结果<em>阈值 + 贪心一对一</em></h2>
+    <div class="body">
+      <div class="gauge">
+        <div class="dial">
+          <svg width="132" height="132" viewBox="0 0 132 132">
+            <circle cx="66" cy="66" r="56" fill="none" stroke="#16233a" stroke-width="11"/>
+            <circle id="arc" cx="66" cy="66" r="56" fill="none" stroke="#34d399" stroke-width="11"
+                    stroke-linecap="round" stroke-dasharray="351.9" stroke-dashoffset="351.9"/>
+            <circle id="thrmark" cx="66" cy="122" r="5.5" fill="#fbbf24"/>
+          </svg>
+          <div class="val"><b id="pval">—</b><small>P(同一架)</small></div>
+        </div>
+        <div class="verdict">
+          <div class="big" id="verdict">等待输入</div>
+          <div class="why" id="why">拖动左侧滑杆观察概率变化</div>
+        </div>
+      </div>
+
+      <div class="bar">
+        <div class="t"><span>策略（PPO）<i id="thb">阈值</i></span><span id="pstr">—</span></div>
+        <div class="track"><div class="fill" id="pfill" style="width:0;background:linear-gradient(90deg,#0ea5e9,#22d3ee)"></div>
+          <i class="mark" id="thi" style="left:30%"></i></div>
+      </div>
+      <div class="bar">
+        <div class="t"><span>规则基线（几何门限）</span><span id="rstr">—</span></div>
+        <div class="track"><div class="fill" id="rfill" style="width:0;background:linear-gradient(90deg,#64748b,#94a3b8)"></div></div>
+      </div>
+
+      <div class="chain" id="chain"></div>
+    </div>
+  </section>
+  </div>
+
+  <div class="bottom3">
+  <section>
+    <h2>训练曲线<em>30 轮 · 测试集奖励</em></h2>
+    <div class="body" style="padding-top:4px"><canvas class="chart" id="curve"></canvas></div>
+  </section>
+  <section>
+    <h2>规则 vs 策略<em>验证集</em></h2>
+    <div class="body" style="padding-top:6px" id="cmp"></div>
+  </section>
+  <section>
+    <h2>模型在看什么<em>第一层权重范数</em></h2>
+    <div class="body" style="padding-top:8px" id="imp"></div>
+  </section>
+  </div>
+
+  <section class="livewrap">
+    <h2>实时影子流<em id="liveinfo">等待数据…</em></h2>
+    <div class="body">
+      <div class="livechips" id="livechips"></div>
+      <div class="livetable-wrap">
+        <table id="livetable">
+          <thead><tr>
+            <th>帧</th><th>来源</th><th>本地ID</th><th>规则 →</th><th>策略 →</th><th>p</th><th>一致</th>
+          </tr></thead>
+          <tbody><tr><td colspan="7" class="mute" style="padding:14px">暂无数据</td></tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#5f728f">
+        点任意一行 → 把这帧的 18 维特征灌进左侧模型，看策略当时是怎么想的
+      </div>
+    </div>
+  </section>
+  </div>
+</main>
+
+<script>
+/* ============================ 状态 ============================ */
+const API = (location.protocol === 'file:' ? 'http://127.0.0.1:8080' : location.origin);
+const DIM = 19;
+let MODEL = null;          // 后端返回的权重
+let FEAT = new Array(DIM).fill(0);
+let ACT = { h1: new Array(64).fill(0), h2: new Array(64).fill(0) };
+let TARGET = { h1: new Array(64).fill(0), h2: new Array(64).fill(0) };
+
+/* 特征定义：名称 / 范围 / 步长 / 分组 / 是否二值 */
+const SPEC = [
+  {n:'距离/门限',      min:0, max:5,  step:.01, g:'几何', d:.30},
+  {n:'绝对距离(百米)', min:0, max:2,  step:.01, g:'几何', d:.10},
+  {n:'高差/30m',      min:0, max:3,  step:.01, g:'几何', d:.10},
+  {n:'航向差/30°',    min:0, max:6,  step:.01, g:'几何', d:.05},
+  {n:'Δt(秒)',        min:0, max:15, step:.1,  g:'几何', d:1.0},
+  {n:'ua 相同',       min:0, max:1,  step:1,   g:'身份', d:0, bin:1},
+  {n:'ua 冲突',       min:0, max:1,  step:1,   g:'身份', d:0, bin:1},
+  {n:'ua 缺失',       min:0, max:1,  step:1,   g:'身份', d:1, bin:1},
+  {n:'reg 相同',      min:0, max:1,  step:1,   g:'身份', d:0, bin:1},
+  {n:'reg 冲突',      min:0, max:1,  step:1,   g:'身份', d:0, bin:1},
+  {n:'速度相对差',    min:0, max:2,  step:.01, g:'运动', d:.10},
+  {n:'候选排名',      min:0, max:10, step:1,   g:'运动', d:0},
+  {n:'航迹存活时长/60', min:0, max:1, step:.01, g:'运动', d:.2},
+  {n:'源质量',        min:0, max:1,  step:.01, g:'源头', d:.80},
+  {n:'源 σ/20',       min:0, max:2,  step:.01, g:'源头', d:.50},
+  {n:'低速标志',      min:0, max:1,  step:1,   g:'源头', d:0, bin:1},
+  {n:'最近邻航迹/100',min:0, max:10, step:.01, g:'上下文', d:2.0},
+  {n:'航迹总数/100',  min:0, max:2,  step:.01, g:'上下文', d:.07},
+  {n:'门限膨胀比',    min:0, max:3,  step:.01, g:'上下文', d:1.0},
+];
+
+const PRESETS = {
+  same:     [.30,.10,.10,.05,1, 0,0,1, 0,0, .10,0,.20, .80,.50,0, 2.0,.07, 1.0],
+  cross:    [.55,.18,.05,5.0,1, 0,0,1, 0,0, .12,0,.20, .75,.60,0, 1.2,.09, 1.0],
+  swarm:    [.80,.26,.15,.30,0.6, 0,0,1, 0,0, .30,3,.50, .60,1.00,0, .10,.40, 2.4],
+  conflict: [.30,.10,.10,.05,1, 0,1,0, 0,0, .10,0,.20, .80,.50,0, 2.0,.07, 1.0],
+  // 真实分歧样本（影子模式会抓到的两类情况）
+  extra:    [.40,.64,1.56,.66,2.2, 0,0,1, 0,0, .49,1,.60, .60,.66,0, 1.04,.22, 1.3],
+  missed:   [.20,.12,.60,1.89,1.9, 0,0,1, 0,0, .16,4,.15, .50,.57,1, 1.33,.16, 1.8],
+};
+
+const $ = s => document.querySelector(s);
+const tokenHeader = () => {
+  let t = '';
+  try { t = localStorage.getItem('lav_token') || ''; } catch (e) { t = ''; }
+  return t ? {'X-Token': t} : {};
+};
+const apiGet = (path) => fetch(API + path, {cache: 'no-store', headers: tokenHeader()});
+const apiPost = (path, body) => fetch(API + path, {
+  method: 'POST',
+  headers: Object.assign({'Content-Type': 'application/json'}, tokenHeader()),
+  body: JSON.stringify(body || {}),
+});
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+
+/* ============================ 加载模型 ============================ */
+async function load() {
+  try {
+    const r = await apiGet('/api/rl/model');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    MODEL = await r.json();
+    $('#pill-api').className = 'pill ok';
+    $('#pill-api').lastElementChild.textContent = '已连接 8080';
+    $('#pill-model').className = 'pill ok';
+    $('#pill-model').lastElementChild.textContent =
+      MODEL.model_info.params + ' 参数 · 阈值 ' + MODEL.threshold.toFixed(2);
+    $('#netinfo').textContent = MODEL.model_info.layers.join(' → ');
+    buildSliders();
+    buildCompare();
+    buildImportance();
+    drawCurve();
+    const q = new URLSearchParams(location.search).get('preset');
+    applyPreset(PRESETS[q] ? q : 'same');
+  } catch (e) {
+    $('#pill-api').className = 'pill bad';
+    $('#pill-api').lastElementChild.textContent = '未连接';
+    $('#err').classList.remove('hide');
+    $('#err').textContent = '无法读取策略权重（' + e.message + '）。请先启动后端：'
+      + 'cd backend && python -m uvicorn app.main:app --port 8080';
+  }
+}
+
+/* ============================ 滑杆 ============================ */
+function buildSliders() {
+  const box = $('#sliders');
+  let lastG = null;
+  SPEC.forEach((s, i) => {
+    if (s.g !== lastG) {
+      lastG = s.g;
+      const g = document.createElement('div');
+      g.className = 'grp'; g.textContent = s.g; box.appendChild(g);
+    }
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = '<label title="' + s.n + '">' + s.n + '</label>'
+      + '<output id="o' + i + '"></output>'
+      + '<input type="range" id="s' + i + '" min="' + s.min + '" max="' + s.max
+      + '" step="' + s.step + '"' + (s.bin ? ' class="bin"' : '') + '>';
+    box.appendChild(row);
+    const inp = row.querySelector('input');
+    inp.addEventListener('input', () => {
+      FEAT[i] = parseFloat(inp.value);
+      $('#o' + i).textContent = fmtVal(i);
+      update();
+    });
+  });
+  document.querySelectorAll('[data-preset]').forEach(b => {
+    b.onclick = () => applyPreset(b.dataset.preset);
+  });
+}
+
+function fmtVal(i) {
+  const s = SPEC[i], v = FEAT[i];
+  return s.bin ? (v > .5 ? '1' : '0') : (s.step >= 1 ? v.toFixed(0) : v.toFixed(2));
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name]; if (!p) return;
+  p.forEach((v, i) => {
+    FEAT[i] = v;
+    const inp = $('#s' + i);
+    if (inp) inp.value = v;
+    const o = $('#o' + i);
+    if (o) o.textContent = fmtVal(i);
+  });
+  update(true);
+}
+
+/* ============================ 推理 ============================ */
+function forward() {
+  const W = MODEL.weights, mu = MODEL.mean, sd = MODEL.std;
+  const x = FEAT.map((v, i) => (v - mu[i]) / Math.max(1e-6, sd[i]));
+  const h1 = new Array(W.enc0_b.length).fill(0);
+  for (let i = 0; i < x.length; i++)
+    for (let j = 0; j < h1.length; j++) h1[j] += x[i] * W.enc0_w[i][j];
+  for (let j = 0; j < h1.length; j++) h1[j] = Math.tanh(h1[j] + W.enc0_b[j]);
+  const h2 = new Array(W.enc2_b.length).fill(0);
+  for (let i = 0; i < h1.length; i++)
+    for (let j = 0; j < h2.length; j++) h2[j] += h1[i] * W.enc2_w[i][j];
+  for (let j = 0; j < h2.length; j++) h2[j] = Math.tanh(h2[j] + W.enc2_b[j]);
+  let z = W.actor_b[0];
+  for (let i = 0; i < h2.length; i++) z += h2[i] * W.actor_w[i][0];
+  return {x, h1, h2, z, p: 1 / (1 + Math.exp(-clamp(z, -30, 30))) };
+}
+
+/* 规则基线：与 dedup.py 的几何门限一致（用同一组特征反算） */
+function ruleScore() {
+  const dg = FEAT[0], alt = FEAT[2], hdg = FEAT[3], slow = FEAT[15] > .5;
+  const uaC = FEAT[6] > .5, regC = FEAT[9] > .5;
+  if (uaC || regC || dg > 1 || alt > 1 || (!slow && hdg > 1)) return 0;
+  return clamp(1 - dg, 0, 1);
+}
+
+/* ============================ 更新界面 ============================ */
+function update(instant) {
+  if (!MODEL) return;
+  const r = forward();
+  TARGET.h1 = r.h1; TARGET.h2 = r.h2;
+  if (instant) { ACT.h1 = r.h1.slice(); ACT.h2 = r.h2.slice(); }
+
+  const hard = (FEAT[6] > .5 || FEAT[9] > .5);
+  const p = hard ? 0 : r.p;
+  const thr = MODEL.threshold;
+  const accepted = p >= thr;
+
+  $('#pval').textContent = p.toFixed(3);
+  $('#pval').style.color = hard ? '#f87171' : (accepted ? '#34d399' : '#fbbf24');
+  $('#arc').style.stroke = hard ? '#f87171' : (accepted ? '#34d399' : '#fbbf24');
+  $('#arc').style.strokeDashoffset = (351.9 * (1 - p)).toFixed(1);
+
+  // 阈值刻度（0~1 映射到圆环角度）
+  const ang = -90 + 360 * thr;
+  $('#thrmark').setAttribute('transform', 'rotate(' + ang + ' 66 66)');
+
+  $('#verdict').textContent = hard ? '一票否决 · 不合并'
+      : (accepted ? '判定：同一架 → 合并' : '判定：不同目标 → 不合并');
+  $('#verdict').style.color = hard ? '#f87171' : (accepted ? '#34d399' : '#fbbf24');
+  $('#why').innerHTML = hard
+    ? 'ua_id / reg_no 冲突，安全硬规则直接屏蔽该边'
+    : 'P(同一架) = ' + p.toFixed(3) + '，阈值 ' + thr.toFixed(2) + '，'
+      + (accepted ? '接受该关联' : '拒绝该关联');
+
+  $('#pfill').style.width = (p * 100) + '%';
+  $('#pfill').style.background = hard ? 'linear-gradient(90deg,#7f1d1d,#f87171)'
+    : (accepted ? 'linear-gradient(90deg,#0f766e,#34d399)' : 'linear-gradient(90deg,#b45309,#fbbf24)');
+  $('#pstr').textContent = p.toFixed(3);
+  $('#thi').style.left = (thr * 100) + '%';
+  $('#thb').textContent = '阈值 ' + thr.toFixed(2);
+
+  const rs = ruleScore();
+  $('#rfill').style.width = (rs * 100) + '%';
+  $('#rstr').textContent = rs.toFixed(3);
+
+  // 决策链文字
+  $('#chain').innerHTML = [
+    '输入 19 维 → 标准化',
+    '两层 64 单元 Tanh',
+    'logit = <b>' + r.z.toFixed(3) + '</b> → p = <b>' + r.p.toFixed(4) + '</b>',
+    hard ? '<span class="no">ua_id 冲突 → 概率强制 0（硬规则）</span>'
+         : (accepted ? '<b>p ≥ ' + thr.toFixed(2) + '</b> → 接受' : '<span class="no">p &lt; ' + thr.toFixed(2) + ' → 拒绝</span>'),
+    '解码：按 p 从高到低贪心，同源对同航迹仅一次',
+  ].map((t, i) => '<div>' + (i + 1) + '. ' + t + '</div>').join('');
+}
+
+/* ============================ 网络动画 ============================ */
+const cv = $('#net'), ctx = cv.getContext('2d');
+let dpr = 1, W = 0, H = 0;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  W = r.width; H = r.height;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', () => { resize(); drawCurve(); });
+
+function nodeColor(v) {
+  // v ∈ [-1,1]
+  const a = Math.abs(v);
+  if (v >= 0) {
+    if (a > .66) return [34, 211, 238];
+    if (a > .33) return [79, 156, 249];
+    return [38, 52, 77];
+  }
+  return [248, 113, 113];
+}
+function radius(n, layer) {
+  if (layer === 0) return 4.2;
+  if (layer === 3) return 11;
+  return 3.4;
+}
+
+function layout() {
+  const padL = 44, padR = 40, padT = 26, padB = 26;
+  const cols = [padL, padL + (W - padL - padR) * 0.33, padL + (W - padL - padR) * 0.66, W - padR];
+  const ys = n => {
+    const out = [], h = H - padT - padB;
+    for (let i = 0; i < n; i++) out.push(padT + h * (n === 1 ? .5 : i / (n - 1)));
+    return out;
+  };
+  return {cols, y0: ys(18), y1: ys(64), y2: ys(64), y3: ys(1)};
+}
+
+function drawNet() {
+  const L = layout();
+  ctx.clearRect(0, 0, W, H);
+
+  // 连线（只画每个输入最强的 2 条，避免糊成一片）
+  const W0 = MODEL.weights.enc0_w;
+  for (let i = 0; i < 18; i++) {
+    const src = FEAT[i] === 0 ? 0 : Math.abs((FEAT[i] - MODEL.mean[i]) / Math.max(1e-6, MODEL.std[i]));
+    const row = W0[i].map((w, j) => [Math.abs(w), j]).sort((a, b) => b[0] - a[0]).slice(0, 3);
+    row.forEach(([aw, j]) => {
+      const a = clamp(aw / 2.2, 0, .55) * (src > 0 ? 1 : .35);
+      ctx.strokeStyle = 'rgba(79,156,249,' + a.toFixed(3) + ')';
+      ctx.lineWidth = .6 + Math.min(1.4, aw / 3);
+      ctx.beginPath();
+      ctx.moveTo(L.cols[0] + 6, L.y0[i]);
+      ctx.bezierCurveTo((L.cols[0] + L.cols[1]) / 2, L.y0[i], (L.cols[0] + L.cols[1]) / 2, L.y1[j], L.cols[1] - 4, L.y1[j]);
+      ctx.stroke();
+    });
+  }
+  // 层间细线
+  ctx.strokeStyle = 'rgba(120,150,200,.06)';
+  ctx.lineWidth = .5;
+  for (let k = 1; k <= 2; k++) {
+    for (let i = 0; i < (k === 1 ? 64 : 64); i += 1) {
+      const y1 = k === 1 ? L.y1[i] : L.y2[i];
+      const y2 = k === 1 ? L.y2[(i * 7) % 64] : L.y3[0];
+      ctx.beginPath();
+      ctx.moveTo(L.cols[k], y1);
+      ctx.lineTo(L.cols[k + 1], y2);
+      ctx.stroke();
+    }
+  }
+
+  // 节点
+  const layers = [
+    {y: L.y0, x: L.cols[0], vals: null, n: 18},
+    {y: L.y1, x: L.cols[1], vals: ACT.h1, n: 64},
+    {y: L.y2, x: L.cols[2], vals: ACT.h2, n: 64},
+    {y: L.y3, x: L.cols[3], vals: null, n: 1},
+  ];
+  layers.forEach((ly, li) => {
+    for (let i = 0; i < ly.n; i++) {
+      let v = 0;
+      if (li === 0) v = clamp((FEAT[i] - MODEL.mean[i]) / Math.max(1e-6, MODEL.std[i]) / 2, -1, 1);
+      else if (li === 3) v = clamp((ACT.h2.reduce((s, h, j) => s + h * MODEL.weights.actor_w[j][0], 0)) / 4, -1, 1);
+      else v = ly.vals ? ly.vals[i] : 0;
+      const c = nodeColor(v), r = radius(i, li);
+      ctx.beginPath();
+      ctx.arc(ly.x, ly.y[i], r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+      ctx.globalAlpha = .25 + .75 * Math.min(1, Math.abs(v) * 1.6);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      if (li === 3) {
+        ctx.strokeStyle = 'rgba(34,211,238,.5)';
+        ctx.lineWidth = 1.4; ctx.stroke();
+      }
+    }
+    // 层标注
+    ctx.fillStyle = 'rgba(142,160,189,.75)';
+    ctx.font = '11px "Cascadia Mono",Consolas,monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(['输入 ' + DIM, 'Tanh 64', 'Tanh 64', 'σ'][li], ly.x, H - 8);
+  });
+
+  // 特征名（只标几维，避免拥挤）
+  ctx.textAlign = 'right';
+  ctx.font = '10px "Microsoft YaHei",sans-serif';
+  [0, 2, 3, 5, 15, 18].forEach(i => {
+    ctx.fillStyle = 'rgba(142,160,189,' + (0.35 + 0.5 * Math.min(1, Math.abs(FEAT[i]))) + ')';
+    ctx.fillText(SPEC[i].n, L.cols[0] - 10, L.y0[i] + 3.5);
+  });
+}
+
+/* 平滑动画 */
+function tick() {
+  for (let i = 0; i < 64; i++) {
+    ACT.h1[i] += (TARGET.h1[i] - ACT.h1[i]) * .18;
+    ACT.h2[i] += (TARGET.h2[i] - ACT.h2[i]) * .18;
+  }
+  drawNet();
+  requestAnimationFrame(tick);
+}
+
+/* ============================ 训练曲线 ============================ */
+function drawCurve() {
+  const c = $('#curve'), g = c.getContext('2d');
+  const r = c.getBoundingClientRect();
+  const dpr2 = window.devicePixelRatio || 1;
+  c.width = r.width * dpr2; c.height = r.height * dpr2;
+  g.setTransform(dpr2, 0, 0, dpr2, 0, 0);
+  g.clearRect(0, 0, r.width, r.height);
+  if (!MODEL || !MODEL.history.length) return;
+
+  const hist = MODEL.history;
+  const vals = hist.map(h => h.test);
+  const base = MODEL.rule_baseline.reward;
+  const min = Math.min(...vals, base) - 40, max = Math.max(...vals, base) + 40;
+  const padL = 46, padR = 14, padT = 18, padB = 26;
+  const X = i => padL + (r.width - padL - padR) * i / (hist.length - 1);
+  const Y = v => padT + (r.height - padT - padB) * (1 - (v - min) / (max - min));
+
+  // 网格
+  g.strokeStyle = 'rgba(30,43,69,.9)'; g.lineWidth = 1;
+  for (let k = 0; k <= 2; k++) {
+    const y = padT + (r.height - padT - padB) * k / 2;
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(r.width - padR, y); g.stroke();
+    g.fillStyle = 'rgba(95,114,143,.9)'; g.font = '10px monospace'; g.textAlign = 'right';
+    g.fillText(Math.round(max - (max - min) * k / 2), padL - 6, y + 3);
+  }
+  // 规则基线
+  g.strokeStyle = 'rgba(148,163,184,.7)'; g.setLineDash([4, 4]);
+  g.beginPath(); g.moveTo(padL, Y(base)); g.lineTo(r.width - padR, Y(base)); g.stroke();
+  g.setLineDash([]);
+  const bl = '规则基线 ' + base.toFixed(0);
+  g.font = '10px monospace'; g.textAlign = 'right';
+  const bw = g.measureText(bl).width + 8;
+  g.fillStyle = 'rgba(7,12,24,.92)';
+  g.fillRect(r.width - padR - bw, Y(base) + 3, bw, 14);
+  g.fillStyle = 'rgba(148,163,184,.95)';
+  g.fillText(bl, r.width - padR - 4, Y(base) + 14);
+
+  // 曲线 + 渐变填充
+  const grad = g.createLinearGradient(0, padT, 0, r.height - padB);
+  grad.addColorStop(0, 'rgba(34,211,238,.28)');
+  grad.addColorStop(1, 'rgba(34,211,238,0)');
+  g.beginPath();
+  hist.forEach((h, i) => i ? g.lineTo(X(i), Y(h.test)) : g.moveTo(X(i), Y(h.test)));
+  g.lineTo(X(hist.length - 1), r.height - padB);
+  g.lineTo(X(0), r.height - padB); g.closePath();
+  g.fillStyle = grad; g.fill();
+
+  g.beginPath();
+  hist.forEach((h, i) => i ? g.lineTo(X(i), Y(h.test)) : g.moveTo(X(i), Y(h.test)));
+  g.strokeStyle = '#22d3ee'; g.lineWidth = 1.8; g.stroke();
+
+  // 末点
+  const last = hist[hist.length - 1];
+  g.beginPath(); g.arc(X(hist.length - 1), Y(last.test), 3.2, 0, Math.PI * 2);
+  g.fillStyle = '#22d3ee'; g.fill();
+  g.fillStyle = 'rgba(230,237,247,.9)'; g.textAlign = 'right'; g.font = '11px monospace';
+  g.fillText(last.test.toFixed(0), r.width - padR, Y(last.test) - 8);
+
+  // 横轴
+  g.fillStyle = 'rgba(95,114,143,.9)'; g.textAlign = 'center'; g.font = '10px monospace';
+  g.textAlign = 'left';  g.fillText('第1轮', padL, r.height - 8);
+  g.textAlign = 'right'; g.fillText('第' + hist.length + '轮', r.width - padR, r.height - 8);
+}
+
+/* ============================ 对比表 / 重要性 ============================ */
+function buildCompare() {
+  const e = MODEL.expected, r = MODEL.rule_baseline;
+  const rows = [
+    ['累计奖励', e.reward, r.reward, 1],
+    ['误配（越少越好）', e.wrong, r.wrong, -1],
+    ['漏配（越少越好）', e.miss, r.miss, -1],
+    ['平均碎片数', e.frags, r.frags, -1],
+    ['被拆分占比', e.split, r.split, -1],
+  ];
+  let html = '<table><thead><tr><th>指标</th><th>PPO</th><th>规则</th></tr></thead><tbody>';
+  rows.forEach(([name, a, b, dir]) => {
+    if (a == null || b == null) return;
+    const win = dir > 0 ? a > b : a < b;
+    const f = (v, isPct) => isPct ? (v * 100).toFixed(0) + '%'
+      : (Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(0));
+    const pct = name === '被拆分占比';
+    html += '<tr><td>' + name + '</td>'
+      + '<td class="' + (win ? 'win' : 'lose') + '">' + f(a, pct) + '</td>'
+      + '<td>' + f(b, pct) + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div style="margin-top:8px;font-size:11px;color:#5f728f">'
+    + '阈值 ' + MODEL.threshold.toFixed(2) + ' · 训练：规则热启动 + 逐边 PPO</div>';
+  $('#cmp').innerHTML = html;
+}
+
+function buildImportance() {
+  const W0 = MODEL.weights.enc0_w;
+  const norms = W0.map(row => Math.sqrt(row.reduce((s, w) => s + w * w, 0)));
+  const idx = norms.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, 8);
+  const mx = idx[0][0];
+  $('#imp').innerHTML = idx.map(([v, i]) =>
+    '<div class="imp"><div class="n" title="' + SPEC[i].n + '">' + SPEC[i].n + '</div>'
+    + '<div class="t"><div class="f" style="width:' + (v / mx * 100).toFixed(0) + '%"></div></div>'
+    + '<div class="v">' + v.toFixed(2) + '</div></div>').join('');
+}
+
+/* ============================ 实时影子流 ============================ */
+let livePaused = false;
+
+function renderLive(d) {
+  const info = $('#liveinfo'), chips = $('#livechips'), tb = $('#livetable tbody');
+  if (!d.enabled) {
+    info.textContent = '未开启';
+    chips.innerHTML = '<span class="chip warn">影子模式关闭：<b>DEDUP_SHADOW=1</b> 重启后端</span>';
+    return;
+  }
+  const st = d.stats || {};
+  info.textContent = (st.frames || 0) + ' 帧 · ' + (st.observations || 0) + ' 条观测';
+  const rate = (st.agree_rate == null ? 1 : st.agree_rate) * 100;
+  chips.innerHTML = [
+    '<span class="chip ' + (rate >= 95 ? 'good' : 'warn') + '">一致率 <b>' + rate.toFixed(1) + '%</b></span>',
+    '<span class="chip">一致 <b>' + (st.agree || 0) + '</b></span>',
+    '<span class="chip warn">策略多并 <b>' + (st.policy_extra || 0) + '</b></span>',
+    '<span class="chip warn">策略少并 <b>' + (st.policy_missed || 0) + '</b></span>',
+    '<span class="chip">阈值 <b>' + MODEL.threshold.toFixed(2) + '</b></span>',
+  ].join('');
+
+  const rows = d.rows || [];
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="mute" style="padding:14px">'
+      + '暂无判定。跑 <b>tools/sim_two_devices.py</b> 灌点数据试试</td></tr>';
+    return;
+  }
+  tb.innerHTML = rows.slice(0, 40).map((r, i) =>
+    '<tr data-i="' + i + '">'
+    + '<td class="mute">' + r.frame + '</td>'
+    + '<td>' + r.src + '</td>'
+    + '<td>' + r.lid + '</td>'
+    + '<td class="' + (r.rule_gid ? '' : 'mute') + '">' + (r.rule_gid || '新建') + '</td>'
+    + '<td class="' + (r.policy_gid ? '' : 'mute') + '">' + (r.policy_gid || '新建') + '</td>'
+    + '<td>' + (r.p_max == null ? '—' : r.p_max.toFixed(3)) + '</td>'
+    + '<td class="' + (r.agree ? 'ok' : 'bad') + '">' + (r.agree ? '✓' : '✗') + '</td>'
+    + '</tr>').join('');
+
+  tb.querySelectorAll('tr').forEach(tr => {
+    tr.onclick = () => {
+      const r = rows[+tr.dataset.i];
+      if (!r || !r.feat) return;
+      r.feat.forEach((v, i) => {
+        FEAT[i] = v;
+        const inp = $('#s' + i); if (inp) inp.value = v;
+        const o = $('#o' + i); if (o) o.textContent = fmtVal(i);
+      });
+      update(true);
+      document.querySelector('#sliders').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+      tr.classList.remove('flash'); void tr.offsetWidth; tr.classList.add('flash');
+    };
+  });
+}
+
+async function pollLive() {
+  if (livePaused) return;
+  try {
+    const r = await apiGet('/api/rl/live?n=40');
+    renderLive(await r.json());
+  } catch (e) { /* 后端重启中，忽略 */ }
+}
+
+/* ============================ 启动 ============================ */
+resize();
+load().then(() => {
+  if (MODEL) { update(true); requestAnimationFrame(tick); }
+  pollLive();
+  setInterval(pollLive, 1500);
+});
+</script>
+
+<div id="boot-bar" style="position:fixed;left:0;right:0;top:0;z-index:9999;
+  background:#1e293b;border-bottom:1px solid #334155;color:#93b4d8;
+  font:13px/1.6 'Microsoft YaHei',sans-serif;padding:6px 14px;text-align:center">
+  正在连接后端服务… <span id="boot-t">0</span>s（首次启动需预热约 40 秒）
+</div>
+<script>
+(function () {
+  var bar = document.getElementById('boot-bar'), t = 0, timer = null;
+  function tick() { t++; var e = document.getElementById('boot-t'); if (e) e.textContent = t; }
+  timer = setInterval(tick, 1000);
+  function done() { clearInterval(timer); if (bar) { bar.style.background = '#14532d';
+      bar.style.color = '#86efac'; bar.innerHTML = '后端已就绪 · http://127.0.0.1:8080';
+      setTimeout(function () { bar.style.display = 'none'; }, 2500); } }
+  function check() {
+    fetch('http://127.0.0.1:8080/api/health', { cache: 'no-store' })
+      .then(function (r) { if (r.ok) done(); else setTimeout(check, 1500); })
+      .catch(function () { setTimeout(check, 1500); });
+  }
+  check();
+})();
+</script>
+
+
+<div id="nav-bar" style="position:fixed;right:14px;bottom:14px;z-index:9998;display:flex;gap:6px;font:12px/1 'Microsoft YaHei',sans-serif">
+  <a href="demo.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">① 主演示台</a>
+  <a href="demo_p1.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">② 航道总览</a>
+  <a href="demo_p1_place.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">③ 航道匹配</a>
+  <a href="rl_lab.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#2563eb;color:#fff;border:1px solid #3b82f6">④ RL 实验室</a>
+</div>
+</body>
+</html>

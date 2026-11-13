@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.1",
+  "frame": "WGS84",
+  "altitude_ref": "MSL",
+  "description": "低空起降点系统统一数据接口 schema(机器可读)。字段别名仅作文档用途, 运行时以 interface.js / interface.py 为准。",
+  "geo": {
+    "M_PER_DEG_LAT": 111320.0,
+    "meters_per_deg_lon": "M_PER_DEG_LAT * cos(lat * pi / 180)"
+  },
+  "entities": {
+    "airport": {
+      "code": "string",
+      "name": "string",
+      "lat": "number",
+      "lon": "number",
+      "elevation": "number (MSL m)",
+      "safe_radius": "number (m)",
+      "runway_heading": "number (deg)"
+    },
+    "obstacle": {
+      "id": "string",
+      "name": "string",
+      "type": "enum: fixed | dynamic",
+      "lat": "number",
+      "lon": "number",
+      "base_msl": "number",
+      "top_msl": "number",
+      "radius": "number",
+      "buffer": "number",
+      "active": "boolean"
+    },
+    "airspace": {
+      "id": "string",
+      "name": "string",
+      "polygon": "[[lat,lon],...]",
+      "floor_msl": "number",
+      "ceiling_msl": "number",
+      "active": "boolean"
+    },
+    "meteo": {
+      "timestamp": "ISO8601 string",
+      "wind_speed": "number (m/s)",
+      "wind_dir": "number (deg)",
+      "gust": "number (m/s)",
+      "visibility": "number (m)",
+      "cloud_base_agl": "number (m)",
+      "turbulence": "int 1..4",
+      "wind_shear": "int 1..4",
+      "temperature": "number (C)",
+      "dew_point": "number (C)",
+      "pressure": "number (hPa)"
+    },
+    "traffic": {
+      "id": "string",
+      "model": "string",
+      "reg_no": "string",
+      "ua_id": "string",
+      "phase": "enum: APPROACH | DEPARTURE | HOVER | CRUISE | STANDBY | LANDED",
+      "lat": "number",
+      "lon": "number",
+      "alt_msl": "number",
+      "speed": "number (m/s)",
+      "heading": "number (deg)",
+      "vertical_speed": "number (m/s)",
+      "battery_pct": "int",
+      "link_quality": "int 1..5",
+      "emergency": "boolean",
+      "rid_lost": "boolean",
+      "route": "[{lat,lon,alt_msl}]",
+      "ts": "ISO8601 string (observation time, NOT receive time)",
+      "source_node": "string (e.g. NODE-A / RID-7A21)",
+      "quality": "number 0..1 (source trust: RID 0.8 / ADS-B 0.6 / radar 0.4)",
+      "msg_id": "string (idempotency key, optional)"
+    },
+    "traffic_dedup": {
+      "_comment": "GET /api/traffic 去重后的附加字段",
+      "global_id": "string",
+      "sources": "[string]",
+      "source_ids": "{source: local_id}",
+      "confidence": "number 0..1",
+      "merged": "boolean"
+    },
+    "program": {
+      "type": "enum: arrival | departure | missed",
+      "version": "string",
+      "source": "enum: static | plan | dynamic",
+      "plan_id": "int",
+      "waypoints": "[{lat,lon,alt_msl,speed}]",
+      "miss_approach": "[{lat,lon,alt_msl,speed}]"
+    }
+  },
+  "aliases": {
+    "communication": {
+      "obstacle.height": "top_msl - airport.elevation",
+      "obstacle.x_y": "ENU -> lat/lon via geo",
+      "meteo.wind": "wind_speed",
+      "meteo.windDir": "wind_dir",
+      "meteo.ceiling": "cloud_base_agl",
+      "meteo.temp": "temperature",
+      "meteo.dewPoint": "dew_point",
+      "meteo.qnh": "pressure",
+      "fence.fencePoly": "airspace.polygon",
+      "traffic.alt": "alt_msl - airport.elevation",
+      "traffic.regNo": "reg_no",
+      "traffic.uaId": "ua_id",
+      "traffic.vs": "vertical_speed"
+    },
+    "flycontrol": {
+      "obstacle.obs_type": "1->fixed, 2->dynamic",
+      "obstacle.top_agl": "top_msl - elevation",
+      "obstacle.base_agl": "base_msl - elevation",
+      "meteo.cloud_base": "cloud_base_agl",
+      "airspace.floor_agl": "floor_msl - elevation",
+      "airspace.ceiling_agl": "ceiling_msl - elevation",
+      "waypoint.z": "alt_msl - elevation"
+    }
+  },
+  "endpoints": {
+    "snapshot": "GET /api/sync/snapshot",
+    "traffic_ingest": "POST /api/traffic/ingest",
+    "traffic_list": "GET /api/traffic",
+    "traffic_stats": "GET /api/traffic/stats"
+  }
+}

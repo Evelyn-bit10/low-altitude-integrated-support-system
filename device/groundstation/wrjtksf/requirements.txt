@@ -1,0 +1,33 @@
+# ============================================================
+#  pip 依赖（在 venv 中安装）
+#  PyQt5 系列由 start.sh 通过 apt 安装，不在此列
+# ============================================================
+
+# ---- 串口通信（GPS / RID / 传感器） ----
+pyserial
+
+# ---- MAVLink 无人机通信 ----
+pymavlink
+
+# ---- ADS-B 1090MHz 信号解码 ----
+rs1090
+
+# ---- YAML 配置文件解析 ----
+pyyaml
+
+# ---- 天气 API ----
+aiohttp>=3.8
+brotli
+
+# ---- 地图瓦片生成 (scripts/generate_dsm_tiles.py) ----
+numpy
+Pillow
+rasterio
+
+# ---- 测试 ----
+pytest
+
+# ---- 注意 ----
+# PyQt5 / PyQt5-svg / PyQtWebEngine 由 start.sh 通过 apt 安装，pip 安装极慢且易失败
+# PySide6 不在树莓派上使用，如需请自行 pip install PySide6
+# winrt 是 Windows 专属包，Linux（树莓派）不可安装

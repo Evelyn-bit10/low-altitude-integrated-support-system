@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>低空综合保障设备 · 软件系统功能分解</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0d1424; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", -apple-system, "Segoe UI", sans-serif; overflow: auto; }
+  #wrap { padding: 16px 20px 28px; }
+  h1 { color: #e8edf7; font-size: 17px; font-weight: 600; margin: 0 0 6px; letter-spacing: .5px; }
+  .hint { color: #64748b; font-size: 11px; margin: 0 0 10px; line-height: 1.7; }
+  .hint b { color: #94a3b8; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 12px; font-size: 11px; color: #94a3b8; align-items: center; }
+  .legend .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .legend .sw.dash { border: 1.5px dashed #fbbf24; background: rgba(30,41,59,.9); }
+  .toolbar { margin: 0 0 6px; }
+  .toolbar button { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 5px;
+    padding: 5px 12px; font-size: 12px; cursor: pointer; margin-right: 8px; font-family: inherit; }
+  .toolbar button:hover { background: #273449; color: #fff; }
+  svg { display: block; }
+  .node rect { cursor: pointer; transition: filter .12s; }
+  .node rect:hover { filter: brightness(1.18); }
+  .node text { pointer-events: none; }
+  .collapse-tag { pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>低空综合保障设备 · 软件系统功能分解</h1>
+  <p class="hint">点击<b>有子节点的模块</b>折叠 / 展开 · 共<b>三大系统 → 功能模块 → 子功能点</b>三层 · 模块名带需求说明书章节号</p>
+  <div class="legend">
+    <span><span class="sw" style="background:#3b82f6"></span>设备端嵌入式软件</span>
+    <span><span class="sw" style="background:#22c55e"></span>后台管理平台</span>
+    <span><span class="sw" style="background:#f59e0b"></span>终端 APP</span>
+    <span><span class="sw dash"></span>预留（二期，可插拔）</span>
+    <span style="color:#7c3aed">◆</span><span>初版边界：不做飞行控制 · 智能输出=建议＋人工确认</span>
+  </div>
+  <div class="toolbar">
+    <button id="btnExpand">全部展开</button>
+    <button id="btnModule">折叠到模块层</button>
+  </div>
+  <div id="map"></div>
+</div>
+<script>
+// ===== 数据（系统功能分解树，编号对齐《软件及管理平台详细功能需求说明书》）=====
+const root = {
+  name: "低空综合保障设备\n软件系统",
+  children: [
+    {
+      name: "一、设备端嵌入式软件\n（节点层）",
+      color: "#3b82f6",
+      children: [
+        { name: "4.1 设备抽象层\n（插件化）", children: [
+          { name: "统一插件接口\ninit/start/stop/stream/config/health" },
+          { name: "插件生命周期状态机\nREGISTERED→…→FAULT" },
+          { name: "插件清单 manifest\n（插件元数据）" },
+          { name: "ADS-B 接收插件\n（标配）" },
+          { name: "RID 远程识别插件\n（标配）" },
+          { name: "气象观测插件\n（标配）" },
+          { name: "补能状态插件\n（标配）" },
+          { name: "雷达插件（预留）", tag: "预留" },
+          { name: "频谱侦测插件（预留）", tag: "预留" },
+          { name: "光电红外插件（预留）", tag: "预留" },
+        ]},
+        { name: "4.2 本地态势融合", children: [
+          { name: "多源目标关联\n（有标识/无标识）" },
+          { name: "可信度加权融合\n（Q_s 三因子）" },
+          { name: "航迹跟踪与预测\n（卡尔曼滤波）" },
+          { name: "统一空中态势图输出" },
+        ]},
+        { name: "4.3 本地进离港排序\n（建议）", children: [
+          { name: "判据一：地面起降点占用" },
+          { name: "判据二：风场影响间隔\n（下洗流/喷流）" },
+          { name: "混合类型协同排序" },
+          { name: "排序建议输出\n（人工确认）" },
+        ]},
+        { name: "4.4 边缘自治与断网补传", children: [
+          { name: "断网独立运行" },
+          { name: "本地缓存队列\n（持久化）" },
+          { name: "/device/sync 分页补传" },
+          { name: "去重合并（幂等）" },
+        ]},
+      ],
+    },
+    {
+      name: "二、后台管理平台\n（B/S）",
+      color: "#22c55e",
+      children: [
+        { name: "5.1 起降点管理", children: [
+          { name: "台账管理" },
+          { name: "状态监控" },
+          { name: "分级管控" },
+          { name: "运维管理" },
+        ]},
+        { name: "5.2 设备管理\n（通导监气象＋补能）", children: [
+          { name: "5.2.1 通讯设备管理", children: [
+            { name: "地空语音通信监控" },
+            { name: "数据链通信监控" },
+            { name: "质量评估与故障诊断" },
+            { name: "通信覆盖分析" },
+            { name: "通信设备运维" },
+          ]},
+          { name: "5.2.2 导航设备管理", children: [
+            { name: "卫星导航增强监控" },
+            { name: "地基导航信标监控" },
+            { name: "视觉辅助导航监控" },
+            { name: "精度评估与覆盖分析" },
+            { name: "导航数据校准" },
+          ]},
+          { name: "5.2.3 监视设备管理", children: [
+            { name: "广播式监视接入" },
+            { name: "网络式监视接入" },
+            { name: "多源融合处理" },
+            { name: "空域态势可视化" },
+            { name: "异常目标检测告警" },
+            { name: "监视设备运维" },
+          ]},
+          { name: "5.2.4 气象设备管理", children: [
+            { name: "地面气象观测" },
+            { name: "边界层风场探测" },
+            { name: "气象综合分析" },
+            { name: "起降气象标准校验" },
+            { name: "气象风险分级预警" },
+            { name: "气象设备运维与质控" },
+          ]},
+          { name: "5.2.5 补能设备管理\n（能源核）", children: [
+            { name: "充电状态监控" },
+            { name: "储能缓冲监控" },
+            { name: "液冷与消防联动监控" },
+            { name: "补能设备运维" },
+          ]},
+        ]},
+        { name: "5.3 飞行程序管理", children: [
+          { name: "程序台账配置" },
+          { name: "程序审核发布" },
+          { name: "气象驱动切换（建议）" },
+          { name: "程序执行监控" },
+        ]},
+        { name: "5.4 航路航线管理", children: [
+          { name: "航线台账管理" },
+          { name: "航线可视化展示" },
+          { name: "航线占用管理" },
+          { name: "航线适配校验" },
+        ]},
+        { name: "5.5 净空保护区管理", children: [
+          { name: "净空区域划定" },
+          { name: "净空隐患监测" },
+          { name: "隐患台账与整改" },
+          { name: "净空合规统计" },
+        ]},
+        { name: "5.6 智能算法\n（建议＋人工确认）", children: [
+          { name: "5.6.1 冲突探测与解脱建议", children: [
+            { name: "冲突探测\n（六类/战略战术/三级预警）" },
+            { name: "解脱建议计算" },
+            { name: "人工确认与留痕" },
+          ]},
+          { name: "5.6.2 气象自适应程序切换", children: [
+            { name: "气象阈值矩阵" },
+            { name: "切换判定" },
+            { name: "切换联动" },
+            { name: "人工兜底" },
+          ]},
+        ]},
+        { name: "5.7 跨平台交互\n（对接层）", children: [
+          { name: "5.7.1 地方低空平台", children: [
+            { name: "上行同步" },
+            { name: "下行接收" },
+            { name: "业务协同" },
+            { name: "接口监控" },
+          ]},
+          { name: "5.7.2 民航局 UOM", children: [
+            { name: "数据订阅" },
+            { name: "数据推送" },
+            { name: "协同调度" },
+            { name: "数据一致性校验" },
+          ]},
+        ]},
+        { name: "5.8 基础通用功能", children: [
+          { name: "日志管理" },
+          { name: "告警中心" },
+          { name: "数据统计报表" },
+          { name: "用户与权限（RBAC）" },
+          { name: "首页可视化大屏" },
+        ]},
+        { name: "组网层协同\n（多点协同 · 对应 3.2）", children: [
+          { name: "/cluster/register\n入网注册" },
+          { name: "/cluster/heartbeat\n心跳" },
+          { name: "/ws/cluster/surveillance\n监视数据共享" },
+          { name: "/cluster/procedures/sync\n飞行程序同步" },
+          { name: "/cluster/conflict\n跨点冲突协同" },
+          { name: "/cluster/airports\n起降点群信息" },
+        ]},
+      ],
+    },
+    {
+      name: "三、终端 APP\n（Flutter）",
+      color: "#f59e0b",
+      children: [
+        { name: "7.1 远程监控\n（WebSocket＋REST）", children: [
+          { name: "全域态势查看" },
+          { name: "告警推送接收" },
+          { name: "起降点/设备查询" },
+          { name: "冲突/排序建议查看" },
+        ]},
+        { name: "7.2 近场直连\n（WiFi/蓝牙 · 只读不控）", children: [
+          { name: "设备发现与连接" },
+          { name: "本机监视查看" },
+          { name: "本机气象查看" },
+          { name: "设备健康查看" },
+        ]},
+        { name: "7.3 离线缓存\n（SQLite）", children: [
+          { name: "离线数据缓存" },
+          { name: "离线查看" },
+          { name: "缓存同步" },
+        ]},
+      ],
+    },
+  ],
+};
+
+// ===== 常量 =====
+const FONT = 11;
+const LINE_H = 15;
+const PAD_X = 9;
+const PAD_Y = 6;
+const TAG_W = 14;      // 折叠标记预留宽度
+const LEVEL_X = 205;
+const GAP = 9;         // 叶子纵向间距
+const MARGIN_X = 20;
+const MARGIN_Y = 18;
+
+// ===== 状态 =====
+const collapsed = new Set();
+let nodes = [];
+
+function isLeaf(n) { return !n.children || n.children.length === 0; }
+
+function textWidth(str) {
+  let w = 0;
+  for (const ch of str) w += (ch.charCodeAt(0) > 255) ? FONT : FONT * 0.62;
+  return w;
+}
+
+function measure(n) {
+  const lines = (n.name || "").split("\n");
+  let maxW = 0;
+  for (const l of lines) maxW = Math.max(maxW, textWidth(l));
+  const kids = !isLeaf(n);
+  const w = Math.max(40, maxW + PAD_X * 2 + (kids ? TAG_W : 0));
+  const h = lines.length * LINE_H + PAD_Y * 2;
+  return { lines, w, h };
+}
+
+// 建立 parent 引用
+(function link(node) {
+  if (node.children) for (const c of node.children) { c._parent = node; link(c); }
+})(root);
+// 一级分支 top 引用（携带颜色）
+root.children.forEach(function (top) {
+  (function setTop(n) { n.top = top; if (n.children) n.children.forEach(setTop); })(top);
+});
+
+function initDefaultCollapse() {
+  collapsed.clear();
+  (function walk(n) {
+    if (!isLeaf(n) && n.children.every(isLeaf)) collapsed.add(n);
+    if (n.children) n.children.forEach(walk);
+  })(root);
+}
+
+let yCursor = 0;
+function layout(n, depth) {
+  const m = measure(n);
+  const kids = (!isLeaf(n) && !collapsed.has(n)) ? n.children : null;
+  let cy;
+  if (!kids) {
+    const top = MARGIN_Y + yCursor;
+    cy = top + m.h / 2;
+    yCursor += m.h + GAP;
+  } else {
+    const cys = kids.map(c => layout(c, depth + 1));
+    cy = (cys[0] + cys[cys.length - 1]) / 2;
+  }
+  nodes.push({ n, x: MARGIN_X + depth * LEVEL_X, cy, w: m.w, h: m.h, depth, lines: m.lines });
+  return cy;
+}
+
+function render() {
+  nodes = []; yCursor = 0;
+  layout(root, 0);
+  let maxX = 0;
+  for (const o of nodes) maxX = Math.max(maxX, o.x + o.w);
+  const totalW = maxX + MARGIN_X;
+  const totalH = yCursor + MARGIN_Y;
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + totalW + " " + totalH);
+  svg.setAttribute("width", "100%");
+  svg.style.maxWidth = totalW + "px";
+
+  // 连接线（先画，在节点下方）
+  const gEdge = document.createElementNS(svgNS, "g");
+  for (const o of nodes) {
+    if (o.n === root) continue;
+    const p = nodes.find(q => q.n === o.n._parent);
+    if (!p) continue;
+    const x1 = p.x + p.w, y1 = p.cy;
+    const x2 = o.x, y2 = o.cy;
+    const mx = (x1 + x2) / 2;
+    const d = "M " + x1 + " " + y1 + " C " + mx + " " + y1 + ", " + mx + " " + y2 + ", " + x2 + " " + y2;
+    const path = document.createElementNS(svgNS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#3a4a63");
+    path.setAttribute("stroke-width", "1.4");
+    gEdge.appendChild(path);
+  }
+  svg.appendChild(gEdge);
+
+  // 节点
+  for (const o of nodes) {
+    const g = document.createElementNS(svgNS, "g");
+    g.setAttribute("class", "node");
+    g.setAttribute("transform", "translate(" + o.x + ", " + (o.cy - o.h / 2) + ")");
+
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("width", o.w);
+    rect.setAttribute("height", o.h);
+    rect.setAttribute("rx", "6");
+
+    let fill, stroke, textColor, dash = null;
+    if (o.n === root) {
+      fill = "#7c3aed"; stroke = "#a78bfa"; textColor = "#ffffff";
+    } else if (o.n.tag === "预留") {
+      fill = "rgba(30,41,59,0.9)"; stroke = "#fbbf24"; textColor = "#fcd34d"; dash = "4 3";
+    } else {
+      const base = o.n.top ? o.n.top.color : "#64748b";
+      if (isLeaf(o.n)) {
+        fill = "rgba(30,41,59,0.9)"; stroke = "#475569"; textColor = "#cbd5e1";
+      } else {
+        fill = base; stroke = base; textColor = "#ffffff";
+      }
+    }
+    rect.setAttribute("fill", fill);
+    rect.setAttribute("stroke", stroke);
+    rect.setAttribute("stroke-width", o.n === root ? "1.5" : "1.2");
+    if (dash) rect.setAttribute("stroke-dasharray", dash);
+
+    const hasKids = !isLeaf(o.n);
+    const cx = (o.w - (hasKids ? TAG_W : 0)) / 2;
+
+    const txt = document.createElementNS(svgNS, "text");
+    txt.setAttribute("x", cx);
+    txt.setAttribute("text-anchor", "middle");
+    txt.setAttribute("font-size", FONT);
+    if (o.n === root) txt.setAttribute("font-weight", "600");
+    txt.setAttribute("fill", textColor);
+    const totalTextH = o.lines.length * LINE_H;
+    const firstBaseline = (o.h - totalTextH) / 2 + LINE_H * 0.72;
+    o.lines.forEach(function (l, i) {
+      const ts = document.createElementNS(svgNS, "tspan");
+      ts.setAttribute("x", cx);
+      ts.setAttribute("dy", i === 0 ? firstBaseline : LINE_H);
+      ts.textContent = l;
+      txt.appendChild(ts);
+    });
+
+    g.appendChild(rect);
+    g.appendChild(txt);
+
+    if (hasKids) {
+      const tag = document.createElementNS(svgNS, "text");
+      tag.setAttribute("class", "collapse-tag");
+      tag.setAttribute("x", o.w - 5);
+      tag.setAttribute("y", 11);
+      tag.setAttribute("text-anchor", "end");
+      tag.setAttribute("font-size", "10");
+      tag.setAttribute("fill", "rgba(255,255,255,0.9)");
+      tag.textContent = collapsed.has(o.n) ? "▸" : "▾";
+      g.appendChild(tag);
+    }
+
+    g.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (isLeaf(o.n)) return;
+      if (collapsed.has(o.n)) collapsed.delete(o.n); else collapsed.add(o.n);
+      render();
+    });
+
+    svg.appendChild(g);
+  }
+
+  const wrap = document.getElementById("map");
+  wrap.innerHTML = "";
+  wrap.appendChild(svg);
+}
+
+document.getElementById("btnExpand").addEventListener("click", function () { collapsed.clear(); render(); });
+document.getElementById("btnModule").addEventListener("click", function () { initDefaultCollapse(); render(); });
+
+initDefaultCollapse();
+render();
+</script>
+</body>
+</html>

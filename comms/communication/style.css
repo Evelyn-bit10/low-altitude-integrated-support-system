@@ -1,0 +1,131 @@
+:root{
+  --bg:#0a1020; --bg2:#0f1a2e; --panel:#111e36; --panel2:#0c1728;
+  --line:#1e3a5f; --txt:#d6e6ff; --dim:#7f9bc4; --acc:#2f9bff; --ok:#25d07d;
+  --warn:#ffb020; --bad:#ff4d5e; --cyan:#27e0d8; --mono:Consolas,"JetBrains Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:radial-gradient(1200px 600px at 70% -10%,#13243f 0%,var(--bg) 55%);
+  color:var(--txt); font-family:"Segoe UI","Microsoft YaHei",sans-serif; font-size:13px;
+  overflow:hidden;
+}
+#app{display:flex;flex-direction:column;height:100vh;gap:8px;padding:8px}
+
+/* ---------- 顶栏 ---------- */
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;
+  background:linear-gradient(90deg,#0d1b31 0%,#122744 60%,#0d1b31 100%);
+  border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.brand{display:flex;gap:12px;align-items:center}
+.brand-icon{font-size:26px;filter:drop-shadow(0 0 8px #2f9bff)}
+.brand-title{font-size:16px;font-weight:700;letter-spacing:.5px}
+.brand-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.topbar-status{display:flex;gap:8px;align-items:center}
+.status-item{padding:5px 10px;border-radius:999px;border:1px solid var(--line);
+  background:#0b1626;font-size:12px;font-family:var(--mono);color:var(--dim)}
+.status-item.ok{color:var(--ok);border-color:#1d6b46}
+.status-item.warn{color:var(--warn);border-color:#7a5a16}
+.status-item.bad{color:var(--bad);border-color:#7a2731;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.45}}
+
+/* ---------- 布局 ---------- */
+.layout{display:grid;grid-template-columns:300px 1fr 380px;gap:8px;flex:1;min-height:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;min-height:0}
+.panel-title{font-size:13px;font-weight:700;color:#e8f2ff;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.panel-title.sub{margin-top:10px;font-size:12px}
+.hint{font-size:11px;color:var(--dim);font-weight:400}
+.left{overflow:auto}
+.center{padding:10px}
+.right{overflow:hidden}
+
+/* ---------- 飞行器列表 ---------- */
+.uas-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;flex:1;overflow:auto}
+.uas-card{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel2);cursor:pointer;transition:.15s}
+.uas-card:hover{border-color:var(--acc)}
+.uas-card.active{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.uas-card .r1{display:flex;justify-content:space-between;align-items:center}
+.uas-card .callsign{font-family:var(--mono);font-weight:700;color:#eaf3ff}
+.uas-card .phase{font-size:11px;padding:2px 7px;border-radius:99px;background:#13315c;color:var(--acc)}
+.uas-card .phase.hover{background:#0f3d3a;color:var(--cyan)}
+.uas-card .phase.approach{background:#3c3410;color:var(--warn)}
+.uas-card .phase.emergency{background:#4b1720;color:var(--bad)}
+.uas-card .r2{display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--dim);font-family:var(--mono)}
+.uas-card .bar{height:3px;background:#16283f;border-radius:3px;margin-top:6px;overflow:hidden}
+.uas-card .bar i{display:block;height:100%;background:linear-gradient(90deg,#25d07d,#2f9bff)}
+.uas-card.lost{opacity:.55;border-style:dashed}
+.uas-card.lost .phase{background:#3a1420;color:var(--bad)}
+
+/* ---------- 通讯指标 ---------- */
+.link-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.lm{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px}
+.lm span{display:block;font-size:11px;color:var(--dim)}
+.lm b{font-family:var(--mono);font-size:14px;color:#eaf3ff}
+.comp-table{width:100%;margin-top:6px;border-collapse:collapse;font-size:11px}
+.comp-table td{padding:4px 2px;border-bottom:1px dashed #1a2f4d;color:var(--dim)}
+.comp-table td.ok{color:var(--ok);text-align:right}
+.comp-table td.bad{color:var(--bad);text-align:right}
+
+/* ---------- 态势图 ---------- */
+.map-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.map-controls{display:flex;gap:10px;font-size:11px;color:var(--dim);align-items:center;flex-wrap:wrap}
+.map-controls label{display:flex;gap:3px;align-items:center}
+.map-controls select{background:#0b1626;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:2px 4px}
+.canvas-wrap{position:relative;flex:1;margin-top:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#081020}
+canvas{display:block;width:100%;height:100%}
+.map-legend{position:absolute;left:10px;bottom:8px;display:flex;gap:12px;font-size:11px;color:var(--dim);flex-wrap:wrap;background:rgba(8,14,28,.75);padding:5px 9px;border-radius:8px;border:1px solid var(--line)}
+.map-legend span{display:flex;gap:4px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.vertiport{background:#2f9bff;box-shadow:0 0 8px #2f9bff}
+.dot.uas{background:#25d07d}
+.dot.obstacle{background:#ffb020}
+.line{width:16px;height:0;border-top:2px dashed;display:inline-block}
+.line.fence{border-color:#ff4d5e}
+.line.range{border-color:#2f9bff}
+.selected-info{position:absolute;left:10px;top:8px;background:rgba(8,14,28,.8);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:11px;color:var(--cyan);font-family:var(--mono);max-width:60%;white-space:pre-line}
+
+/* ---------- 通讯面板 ---------- */
+.msg-stream{flex:1;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-top:8px;min-height:0;padding-right:4px}
+.msg{border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:6px;background:var(--panel2);padding:6px 8px;font-size:11px}
+.msg.from-uas{border-left-color:var(--ok)}
+.msg.from-atc{border-left-color:var(--acc)}
+.msg.sys{border-left-color:var(--warn)}
+.msg.alert{border-left-color:var(--bad);background:#241019}
+.msg .mh{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-bottom:3px;font-family:var(--mono)}
+.msg .mt{font-weight:700;color:#cfe6ff}
+.msg .mp{color:#9fc0e8;font-family:var(--mono);font-size:11px;word-break:break-all;white-space:pre-wrap}
+.cmd-row{display:flex;gap:6px;margin-top:8px}
+.cmd-row select,.cmd-row input{flex:1;background:#0b1626;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px}
+.cmd-row button{background:linear-gradient(90deg,#0f4c8f,#2f9bff);border:0;color:white;border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:700;white-space:nowrap}
+.cmd-row button:hover{filter:brightness(1.15)}
+.uas-detail{margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:8px;font-size:11px;font-family:var(--mono);color:var(--dim);line-height:1.7;min-height:96px;overflow:auto}
+
+/* ---------- 底栏 ---------- */
+.bottombar{display:grid;grid-template-columns:1.1fr .9fr 1fr;gap:8px;height:132px}
+.bottombar .panel{padding:8px 10px}
+.met-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:6px}
+.met-cell{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 6px;text-align:center}
+.met-cell span{display:block;font-size:10px;color:var(--dim)}
+.met-cell b{font-family:var(--mono);font-size:12px;color:#eaf3ff}
+.met-cell.bad b{color:var(--bad)}
+.met-cell.warn b{color:var(--warn)}
+.obs-list{overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.obs-item{display:flex;justify-content:space-between;font-size:11px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 7px;font-family:var(--mono)}
+.obs-item .nm{color:#d6e6ff}
+.obs-item .ds{color:var(--dim)}
+.obs-item.conflict{border-color:var(--bad);background:#241019}
+.log-list{overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:3px;font-size:11px}
+.log-item{font-family:var(--mono);color:var(--dim);border-bottom:1px dashed #16283f;padding-bottom:3px}
+.log-item.warn{color:var(--warn)}
+.log-item.bad{color:var(--bad)}
+.log-item.ok{color:var(--ok)}
+
+/* 滚动条 */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+
+@media (max-width:1200px){
+  .layout{grid-template-columns:260px 1fr 320px}
+  .bottombar{grid-template-columns:1fr}
+  .met-grid{grid-template-columns:repeat(4,1fr)}
+}

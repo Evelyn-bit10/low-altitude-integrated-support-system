@@ -1,0 +1,67 @@
+{
+  "policy_file": "policy_weights.json",
+  "features": [
+    "距离/门限",
+    "绝对距离",
+    "高差/30m",
+    "航向差/30°",
+    "Δt",
+    "ua相同",
+    "ua冲突",
+    "ua缺失",
+    "reg相同",
+    "reg冲突",
+    "速度相对差",
+    "候选排名",
+    "航迹已跟踪帧数",
+    "源质量",
+    "源σ/20",
+    "低速标志",
+    "最近邻航迹距离/100",
+    "航迹总数/100",
+    "门限膨胀比"
+  ],
+  "threshold": 0.8,
+  "decision_rule": "score >= threshold 即接受该边；同一来源对同一航迹只接受一次",
+  "safety_rules": [
+    "ua_id 冲突一票否决（masked）"
+  ],
+  "calibrated_on": [
+    [
+      "sparse",
+      "noid",
+      71
+    ],
+    [
+      "dense",
+      "noid",
+      72
+    ],
+    [
+      "hard_dense",
+      "hard",
+      73
+    ],
+    [
+      "swarm",
+      "noid",
+      74
+    ]
+  ],
+  "expected": {
+    "reward": -1003.5,
+    "wrong": 760,
+    "miss": 29,
+    "true": 2504,
+    "frags": 2.375,
+    "split": 0.875
+  },
+  "rule_baseline": {
+    "reward": -1247.0,
+    "wrong": 909,
+    "miss": 38,
+    "true": 2346,
+    "frags": 2.562,
+    "split": 0.917
+  }
+}

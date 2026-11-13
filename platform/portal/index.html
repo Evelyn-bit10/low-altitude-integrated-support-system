@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#05070f">
+  <meta name="description" content="挺中航空科技有限公司 · 低空起降点一体化运行门户">
+  <title>挺中航空 · 低空起降点一体化系统</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop-grid"></div>
+    <div class="backdrop-glow glow-a"></div>
+    <div class="backdrop-glow glow-b"></div>
+    <div class="noise"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="#/home" data-nav="home" aria-label="返回运行总览">
+      <span class="brand-symbol"><i></i><i></i><i></i></span>
+      <span class="brand-copy"><b>挺中航空</b><small>SKYPORT OPERATIONS</small></span>
+    </a>
+    <nav class="topnav" aria-label="系统主导航">
+      <a href="#/home" data-nav="home">运行总览</a>
+      <a href="#/situation" data-nav="situation">实时态势</a>
+      <a href="#/program" data-nav="program">飞行程序</a>
+      <a href="#/ground" data-nav="ground">地面站</a>
+      <a href="#/dashboard" data-nav="dashboard">数据看板</a>
+      <a href="#/business" data-nav="business">业务管理</a>
+    </nav>
+    <div class="system-meta">
+      <button id="connection-pill" class="connection-pill is-mock" type="button" data-action="toggle-mode" title="点击切换数据源：演示数据 / 实时数据"><i></i><span>演示数据</span></button>
+      <time id="system-clock" class="mono">--:--:--</time>
+    </div>
+    <button id="nav-toggle" class="nav-toggle" type="button" aria-label="展开导航">☰</button>
+  </header>
+
+  <main id="app" class="app" tabindex="-1"></main>
+  <div id="overlay-root"></div>
+  <div id="toast-root" class="toast-stack" aria-live="polite"></div>
+
+  <noscript><div class="noscript">此门户需要启用 JavaScript。</div></noscript>
+  <script src="mock-data.js"></script>
+  <script src="api.js"></script>
+  <script src="visuals.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

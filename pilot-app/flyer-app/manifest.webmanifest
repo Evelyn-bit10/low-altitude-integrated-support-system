@@ -1,0 +1,22 @@
+{
+  "name": "挺中航空 · C 端",
+  "short_name": "挺中航空",
+  "description": "挺中航空科技有限公司 · 起降点周边信息与飞行器实时动态",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#05070f",
+  "theme_color": "#05070f",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "起降申请", "short_name": "申请", "url": "./index.html#/apply" },
+    { "name": "实时态势", "short_name": "态势", "url": "./index.html#/home" }
+  ]
+}

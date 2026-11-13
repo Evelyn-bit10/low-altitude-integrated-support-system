@@ -1,0 +1,194 @@
+simulation:
+  tick_seconds: 0.1
+  speed: 18.0
+  cruise_altitude: 12.0
+  dock_dwell_seconds: 5.0
+  # 停靠充电演示：相对真实时间的加速倍数（越大演示越短）
+  charging_acceleration: 48.0
+  spawn_count: 3
+  max_concurrent_inbound: 2
+  inbound_dispatch_interval_seconds: 0.8
+  max_concurrent_outbound: 1
+  outbound_dispatch_interval_seconds: 0.8
+  route_fade_per_second: 0.35
+  trail_max_points: 180
+  safe_altitude_max: 120.0
+
+zones:
+  waiting:
+    x_min: -220
+    y_min: -160
+    x_max: -120
+    y_max: 160
+  pad:
+    x_min: -40
+    y_min: -80
+    x_max: 120
+    y_max: 80
+
+slots:
+  - id: S1
+    x: 0
+    y: 40
+    name: "北机位·轻型"
+    type: outdoor
+    footprint_radius_m: 13
+    max_drone_size_m: 1.15
+    station_charge_kw: 4.5
+    station_charge_cap_kw: 5.0
+  - id: S2
+    x: 0
+    y: -40
+    name: "南机位·中型"
+    type: outdoor
+    footprint_radius_m: 14
+    max_drone_size_m: 2.2
+    station_charge_kw: 9.0
+    station_charge_cap_kw: 10.0
+  - id: S3
+    x: 80
+    y: 40
+    name: "东北·重型快充"
+    type: indoor
+    footprint_radius_m: 15
+    max_drone_size_m: 4.2
+    station_charge_kw: 22.0
+    station_charge_cap_kw: 25.0
+  - id: S4
+    x: 80
+    y: -40
+    name: "东南·通用"
+    type: outdoor
+    footprint_radius_m: 14
+    max_drone_size_m: 3.0
+    station_charge_kw: 12.0
+    station_charge_cap_kw: 15.0
+
+path:
+  inbound_entry:
+    x: -170
+    y: 30
+  outbound_exit:
+    x: 190
+    y: -30
+  far_exit:
+    x: 300
+    y: -200
+  grid_step: 10
+  spline_samples_per_segment: 8
+  min_turn_radius: 18
+
+deviation:
+  distance_threshold: 18.0
+  duration_threshold_seconds: 1.2
+  cooldown_seconds: 6.0
+
+alert:
+  mode: mock
+  smtp:
+    host: smtp.example.com
+    port: 587
+    username: demo@example.com
+    password: change_me
+    from_email: demo@example.com
+    to_email: pilot@example.com
+
+map:
+  surveillance_radius: 170
+  background_image: ""
+
+# 地面站演示：与地图原点 (0,0) 对齐的 WGS84；Windows 定位失败时使用默认值。
+gcs:
+  default_lat: 29.755
+  default_lon: 106.815
+  # 天气卡片显示的位置名称（设置后优先于 API 返回值）
+  location_name_override: "重庆南岸区"
+  weather_api_key: ""
+  weather_update_interval_seconds: 300
+  # 硬件 GNSS（NMEA GGA/RMC），非空则优先于 Windows 定位
+  gps_serial_port: ""
+  gps_serial_baud: 115200
+  # MAVLink 实机：connection 可为串口 COMx 或 udp:127.0.0.1:14550 等（pymavlink 语法）
+  mavlink_connection: ""
+  mavlink_baud: 57600
+  mavlink_drone_id: "REAL-1"
+  mavlink_drone_name: "实机"
+  mavlink_autoconnect: false
+  # ADS-B 接收机串口（需 pyserial；解码需 rs1090）
+  adsb_serial_port: ""
+  adsb_serial_baud: 921600
+  adsb_autoconnect: false
+  # 雷达上是否保留演示旋转点（与 ADS-B / 实机目标叠加）
+  radar_show_demo_aux: true
+  # 飞手邮件（机位分配 / 偏航告警），仅本仓库「停靠算法」使用；密码勿入库，用环境变量 PILOT_SMTP_PASSWORD
+  pilot_smtp_enabled: false
+  pilot_smtp_host: smtp.qq.com
+  pilot_smtp_port: 465
+  pilot_smtp_username: ""
+  pilot_smtp_password: ""
+  pilot_smtp_use_ssl: true
+  pilot_smtp_use_starttls: false
+  pilot_mail_sender: ""
+
+obstacles:
+  - name: IN-OBS-L1
+    x: -185
+    y: 70
+    radius: 14
+    height: 38
+  - name: IN-OBS-L2
+    x: -150
+    y: -10
+    radius: 12
+    height: 32
+  - name: OUT-OBS-R1
+    x: 160
+    y: -80
+    radius: 13
+    height: 40
+  - name: OUT-OBS-R2
+    x: 220
+    y: 20
+    radius: 12
+    height: 36
+  - name: OBS-1
+    x: -10
+    y: 85
+    radius: 12
+    height: 45
+  - name: OBS-2
+    x: 120
+    y: 10
+    radius: 16
+    height: 52
+  - name: OBS-3
+    x: 10
+    y: -105
+    radius: 10
+    height: 30
+
+no_fly_zones:
+  - name: NFZ-Entry-Guard
+    x_min: -130
+    y_min: 55
+    x_max: -40
+    y_max: 140
+    max_allowed_altitude: 120
+  - name: NFZ-Exit-Guard
+    x_min: 120
+    y_min: -120
+    x_max: 250
+    y_max: -35
+    max_allowed_altitude: 120
+  - name: NFZ-Restricted-A
+    x_min: 140
+    y_min: -20
+    x_max: 230
+    y_max: 90
+    max_allowed_altitude: 120
+  - name: NFZ-Restricted-B
+    x_min: 100
+    y_min: -180
+    x_max: 240
+    y_max: -80
+    max_allowed_altitude: 120

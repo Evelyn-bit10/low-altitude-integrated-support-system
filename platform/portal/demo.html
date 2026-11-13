@@ -1,0 +1,2024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>低空综合保障系统 · 功能演示台</title>
+<style>
+:root{
+  --bg:#05070f;--panel:rgba(13,25,43,.92);--line:rgba(117,163,215,.18);
+  --text:#eaf4ff;--muted:#7b90ad;--blue:#2f9bff;--cyan:#27e0d8;
+  --green:#49e3ae;--orange:#ffb35c;--red:#ff6279;--purple:#7c5cff;
+  --mono:"Cascadia Code",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,rgba(47,155,255,.12),transparent 60%),var(--bg);
+  color:var(--text);font-family:Inter,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;min-height:100vh}
+a{color:var(--cyan);text-decoration:none}
+.top{display:flex;align-items:center;gap:18px;padding:18px 30px;border-bottom:1px solid var(--line);
+  background:rgba(5,9,18,.9);position:sticky;top:0;z-index:20;backdrop-filter:blur(14px)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo i{width:30px;height:30px;display:grid;place-items:center;border:1px solid rgba(61,196,255,.5);
+  border-radius:9px;transform:skew(-9deg);color:var(--cyan);font-style:normal}
+.logo b{font-size:15px;letter-spacing:.1em}
+.logo small{display:block;color:#67819f;font:9px var(--mono);letter-spacing:.14em}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);
+  border-radius:999px;color:#9fb4cb;font-size:11px}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.pill.ok i{background:var(--green);box-shadow:0 0 9px var(--green)}
+.pill.bad i{background:var(--red);box-shadow:0 0 9px var(--red)}
+.tabs{display:flex;gap:8px;padding:16px 30px 0}
+.tab{padding:10px 18px;border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;
+  background:rgba(9,18,32,.6);color:#8fa5c0;font-size:13px;cursor:pointer}
+.tab.active{background:var(--panel);color:#eaf4ff;border-color:rgba(47,155,255,.4);box-shadow:0 -2px 0 var(--cyan) inset}
+.wrap{display:grid;grid-template-columns:minmax(320px,380px) 1fr;gap:14px;padding:0 30px 30px}
+.card{border:1px solid var(--line);border-radius:0 12px 12px 12px;background:var(--panel);overflow:hidden}
+.side{border-radius:0 0 12px 12px}
+.left{display:grid;gap:14px;align-content:start}
+.right{display:grid;gap:14px}
+.box{padding:16px 18px;border-bottom:1px solid var(--line)}
+.box:last-child{border-bottom:0}
+h2{margin:0 0 4px;font-size:14px}
+h3{margin:0 0 10px;font-size:12px;color:#cfe3f5}
+p.sub{margin:0;color:var(--muted);font-size:11px;line-height:1.6}
+button{font:inherit;cursor:pointer;border-radius:8px}
+.btn{padding:9px 14px;border:1px solid rgba(71,181,255,.45);background:rgba(47,155,255,.1);
+  color:#dbefff;font-size:12px;transition:.15s}
+.btn:hover{background:rgba(39,224,216,.12);border-color:var(--cyan)}
+.btn.primary{background:linear-gradient(135deg,rgba(47,155,255,.85),rgba(124,92,255,.8));border-color:transparent}
+.btn.ghost{background:rgba(7,15,29,.5)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.dir-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.dir{padding:10px 6px;border:1px solid var(--line);background:rgba(2,10,20,.3);color:#9fb4cb;text-align:center}
+.dir b{display:block;font-size:13px}
+.dir small{display:block;margin-top:2px;color:#5f7794;font-size:9px}
+.dir.active{border-color:rgba(39,224,216,.6);background:rgba(39,224,216,.12);color:#c9fff9}
+.kv{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.kv>div{padding:10px 12px;border:1px solid rgba(117,163,215,.13);border-radius:8px;background:rgba(2,10,20,.22)}
+.kv small{display:block;color:#617b99;font-size:10px}
+.kv b{display:block;margin-top:5px;font-size:17px;color:#c8dcee}
+.mono{font-family:var(--mono)}
+canvas{display:block;width:100%;background:#071322}
+.log{height:150px;overflow:auto;padding:10px 16px;font:11px/1.7 var(--mono);color:#86a0bb}
+.log div{border-bottom:1px dashed rgba(117,163,215,.1);padding:2px 0}
+.log .ok{color:var(--green)}.log .warn{color:var(--orange)}.log .err{color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{color:#627c9b;font:10px var(--mono);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid rgba(117,163,215,.08);color:#aebfd3}
+.tag{display:inline-block;padding:1px 6px;border-radius:4px;font:10px var(--mono);
+  border:1px solid rgba(124,92,255,.4);color:#b7a7ff;background:rgba(124,92,255,.12)}
+.tag.green{border-color:rgba(73,227,174,.35);color:#76ecc0;background:rgba(73,227,174,.1)}
+.tag.red{border-color:rgba(255,98,121,.35);color:#ff98a8;background:rgba(255,98,121,.1)}
+.tag.orange{border-color:rgba(255,179,92,.35);color:#ffc67c;background:rgba(255,179,92,.1)}
+.narr{padding:14px 18px;border-left:3px solid var(--cyan);background:rgba(39,224,216,.05);
+  color:#bcd7ea;font-size:12px;line-height:1.9}
+.narr b{color:#8ffff0}
+.hint{color:#6f88a6;font-size:11px;line-height:1.7}
+.feed{max-height:220px;overflow:auto}
+.hidden{display:none}
+.chk{display:inline-flex;align-items:center;gap:6px;color:#8fa5c0;font-size:11px;cursor:pointer}
+#dedup-map{display:block;width:100%;background:#06101c}
+#profile{background:#08111f;border-radius:8px}
+.wxrow{display:grid;grid-template-columns:40px 1fr 68px;gap:8px;align-items:center;margin:6px 0;font-size:12px;color:#8ea0bd}
+.wxrow input[type=range]{-webkit-appearance:none;height:16px;width:100%;background:transparent}
+.wxrow input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:#1d4ed8}
+.wxrow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#e6f7ff;border:2px solid #22d3ee;margin-top:-4px}
+.wxrow output{font:11px Consolas,monospace;color:#22d3ee;text-align:right}
+.flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.flow .step{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0b1424;
+  color:#cfd9e6;text-align:center;line-height:1.5;font-size:11px}
+.flow .step i{font-style:normal;color:#5f7794;font-size:10px}
+.flow .arrow{color:#3d5a80}
+#subtitle{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99;
+  background:rgba(8,16,30,.94);border:1px solid #1e3a5f;border-radius:10px;padding:10px 18px;
+  color:#cfe3f5;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none;max-width:72vw}
+#subtitle b{color:#49e3ae}
+.rlchips{display:flex;gap:8px;flex-wrap:wrap}
+.rlchip{padding:3px 9px;border:1px solid var(--line);border-radius:999px;font:11px/1.6 Consolas,monospace;color:var(--muted)}
+.rlchip b{color:#7cc7ff;font-weight:600}
+.rlchip.good{border-color:#1c5a44;color:#7ee2b8}.rlchip.good b{color:#49e3ae}
+.rlchip.warn{border-color:#5a4a1c;color:#e8c874}.rlchip.warn b{color:#f2c14e}
+.concl{margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(73,227,174,.08);
+  border:1px solid rgba(73,227,174,.25);font-size:12px;color:#9fe8c8}
+.concl b{color:#49e3ae}
+.cmpgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.cmpcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#0a1424}
+.cmpcard .t{font-size:11px;color:#7b90ad;margin-bottom:6px}
+.cmpcard .v{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.cmpcard .v b{font:600 20px/1 Consolas,monospace}
+.cmpcard .v s{color:#5f7794;font-size:12px;text-decoration:none}
+.cmpcard .good{color:#49e3ae}.cmpcard .bad{color:#ff8f9a}.cmpcard .flat{color:#8ea0bd}
+.hint{font-size:11px;color:#5f7794;line-height:1.7}
+.rlfoot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px;font-size:11px;color:#5f7794}
+.rlfoot a{color:#7cc7ff;text-decoration:none;white-space:nowrap}
+.rlfoot a:hover{text-decoration:underline}
+.lg{display:flex;gap:16px;flex-wrap:wrap;padding:8px 16px 12px;color:#7b90ad;font-size:11px}
+.lg span{display:inline-flex;align-items:center;gap:6px}
+.lg i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.lg i.dotA{background:#2f9bff;box-shadow:0 0 8px #2f9bff}
+.lg i.dotB{background:#c084fc;box-shadow:0 0 8px #c084fc}
+.lg i.ring{background:transparent;border:2px solid #49e3ae;box-shadow:0 0 8px rgba(73,227,174,.6)}
+.lg i.line{width:16px;height:0;border-radius:0;border-top:1px dashed #8fa5c0}
+@media(max-width:1000px){.wrap{grid-template-columns:1fr}}
+/* 第一幕已升级为新页面：隐藏旧内容，整幅显示 iframe */
+#p1 > * { display: none !important; }
+#p1 > #p1-new { display: block !important; grid-column: 1 / -1; }
+#p1-new iframe { width: 100%; height: calc(100vh - 118px); border: 0; border-radius: 12px; background: #070c18; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo"><i>◈</i><div><b>低空综合保障系统</b><small>FUNCTION DEMO CONSOLE</small></div></div>
+  <div class="spacer"></div>
+  <span class="pill" id="pill-api"><i></i>后端 8080</span>
+  <span class="pill" id="pill-director" style="cursor:pointer">▶ 一键演示</span>
+  <span class="pill" id="pill-auth" title="点击设置访问令牌（开启鉴权时才需要）">🔑 未设置</span>
+  <span class="pill" id="pill-uom"><i></i>模拟 UOM 8099</span>
+  <span class="pill" id="pill-clock"><i></i><span id="clock">--:--:--</span></span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="p1">① 进出场程序</div>
+  <div class="tab" data-tab="p2">② 多设备去重</div>
+  <div class="tab" data-tab="p3">③ 对外数据推送</div>
+  <div class="tab" data-tab="p4">④ RL 影子模式</div>
+  <div class="tab" data-tab="p5">⑤ 多机排序</div>
+</div>
+
+<!-- ================= 1. 进出场程序 ================= -->
+<div class="wrap" id="p1">
+  <div id="p1-new"><iframe src="demo_p1.html" title="进出场程序"></iframe></div>
+  <div class="left">
+    <section class="card side"><div class="box">
+      <h2>选择进出场方向</h2>
+      <p class="sub">8 个方位，选一个后从方案库生成程序；模板不可用时自动动态重规划。</p>
+      <div class="dir-grid" id="dirs" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btn-arr">生成进场</button>
+        <button class="btn" id="btn-dep">生成离场</button>
+        <button class="btn ghost" id="btn-all">全部 8 方向</button>
+        <button class="btn ghost" id="btn-rec" title="按侧风/航程/余度自动挑一个方向">自动推荐</button>
+      </div>
+    </div></section>
+    <section class="card side"><div class="box">
+      <h3>讲解词</h3>
+      <div class="narr" id="narr1">
+        点一个方向 → 系统去<b>方案库</b>取该方向的模板；<br>
+        模板过不了障碍物/限飞区校验时，<b>自动</b>改用 A*+Dubins 重规划；<br>
+        右下角会显示走了哪条路、为什么。
+      </div>
+    </div></section>
+    <section class="card side" id="wx-card"><div class="box">
+      <h3>环境条件</h3>
+      <div class="wxrow"><label>风速</label><input type="range" id="wx-wind" min="0" max="20" step="0.5" value="5"><output id="wx-wind-v">5.0 m/s</output></div>
+      <div class="wxrow"><label>风向</label><input type="range" id="wx-dir" min="0" max="359" step="1" value="0"><output id="wx-dir-v">0 deg</output></div>
+      <div class="wxrow"><label>降水</label><input type="range" id="wx-rain" min="0" max="20" step="0.5" value="0"><output id="wx-rain-v">0 mm/h</output></div>
+      <div class="wxrow"><label>电量</label><input type="range" id="wx-batt" min="10" max="100" step="1" value="100"><output id="wx-batt-v">100%</output></div>
+      <div class="hint" id="wx-state" style="margin-top:8px">拖动滑杆 → 实时重算航道可达性</div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="dyn-run" style="flex:1">▶ 多机航道演示</button>
+      </div>
+      <canvas id="dyn" width="300" height="150" style="width:100%;margin-top:8px;display:block;background:#08111f;border-radius:8px"></canvas>
+    </div></section>
+
+    <section class="card side"><div class="box">
+      <h3>现场日志</h3>
+      <div class="log" id="log1"></div>
+    </div></section>
+  </div>
+  <div class="right">
+    <section class="card"><div class="box" style="padding-bottom:10px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div><h2 id="p1-title">等待选择方向</h2><p class="sub" id="p1-sub">箭头表示飞行方向　·　橙色虚线为复飞段　·　<b>点地图任意位置可自动选航道</b></p></div>
+        <div id="p1-badges"></div>
+      </div>
+    </div>
+    <div id="p1-canvas-wrap"><canvas id="map" width="980" height="500"></canvas></div>
+    <div style="padding:0 12px 8px"><canvas id="profile" width="980" height="150" style="width:100%;display:block"></canvas></div>
+    </section>
+    <section class="card"><div class="box">
+      <h3>生成结果</h3>
+      <div class="kv" id="p1-kv">
+        <div><small>标准程序</small><b class="mono">—</b></div>
+        <div><small>来源</small><b class="mono">—</b></div>
+        <div><small>航路点</small><b class="mono">—</b></div>
+        <div><small>合规 / 仿真</small><b class="mono">—</b></div>
+      </div>
+    </div></section>
+
+    <section class="card"><div class="box" style="padding-bottom:6px">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 style="margin:0">自动切换记录</h3>
+          <span class="mono" id="rec-state" style="color:#5f7794;font-size:11px">—</span>
+        </div>
+      </div>
+      <div class="box" style="padding-top:0">
+        <div class="feed" style="max-height:150px">
+          <table id="rec-hist"><thead><tr>
+            <th>时间</th><th>切换</th><th>得分</th><th>原因</th>
+          </tr></thead><tbody><tr><td colspan="4" style="color:#5f7794">等待调度周期的推荐决策…</td></tr></tbody></table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ================= 2. 多设备去重 ================= -->
+<div class="wrap hidden" id="p2">
+  <div class="left">
+    <section class="card side"><div class="box">
+      <h2>模拟两台设备同时上报</h2>
+      <p class="sub">A/B 各报 5 条，其中 3 架是同一批飞机（1 架在 B 侧丢了 ua_id）。</p>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btn-run">开始上报</button>
+        <button class="btn" id="btn-stop" disabled>停止</button>
+        <button class="btn ghost" id="btn-bad">发一组"不同飞机"</button>
+      </div>
+      <p class="hint" style="margin-top:10px">「不同飞机」：两架 ua_id 不同、相距约 15 m —— 应仍然输出 2 条，证明不会误合并。</p>
+    </div></section>
+    <section class="card side"><div class="box">
+      <h3>讲解词</h3>
+      <div class="narr" id="narr2">
+        每帧 A、B 各上报 5 条，共 <b>10 条</b>；<br>
+        服务端按 <b>ua_id → reg_no → 时空门限</b> 的顺序判定；<br>
+        输出只剩 <b>7 条</b>，其中 3 条标记为<b>双源融合</b>；<br>
+        下方 <b>RL 策略</b> 同时跟跑，只记录判断、不影响输出。
+      </div>
+    </div></section>
+    <section class="card side"><div class="box">
+      <h3>现场日志</h3>
+      <div class="log" id="log2"></div>
+    </div></section>
+  </div>
+  <div class="right">
+    <section class="card"><div class="box">
+      <div class="kv" style="grid-template-columns:repeat(4,1fr)" id="p2-kv">
+        <div><small>原始上报</small><b class="mono" id="k-in">0</b></div>
+        <div><small>去重后</small><b class="mono" id="k-out" style="color:#8ffff0">0</b></div>
+        <div><small>多源融合</small><b class="mono" id="k-merged">0</b></div>
+        <div><small>待确认</small><b class="mono" id="k-tent">0</b></div>
+      </div>
+    </div></section>
+
+    <section class="card">
+      <div class="box" style="padding-bottom:8px">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 style="margin:0">同一架判定 · 俯视图</h3>
+          <label class="chk"><input type="checkbox" id="show-raw" checked> 显示 A / B 原始观测</label>
+        </div>
+      </div>
+      <canvas id="dedup-map" width="960" height="520"></canvas>
+      <div class="lg">
+        <span><i class="dotA"></i>A 设备看到</span>
+        <span><i class="dotB"></i>B 设备看到</span>
+        <span><i class="ring"></i>去重后的唯一航迹</span>
+        <span><i class="line"></i>判定为同一架</span>
+      </div>
+    </section>
+
+    <section class="card"><div class="box" style="padding-bottom:6px">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 style="margin:0">RL 策略在场（影子模式）</h3>
+          <label class="chk"><input type="checkbox" id="rl-on"> 让策略跟跑（只记录，不生效）</label>
+        </div>
+      </div>
+      <div class="box" style="padding-top:2px">
+        <div class="rlchips" id="rl-chips">
+          <span class="rlchip">等待影子数据…</span>
+        </div>
+        <div class="feed" style="max-height:150px;margin-top:8px">
+          <table id="rl-table"><thead><tr>
+            <th>帧</th><th>来源</th><th>本地ID</th><th>规则 →</th><th>策略 →</th><th>p</th><th>一致</th>
+          </tr></thead><tbody><tr><td colspan="7" style="color:#5f7794">还没开始。勾选上方「让策略跟跑」后点「开始上报」。</td></tr></tbody></table>
+        </div>
+        <div class="rlfoot">
+          <span id="rl-hint">策略与规则并行判定，只写日志、不改变输出</span>
+          <a href="rl_lab.html" target="_blank" rel="noopener">打开 RL 实验室 →</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card"><div class="box" style="padding-bottom:6px"><h3>合并明细（哪几条被判定为同一架）</h3></div>
+      <div class="feed" style="max-height:170px"><table id="merges"><thead><tr><th>全局 ID</th><th>A 设备</th><th>B 设备</th><th>依据</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section class="card"><div class="box" style="padding-bottom:6px"><h3>唯一航迹</h3></div>
+      <div class="feed" style="max-height:170px"><table id="tracks"><thead><tr><th>ID</th><th>ua_id</th><th>来源</th><th>置信度</th><th>融合</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+</div>
+
+<!-- ================= 4. RL 影子模式 ================= -->
+<div class="wrap hidden" id="p4">
+  <div class="left">
+    <section class="card side"><div class="box">
+      <h2>RL 影子模式</h2>
+      <p class="sub">神经策略与现网规则并行判定：先对比、再灰度、最后切换。</p>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btn-cmp">跑密集场景对比</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="chk"><input type="checkbox" id="rl-on4"> 实时影子跟跑（只记录）</label>
+      </div>
+      <div class="hint" id="cmp-hint" style="margin-top:10px">点上方按钮，用带真值的仿真场景比一比</div>
+    </div></section>
+
+    <section class="card side"><div class="box">
+      <h3>讲解词</h3>
+      <div class="narr">
+        策略 <b>不直接上线</b>：先跟规则并行跑，只记录判断；<br>
+        在<b>密集</b>场景里两者才会分道扬镳——规则撞门限，策略看整体；<br>
+        一致率够高、无误配，才进入灰度。
+      </div>
+    </div></section>
+  </div>
+
+  <div class="right">
+    <section class="card"><div class="box" style="padding-bottom:6px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0">规则 vs PPO（带真值）</h3>
+        <span class="mono" id="cmp-meta" style="color:#5f7794;font-size:11px">未运行</span>
+      </div>
+    </div>
+    <div class="box" style="padding-top:0">
+      <div class="cmpgrid" id="cmp-cards"></div>
+      <canvas id="cmp-chart" width="960" height="190" style="width:100%;display:block;margin-top:10px"></canvas>
+      <div class="concl" id="cmp-concl"></div>
+      <div class="feed" style="max-height:320px;margin-top:10px">
+        <table id="cmp-table"><thead><tr>
+          <th>场景</th><th>做法</th><th>奖励</th><th>错配</th><th>漏配</th><th>碎片数</th><th>被拆</th>
+        </tr></thead><tbody><tr><td colspan="7" style="color:#5f7794">点左侧「跑密集场景对比」</td></tr></tbody></table>
+      </div>
+    </div></section>
+
+    <section class="card"><div class="box" style="padding-bottom:6px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0">实时影子流</h3>
+        <span class="mono" id="rl-live-meta" style="color:#5f7794;font-size:11px">—</span>
+      </div>
+    </div>
+    <div class="box" style="padding-top:0">
+      <div class="rlchips" id="rl-chips4"><span class="rlchip">等待数据…</span></div>
+      <div class="feed" style="max-height:240px;margin-top:8px">
+        <table id="rl-table4"><thead><tr>
+          <th>帧</th><th>来源</th><th>本地ID</th><th>规则 →</th><th>策略 →</th><th>p</th><th>一致</th>
+        </tr></thead><tbody><tr><td colspan="7" style="color:#5f7794">勾选「实时影子跟跑」并点开始上报</td></tr></tbody></table>
+      </div>
+    </div></section>
+  </div>
+</div>
+
+<!-- ================= 5. 多机排序（离线实验结论） ================= -->
+<div class="wrap hidden" id="p5">
+  <div class="left">
+    <section class="card side"><div class="box">
+      <h2>多机进近排序</h2>
+      <p class="sub">3 架无人机争一条跑道，最小间隔 45 秒。比的是<strong>落地率</strong>——谁也别因为排队耗光电量。</p>
+      <div class="narr" style="margin-top:12px">
+        两个杠杆：<br>
+        · <b>排序</b>（谁先落）→ 减少排队人数<br>
+        · <b>慢飞</b>（怎么等）→ 等待耗电降 60%<br>
+        两者是<b>乘法关系</b>，不是加法。
+      </div>
+    </div></section>
+    <section class="card side"><div class="box">
+      <h3>为什么不用强化学习</h3>
+      <div class="narr">
+        试过 CEM（73.2%）、前瞻搜索（71.3%）、LTR（92.9%），<br>
+        都不如「模仿学习 + 慢飞」。<br>
+        因为这个任务的<b>最优解可以离线算出来</b>（3 架只有 6 种顺序），<br>
+        模仿学习比从稀疏奖励里摸索高效一个数量级。
+      </div>
+    </div></section>
+  </div>
+  <div class="right">
+    <section class="card"><div class="box">
+      <h3>策略对比（每策略 200 局，独立随机种子）</h3>
+      <table id="seq-table"><thead><tr>
+        <th>策略</th><th>落地率</th><th>电量耗尽</th><th>说明</th>
+      </tr></thead><tbody></tbody></table>
+      <div class="concl" id="seq-concl" style="margin-top:10px"></div>
+    </div></section>
+    <section class="card"><div class="box">
+      <h3>结论</h3>
+      <div class="narr">
+        ① <b>优化「飞行方式」比优化「决策算法」收益大 3 倍</b><br>
+        <span style="color:#5f7794">慢飞 +19 个点，排序 +9 个点</span><br><br>
+        ② <b>两个杠杆可以独立优化再组合</b><br>
+        <span style="color:#5f7794">8 行包装器把排序和慢飞叠起来，不需要联合训练</span><br><br>
+        ③ <b>断链时能自主降级</b><br>
+        <span style="color:#5f7794">指令丢 40% 落地率仍是 97.3%，因为"能不能落"只靠一条广播就能自判</span>
+      </div>
+    </div></section>
+  </div>
+</div>
+
+<!-- ================= 3. 对外推送 ================= -->
+<div class="wrap hidden" id="p3">
+  <div class="left">
+    <section class="card side"><div class="box">
+      <h2>推送到政府平台 / UOM</h2>
+      <p class="sub">态势、飞行程序、气象按需推送；落库 + 签名 + 重试 + 监控。</p>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btn-test">发送测试报文</button>
+        <button class="btn" id="btn-flush">立即推送队列</button>
+      </div>
+    </div></section>
+    <section class="card side"><div class="box">
+      <h3>讲解词</h3>
+      <div class="narr" id="narr3">
+        每条报文带 <b>msgId</b>（幂等）、<b>HMAC-SHA256 签名</b>；<br>
+        先落 <b>发件箱</b>再发送，断网不丢；<br>
+        右侧是模拟对端<b>实时收到</b>的报文和签名校验结果。
+      </div>
+    </div></section>
+    <section class="card side"><div class="box">
+      <h3>现场日志</h3>
+      <div class="log" id="log3"></div>
+    </div></section>
+  </div>
+  <div class="right">
+    <section class="card"><div class="box">
+      <div class="kv" style="grid-template-columns:repeat(4,1fr)">
+        <div><small>发送成功</small><b class="mono" id="k-sent">—</b></div>
+        <div><small>待发送</small><b class="mono" id="k-pend">—</b></div>
+        <div><small>成功率</small><b class="mono" id="k-rate">—</b></div>
+        <div><small>平均延迟</small><b class="mono" id="k-lat">—</b></div>
+      </div>
+      <p class="hint" id="push-ep" style="margin-top:10px">—</p>
+      <div class="flow" style="margin-top:14px">
+        <span class="step">① 落发件箱<br><i>断网不丢</i></span><span class="arrow">→</span>
+        <span class="step">② HMAC 签名<br><i>防篡改</i></span><span class="arrow">→</span>
+        <span class="step">③ 推送 UOM<br><i>幂等 msgId</i></span><span class="arrow">→</span>
+        <span class="step">④ 失败重试<br><i>指数退避</i></span>
+      </div>
+    </div></section>
+    <section class="card"><div class="box" style="padding-bottom:6px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0">模拟对端收到的报文</h3><span class="pill" id="uom-state"><i></i>未连接</span>
+      </div>
+    </div>
+      <div class="feed" style="max-height:320px"><table id="pushed"><thead><tr><th>时间</th><th>类型</th><th>msgId</th><th>条数</th><th>签名</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+</div>
+
+<div id="subtitle"></div>
+<script>
+const API = 'http://127.0.0.1:8080';
+const UOM = 'http://127.0.0.1:8099';
+const $ = s => document.querySelector(s);
+const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
+const fmt = (n, d = 0) => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(d);
+
+function log(box, text, cls) {
+  const d = el('div', cls || '');
+  d.textContent = new Date().toLocaleTimeString('zh-CN', {hour12:false}) + '  ' + text;
+  const b = $(box); b.appendChild(d); b.scrollTop = b.scrollHeight;
+}
+
+/* localStorage 在 file:// 下可能被浏览器禁用（抛 SecurityError），
+   一旦抛出来会带崩后面所有初始化，所以统一走安全包装 */
+const _mem = {};
+function storeGet(k) {
+  try { return localStorage.getItem(k); } catch (e) { return _mem[k] || null; }
+}
+function storeSet(k, v) {
+  try { localStorage.setItem(k, v); } catch (e) { _mem[k] = v; }
+}
+function storeDel(k) {
+  try { localStorage.removeItem(k); } catch (e) { delete _mem[k]; }
+}
+
+function tokenHeader() {
+  const t = storeGet('lav_token') || '';
+  return t ? {'X-Token': t} : {};
+}
+
+async function api(path, opts) {
+  const o = Object.assign({cache:'no-store'}, opts || {});
+  o.headers = Object.assign({}, o.headers || {}, tokenHeader());
+  const r = await fetch(API + path, o);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+/* ---------------- 状态灯 ---------------- */
+async function ping() {
+  try { await api('/api/health'); $('#pill-api').className = 'pill ok'; }
+  catch { $('#pill-api').className = 'pill bad'; }
+  try {
+    const r = await fetch(UOM + '/health', {cache:'no-store'});
+    $('#pill-uom').className = 'pill ' + (r.ok ? 'ok' : 'bad');
+    $('#uom-state').className = 'pill ' + (r.ok ? 'ok' : 'bad');
+    $('#uom-state').innerHTML = '<i></i>' + (r.ok ? '已连接 8099' : '未连接');
+  } catch {
+    $('#pill-uom').className = 'pill bad';
+    $('#uom-state').className = 'pill bad';
+    $('#uom-state').innerHTML = '<i></i>未连接（可忽略）';
+  }
+}
+function refreshTokenPill() {
+  const t = storeGet('lav_token') || '';
+  const el = $('#pill-auth');
+  if (!el) return;
+  el.textContent = t ? '🔑 已设置' : '🔑 未设置';
+  el.className = 'pill' + (t ? ' ok' : '');
+}
+if ($('#pill-auth')) {
+  $('#pill-auth').onclick = () => {
+    const cur = storeGet('lav_token') || '';
+    const v = prompt('输入访问令牌（留空则清除） 演示可用：demo-admin / demo-operator / demo-viewer', cur);
+    if (v === null) return;
+    if (v.trim()) storeSet('lav_token', v.trim());
+    else storeDel('lav_token');
+    refreshTokenPill();
+  };
+  refreshTokenPill();
+}
+
+async function pollRecommend() {
+  try {
+    const d = await api('/api/metrics');
+    const cur = d.program || {};
+    const rec = d.recommend || {};
+    const st = $('#rec-state');
+    if (st) {
+      st.textContent = cur.direction
+        ? '当前 ' + cur.direction + (rec.recommend ? ' · 推荐 ' + rec.recommend : '')
+        : '—';
+    }
+    const tb = $('#rec-hist tbody');
+    const hist = (d.recommend_history || []).slice().reverse();
+    if (tb) {
+      tb.innerHTML = hist.length
+        ? hist.map(h => {
+            const t = new Date(h.t * 1000).toLocaleTimeString('zh-CN', {hour12: false});
+            return '<tr><td class="mono">' + t + '</td>'
+              + '<td class="mono">' + (h.from || '—') + ' → ' + (h.to || '—') + '</td>'
+              + '<td class="mono">' + (h.score != null ? h.score.toFixed(2) : '—')
+              + ' <span style="color:#5f7794">(原 ' + (h.prev_score != null ? h.prev_score.toFixed(2) : '—') + ')</span></td>'
+              + '<td style="color:#8ea0bd">' + (h.reason || '') + '</td></tr>';
+          }).join('')
+        : '<tr><td colspan="4" style="color:#5f7794">还没有自动切换（环境变化时会出现）</td></tr>';
+    }
+  } catch (e) { /* 后端未就绪，忽略 */ }
+}
+const SEQ_ROWS = [{"name":"先到先服务 FCFS","land":77.3,"dep":22.7},{"name":"电量优先","land":72.0,"dep":28.0},{"name":"FCFS + 慢飞","land":96.7,"dep":3.3},{"name":"模仿学习（排序）","land":81.3,"dep":18.7},{"name":"模仿 + 慢飞","land":98.7,"dep":1.3}];
+function renderSeq() {
+  const tb = document.querySelector('#seq-table tbody');
+  if (!tb) return;
+  const best = Math.max.apply(null, SEQ_ROWS.map(r => r.land));
+  tb.innerHTML = SEQ_ROWS.map(r => {
+    const win = r.land === best;
+    const note = r.land >= 96 ? '慢飞生效' : (r.name.indexOf('模仿') === 0 ? '排序改进' : '基线');
+    return '<tr><td>' + r.name + (win ? ' ★' : '') + '</td>'
+      + '<td class="mono" style="color:' + (win ? '#49e3ae' : '#cfd9e6') + '">' + r.land.toFixed(1) + '%</td>'
+      + '<td class="mono">' + r.dep.toFixed(1) + '%</td>'
+      + '<td style="color:#7b90ad">' + note + '</td></tr>';
+  }).join('');
+  const el = document.getElementById('seq-concl');
+  if (el) el.innerHTML = '最优：<b>' + SEQ_ROWS.filter(r => r.land === best)[0].name
+    + '</b>　落地率 <b>' + best.toFixed(1) + '%</b>（基线 77.3%）';
+}
+setInterval(pollRecommend, 5000); setTimeout(pollRecommend, 1200);
+
+/* ---------------- 导演模式：一键播放四幕 ---------------- */
+var directorTimer = null, directorOn = false;
+
+function directorSubtitle(html) {
+  var el = document.getElementById('subtitle');
+  if (!el) return;
+  if (!html) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+function stopDirector() {
+  directorOn = false;
+  if (directorTimer) { clearTimeout(directorTimer); directorTimer = null; }
+  var b = document.getElementById('pill-director');
+  if (b) { b.textContent = '▶ 一键演示'; b.className = 'pill'; }
+  directorSubtitle('');
+}
+
+function runDirector() {
+  if (directorOn) { stopDirector(); return; }
+  directorOn = true;
+  var b = document.getElementById('pill-director');
+  if (b) { b.textContent = '■ 停止演示'; b.className = 'pill ok'; }
+
+  var steps = [
+    { ms: 0,     tab: 'p1', cap: '<b>第一幕</b>　进出场程序：点方向 → 方案库取模板；不合格自动 A* 重规划', run: function () { curDir = 'NW'; buildDirs(); generate('arrival'); } },
+    { ms: 14000, tab: 'p2', cap: '<b>第二幕</b>　多设备去重：两台设备看到同一架飞机，10 条观测输出 7 条唯一航迹', run: function () { var e = document.getElementById('btn-run'); if (e) e.click(); } },
+    { ms: 32000, tab: 'p4', cap: '<b>第四幕</b>　RL 影子模式：带真值对比，困难密集场景错配 103 → 1', run: function () { var e = document.getElementById('btn-cmp'); if (e) e.click(); } },
+    { ms: 58000, tab: 'p3', cap: '<b>第三幕</b>　对外推送：落发件箱 → HMAC 签名 → 推送 → 失败重试', run: function () { var e = document.getElementById('btn-test'); if (e) e.click(); } },
+    { ms: 72000, tab: 'p1', cap: '<b>演示结束</b>　感谢观看', run: function () { stopDirector(); } }
+  ];
+
+  function at(i) {
+    if (!directorOn) return;
+    if (i >= steps.length) { stopDirector(); return; }
+    var st = steps[i];
+    switchTab(st.tab);
+    directorSubtitle(st.cap);
+    try { st.run(); } catch (e) {}
+    var nxt = steps[i + 1];
+    directorTimer = setTimeout(function () { at(i + 1); }, nxt ? (nxt.ms - st.ms) : 2000);
+  }
+  at(0);
+}
+
+var _dirBtn = document.getElementById('pill-director');
+if (_dirBtn) _dirBtn.onclick = runDirector;
+
+
+
+setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString('zh-CN',{hour12:false}); }, 1000);
+setInterval(ping, 5000); ping();
+
+/* ---------------- Tab ---------------- */
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+  ['p1','p2','p3','p4','p5'].forEach(id => $('#' + id).classList.toggle('hidden', id !== t.dataset.tab));
+  /* 第一幕已换成新页面 */
+  if (t.dataset.tab === 'p4') rlPoll();
+});
+
+/* ================= 一、进出场程序 ================= */
+const DIRS = [['N','北'],['NE','东北'],['E','东'],['SE','东南'],['S','南'],['SW','西南'],['W','西'],['NW','西北']];
+const COLORS = {N:'#2f9bff',NE:'#27e0d8',E:'#49e3ae',SE:'#ffb35c',S:'#ff6279',SW:'#7c5cff',W:'#c084fc',NW:'#94a3b8'};
+let curDir = 'S', cache = {}, snapshot = null;
+
+function buildDirs() {
+  const box = $('#dirs'); box.innerHTML = '';
+  DIRS.forEach(([d, cn]) => {
+    const b = el('button', 'dir' + (d === curDir ? ' active' : ''));
+    b.innerHTML = '<b class="mono">' + d + '</b><small>' + cn + '</small>';
+    b.onclick = () => { curDir = d; buildDirs(); };
+    box.appendChild(b);
+  });
+}
+buildDirs();
+
+async function ensureSnapshot() {
+  if (snapshot) return snapshot;
+  try { snapshot = await api('/api/sync/snapshot'); } catch (e) { snapshot = null; }
+  return snapshot;
+}
+
+function enu(lat, lon) {
+  const a = snapshot.airport;
+  const k = 111320 * Math.cos(a.lat * Math.PI / 180);
+  return [(lon - a.lon) * k, (lat - a.lat) * 111320];
+}
+
+/* 沿折线画等距箭头（屏幕坐标） */
+function drawDirArrows(ctx, pts, px, py, color, count) {
+  if (!pts || pts.length < 2) return;
+  const segs = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = {X: px(pts[i - 1].x), Y: py(pts[i - 1].y)};
+    const b = {X: px(pts[i].x), Y: py(pts[i].y)};
+    const d = Math.hypot(b.X - a.X, b.Y - a.Y);
+    if (d < 2) continue;
+    segs.push({a, b, d, s: total});
+    total += d;
+  }
+  if (!total || !segs.length) return;
+  const step = total / (count + 1);
+  let si = 0;
+  for (let k = 1; k <= count; k++) {
+    const target = step * k;
+    while (si < segs.length - 1 && segs[si].s + segs[si].d < target) si++;
+    const sg = segs[si];
+    const t = Math.min(1, Math.max(0, (target - sg.s) / sg.d));
+    const X = sg.a.X + (sg.b.X - sg.a.X) * t;
+    const Y = sg.a.Y + (sg.b.Y - sg.a.Y) * t;
+    const ang = Math.atan2(sg.b.Y - sg.a.Y, sg.b.X - sg.a.X);
+    const L = 12, Wd = 6.4;
+    ctx.beginPath();
+    ctx.moveTo(X + L * 0.35 * Math.cos(ang), Y + L * 0.35 * Math.sin(ang));
+    ctx.lineTo(X - L * Math.cos(ang) + Wd * Math.sin(ang),
+               Y - L * Math.sin(ang) - Wd * Math.cos(ang));
+    ctx.lineTo(X - L * Math.cos(ang) - Wd * Math.sin(ang),
+               Y - L * Math.sin(ang) + Wd * Math.cos(ang));
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(6,16,28,.85)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.fill();
+  }
+}
+
+/* 带底色的文字标签，避免压在航迹上看不清 */
+function drawTag(ctx, text, x, y, color) {
+  ctx.font = 'bold 12px Microsoft YaHei';
+  const w = ctx.measureText(text).width + 12;
+  ctx.fillStyle = 'rgba(6,16,28,.82)';
+  ctx.fillRect(x - w / 2, y - 11, w, 20);
+  ctx.strokeStyle = color; ctx.lineWidth = 1;
+  ctx.strokeRect(x - w / 2, y - 11, w, 20);
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
+
+
+/* 高度剖面：横轴沿航迹距离，纵轴高度；复飞段用橙色虚线 */
+function drawProfile(prog) {
+  const cv = document.getElementById('profile');
+  if (!cv) return;
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height;
+  g.clearRect(0, 0, W, H);
+  const wps = (prog && prog.waypoints) || [];
+  if (wps.length < 2) {
+    g.fillStyle = 'rgba(95,119,148,.9)'; g.font = '12px Microsoft YaHei';
+    g.fillText('生成程序后显示高度剖面：进场下降 / 离场爬升 / 复飞爬升', 16, H / 2 + 4);
+    return;
+  }
+  const padL = 46, padR = 14, padT = 14, padB = 20;
+  const cum = [0];
+  for (let i = 1; i < wps.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(wps[i].x - wps[i - 1].x, wps[i].y - wps[i - 1].y));
+  }
+  const total = cum[cum.length - 1] || 1;
+  let zmax = 50;
+  wps.forEach(function (w) { if (w.z > zmax) zmax = w.z; });
+  zmax *= 1.15;
+  const X = function (d) { return padL + (W - padL - padR) * d / total; };
+  const Y = function (z) { return H - padB - (H - padT - padB) * z / zmax; };
+
+  g.strokeStyle = 'rgba(30,43,69,.9)'; g.lineWidth = 1;
+  for (let k = 0; k <= 2; k++) {
+    const z = zmax * k / 2, y = Y(z);
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke();
+    g.fillStyle = 'rgba(95,114,143,.9)'; g.font = '10px Consolas'; g.textAlign = 'right';
+    g.fillText(Math.round(z) + 'm', padL - 6, y + 3);
+  }
+
+  g.beginPath();
+  wps.forEach(function (w, i) { i ? g.lineTo(X(cum[i]), Y(w.z)) : g.moveTo(X(0), Y(w.z)); });
+  g.strokeStyle = '#49e3ae'; g.lineWidth = 2; g.stroke();
+  g.lineTo(X(total), Y(0)); g.lineTo(X(0), Y(0)); g.closePath();
+  g.fillStyle = 'rgba(73,227,174,.12)'; g.fill();
+
+  const ma = prog.miss_approach || [];
+  if (ma.length > 1) {
+    const base = W - padR - 96, span = 90;
+    g.beginPath();
+    ma.forEach(function (w, i) {
+      const x = base + span * i / (ma.length - 1);
+      i ? g.lineTo(x, Y(w.z)) : g.moveTo(x, Y(w.z));
+    });
+    g.setLineDash([5, 4]); g.strokeStyle = 'rgba(255,179,92,.9)'; g.lineWidth = 1.8;
+    g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#ffb35c'; g.font = '10px Microsoft YaHei'; g.textAlign = 'right';
+    g.fillText('复飞', W - padR, padT + 6);
+  }
+  g.fillStyle = 'rgba(95,114,143,.9)'; g.font = '10px Consolas';
+  g.textAlign = 'left'; g.fillText('0', padL, H - 5);
+  g.textAlign = 'right'; g.fillText((total / 1000).toFixed(1) + ' km', W - padR, H - 5);
+}
+
+var choice = null;
+
+/* ---------------- 多机航道选择（画在雷达图上） ---------------- */
+var fleet = { on: false, drones: [], timer: null, raf: null };
+var DIR_BEARING = {N:0,NE:45,E:90,SE:135,S:180,SW:225,W:270,NW:315};
+
+function entryPoint(dir) {
+  var b = (DIR_BEARING[dir] || 0) * Math.PI / 180;
+  return { x: Math.sin(b) * 2500, y: Math.cos(b) * 2500 };
+}
+
+function fleetInit(n) {
+  var arr = [], seed = [[1500,-1200],[-1800,900],[300,1600],[-900,-1500],[1200,1400]];
+  for (var i = 0; i < n; i++) {
+    var p0 = seed[i % seed.length];
+    arr.push({
+      id: 'U' + (i + 1), x: p0[0], y: p0[1], battery: 1.0,
+      dir: 'S', prog: 0, switches: 0,
+      color: ['#ffd666', '#49e3ae', '#7cc7ff'][i % 3]
+    });
+  }
+  return arr;
+}
+
+/* 选航道：挑"从当前位置经该方向入口再到跑道"最短的那条 */
+function pickDir(d) {
+  var best = d.dir, bestLen = 1e18;
+  for (var k in DIR_BEARING) {
+    var e = entryPoint(k);
+    var len = Math.hypot(e.x - d.x, e.y - d.y) + 2500;
+    if (len < bestLen) { bestLen = len; best = k; }
+  }
+  return best;
+}
+
+function fleetPath(d) {
+  var e = entryPoint(d.dir);
+  return [{ x: d.x, y: d.y }, e, { x: 0, y: 0 }];
+}
+
+function fleetStep() {
+  if (!fleet.on) return;
+  var w = document.getElementById('wx-wind'), r = document.getElementById('wx-rain');
+  var wind = w ? parseFloat(w.value) : 5, rain = r ? parseFloat(r.value) : 0;
+  var drain = 0.006 + wind * 0.0012 + rain * 0.0018;
+
+  fleet.drones.forEach(function (d) {
+    d.battery -= drain;
+    d.prog += 0.045;
+
+    // 电量告急 → 重新选航道
+    if (d.battery < (1 - d.prog) * 0.55 && d.switches < 4) {
+      var nd = pickDir(d);
+      if (nd !== d.dir) {
+        d.dir = nd; d.switches += 1;
+        log('#log1', 'U' + d.id.slice(1) + ' 电量 ' + Math.round(d.battery * 100)
+            + '% → 改选 ' + nd + ' 航道', 'warn');
+      }
+    }
+
+    if (d.battery <= 0) {
+      d.battery = 0; d.dead = true;
+      log('#log1', d.id + ' 电量耗尽坠毁', 'err');
+    }
+    if (d.prog >= 1) {
+      log('#log1', d.id + ' 安全落地（剩余 ' + Math.round(d.battery * 100)
+          + '%，改航 ' + d.switches + ' 次）', 'ok');
+      d.prog = 0; d.battery = 1.0; d.switches = 0;
+      var p0 = [[1500,-1200],[-1800,900],[300,1600],[-900,-1500],[1200,1400]][Math.floor(Math.random() * 5)];
+      d.x = p0[0]; d.y = p0[1]; d.dir = pickDir({ x: d.x, y: d.y, dir: 'S' });
+    }
+  });
+  drawMap(cache[curDir]);
+}
+
+function drawFleet(ctx, px, py) {
+  fleet.drones.forEach(function (d) {
+    var path = fleetPath(d);
+    // 航道线
+    ctx.beginPath();
+    path.forEach(function (w, i) { i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)); });
+    ctx.strokeStyle = d.color; ctx.globalAlpha = d.dead ? 0.2 : 0.55;
+    ctx.setLineDash([7, 5]); ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    // 无人机位置（沿折线插值）
+    var k = Math.min(0.999, d.prog) * (path.length - 1);
+    var i0 = Math.floor(k), t = k - i0;
+    var a = path[i0], b = path[Math.min(i0 + 1, path.length - 1)];
+    var dx = px(a.x + (b.x - a.x) * t), dy = py(a.y + (b.y - a.y) * t);
+
+    ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = d.dead ? '#5f7794' : d.color; ctx.fill();
+    ctx.strokeStyle = '#0b1424'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = d.dead ? '#5f7794' : d.color;
+    ctx.font = 'bold 10px Microsoft YaHei'; ctx.textAlign = 'center';
+    ctx.fillText(d.id + ' ' + d.dir, dx, dy - 10);
+    ctx.font = '9px Consolas'; ctx.fillStyle = 'rgba(200,215,235,.85)';
+    ctx.fillText(Math.round(d.battery * 100) + '%', dx, dy + 16);
+    ctx.textAlign = 'left';
+  });
+}
+
+function fleetToggle() {
+  if (fleet.on) {
+    fleet.on = false;
+    if (fleet.timer) { clearInterval(fleet.timer); fleet.timer = null; }
+    if (fleet.raf) { cancelAnimationFrame(fleet.raf); fleet.raf = null; }
+    var b = document.getElementById('dyn-run'); if (b) b.textContent = '▶ 多机航道演示';
+    drawMap(cache[curDir]);
+    return;
+  }
+  fleet.drones = fleetInit(3);
+  fleet.drones.forEach(function (d) { d.dir = pickDir(d); });
+  fleet.on = true;
+  var b = document.getElementById('dyn-run'); if (b) b.textContent = '■ 停止';
+  log('#log1', '多机航道：3 架同时进近，各自选择航道', 'ok');
+  fleet.timer = setInterval(fleetStep, 420);
+  (function loop() {
+    if (!fleet.on) return;
+    drawMap(cache[curDir]);
+    fleet.raf = requestAnimationFrame(loop);
+  })();
+  drawMap(cache[curDir]);
+}
+
+/* ---------------- 动态航道选择演示（左侧小面板） ---------------- */
+var dyn = { on: false, prog: 0, battery: 1.0, dir: 'S', timer: null, switches: 0 };
+
+function dynDraw() {
+  var cv = document.getElementById('dyn');
+  if (!cv) return;
+  var g = cv.getContext('2d'), W = cv.width, H = cv.height;
+  g.clearRect(0, 0, W, H);
+  var padL = 14, padR = 14, y = 42, w = W - padL - padR;
+
+  // 航道进度条
+  g.fillStyle = '#16233a'; g.fillRect(padL, y, w, 8);
+  g.fillStyle = dyn.battery < 0.25 ? '#ff8f9a' : (dyn.battery < 0.5 ? '#fbbf24' : '#49e3ae');
+  g.fillRect(padL, y, w * Math.max(0, Math.min(1, dyn.prog)), 8);
+
+  // 起降点
+  g.beginPath(); g.arc(padL + w, y + 4, 5, 0, Math.PI * 2);
+  g.fillStyle = '#cfe3f5'; g.fill();
+  // 无人机
+  var dx = padL + w * Math.max(0, Math.min(1, dyn.prog));
+  g.beginPath(); g.arc(dx, y + 4, 4, 0, Math.PI * 2);
+  g.fillStyle = '#ffd666'; g.fill();
+
+  // 电量
+  g.fillStyle = '#5f7794'; g.font = '10px Consolas'; g.textAlign = 'left';
+  g.fillText('电量', padL, 18);
+  g.fillStyle = '#16233a'; g.fillRect(padL + 30, 10, w - 30, 8);
+  g.fillStyle = dyn.battery < 0.25 ? '#ff8f9a' : (dyn.battery < 0.5 ? '#fbbf24' : '#22d3ee');
+  g.fillRect(padL + 30, 10, (w - 30) * Math.max(0, dyn.battery), 8);
+  g.fillStyle = '#cfd9e6'; g.textAlign = 'right';
+  g.fillText(Math.round(dyn.battery * 100) + '%', W - padR, 18);
+
+  // 文字
+  g.textAlign = 'left'; g.fillStyle = '#8ea0bd'; g.font = '11px Microsoft YaHei';
+  g.fillText('当前航道：' + dyn.dir + '　已改航 ' + dyn.switches + ' 次', padL, 68);
+  g.fillStyle = dyn.on ? '#49e3ae' : '#5f7794';
+  g.fillText(dyn.on ? '飞行中…' : '点上方按钮开始', padL, 84);
+}
+
+function dynStep() {
+  if (!dyn.on) return;
+  var w = document.getElementById('wx-wind'), r = document.getElementById('wx-rain');
+  var wind = w ? parseFloat(w.value) : 5, rain = r ? parseFloat(r.value) : 0;
+  // 风越大/雨越大，耗电越快
+  var drain = (0.010 + wind * 0.0016 + rain * 0.0022);
+  dyn.battery -= drain;
+  dyn.prog += 0.035;
+
+  if (dyn.battery <= 0) {
+    dynDraw();
+    log('#log1', '动态航道：电量耗尽，未到达（已改航 ' + dyn.switches + ' 次）', 'err');
+    dynStop();
+    return;
+  }
+  // 剩余航程需要的电量不足 → 触发改航
+  var need = (1 - dyn.prog) * 0.75;
+  if (dyn.battery < need * 1.15 && dyn.switches < 3) {
+    api('/api/program/best?battery=' + Math.round(dyn.battery * 100)).then(function (d) {
+      if (d && d.best && d.best.direction && d.best.direction !== dyn.dir) {
+        dyn.dir = d.best.direction;
+        dyn.switches += 1;
+        dyn.prog = Math.max(0, dyn.prog - 0.25);
+        log('#log1', '动态航道：电量 ' + Math.round(dyn.battery * 100) + '% → 切换到 '
+            + dyn.dir + '（余量 ' + Math.round((d.best.energy_margin || 0) * 100) + '%）', 'warn');
+        curDir = dyn.dir; buildDirs();
+      }
+    }).catch(function () {});
+  }
+  if (dyn.prog >= 1) {
+    dynDraw();
+    log('#log1', '动态航道：安全到达（剩余电量 ' + Math.round(dyn.battery * 100) + '%，改航 ' + dyn.switches + ' 次）', 'ok');
+    dynStop();
+    return;
+  }
+  dynDraw();
+}
+
+function dynStop() {
+  dyn.on = false;
+  if (dyn.timer) { clearInterval(dyn.timer); dyn.timer = null; }
+  var b = document.getElementById('dyn-run');
+  if (b) b.textContent = '▶ 动态航道演示';
+  dynDraw();
+}
+
+function dynStart() {
+  if (dyn.on) { dynStop(); return; }
+  dyn.on = true; dyn.prog = 0; dyn.battery = 1.0; dyn.switches = 0; dyn.dir = curDir;
+  var b = document.getElementById('dyn-run');
+  if (b) b.textContent = '■ 停止';
+  log('#log1', '动态航道：从 ' + dyn.dir + ' 方向开始进近', 'ok');
+  dyn.timer = setInterval(dynStep, 260);
+  dynDraw();
+}
+
+async function wxApply() {
+  var w = document.getElementById('wx-wind'), d = document.getElementById('wx-dir');
+  var r = document.getElementById('wx-rain'), b = document.getElementById('wx-batt');
+  if (!w || !d || !r || !b) return;
+  document.getElementById('wx-wind-v').textContent = parseFloat(w.value).toFixed(1) + ' m/s';
+  document.getElementById('wx-dir-v').textContent = d.value + ' deg';
+  document.getElementById('wx-rain-v').textContent = parseFloat(r.value).toFixed(1) + ' mm/h';
+  document.getElementById('wx-batt-v').textContent = b.value + '%';
+  try {
+    await api('/api/env/meteo', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({wind_speed: parseFloat(w.value), wind_dir: parseFloat(d.value),
+                            precipitation: parseFloat(r.value)})
+    });
+    var a = await api('/api/program/assess?direction=' + encodeURIComponent(curDir) + '&battery=' + b.value);
+    var m = a.metrics || {};
+    var cls = a.verdict === 'OK' ? '#49e3ae' : (a.verdict === 'TIGHT' ? '#fbbf24' : '#ff8f9a');
+    var el = document.getElementById('wx-state');
+    if (el) {
+      el.innerHTML = '<b style="color:' + cls + '">' + a.verdict + '</b> 能耗 '
+        + Math.round(m.need_wh || 0) + ' / ' + Math.round(m.available_wh || 0) + ' Wh'
+        + '（余量 ' + Math.round((m.margin || 0) * 100) + '%）<br>'
+        + '<span style="color:#5f7794">' + (a.reasons || []).slice(-2).join('；') + '</span>';
+    }
+  } catch (e) {
+    var el2 = document.getElementById('wx-state');
+    if (el2) el2.textContent = '计算失败：' + e.message;
+  }
+}
+
+async function chooseTrack(ev) {
+  var cv = document.getElementById('map');
+  if (!cv || !window.__mapXf) return;
+  var rect = cv.getBoundingClientRect();
+  var k = cv.width / rect.width;
+  var mx = (ev.clientX - rect.left) * k;
+  var my = (ev.clientY - rect.top) * k;
+  var xf = window.__mapXf;
+  var ex = (mx - xf.cx) / xf.S;
+  var ey = (xf.cy - my) / xf.S;
+  try {
+    var d = await api('/api/program/choose?x=' + ex.toFixed(1) + '&y=' + ey.toFixed(1));
+    choice = d;
+    drawMap(cache[curDir]);
+    var el = document.getElementById('subtitle');
+    if (el) {
+      el.innerHTML = '<b>航道选择</b>　方位 ' + Math.round(d.bearing) + '° ／ 距离 '
+        + Math.round(d.distance_m) + ' m　→　建议 <b>' + d.direction + '</b>'
+        + (d.available ? '（' + (d.std_name || '') + '）' : '（该方向不可用）')
+        + '<br><span style="color:#8ea0bd;font-size:12px">' + d.reason.join('；') + '</span>';
+      el.style.display = 'block';
+    }
+    log('#log1', '选航道：方位 ' + Math.round(d.bearing) + '° / ' + Math.round(d.distance_m) + ' m → ' + d.direction,
+        d.available ? 'ok' : 'err');
+  } catch (e) { log('#log1', '选航道失败：' + e.message, 'err'); }
+}
+
+function drawMap(prog) {
+  const cv = $('#map'), ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const S = Math.min(W, H) / 7000;         // 世界 7km -> 像素
+  const cx = W / 2, cy = H / 2;
+  const px = x => cx + x * S, py = y => cy - y * S;
+  window.__mapXf = {S: S, cx: cx, cy: cy, W: W, H: H};
+
+  // 网格
+  ctx.strokeStyle = 'rgba(117,163,215,.10)'; ctx.lineWidth = 1;
+  for (let r = 1000; r <= 3000; r += 1000) {
+    ctx.beginPath(); ctx.arc(cx, cy, r * S, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.moveTo(px(-3300), cy); ctx.lineTo(px(3300), cy);
+  ctx.moveTo(cx, py(-3300)); ctx.lineTo(cx, py(3300)); ctx.stroke();
+
+  // 障碍物 / 限飞区
+  if (snapshot) {
+    (snapshot.obstacles || []).forEach(o => {
+      const [x, y] = enu(o.lat, o.lon);
+      ctx.beginPath(); ctx.arc(px(x), py(y), Math.max(4, o.radius * S), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,138,92,.20)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,138,92,.55)'; ctx.stroke();
+    });
+    (snapshot.airspaces || []).forEach(a => {
+      ctx.beginPath();
+      a.polygon.forEach(([lat, lon], i) => {
+        const [x, y] = enu(lat, lon);
+        i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y));
+      });
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(124,92,255,.10)'; ctx.fill();
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = 'rgba(124,92,255,.6)'; ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  // 8 方向参考线（未生成的画淡线）
+  DIRS.forEach(([d]) => {
+    const b = {N:0,NE:45,E:90,SE:135,S:180,SW:225,W:270,NW:315}[d] * Math.PI / 180;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(px(Math.sin(b) * 2500), py(Math.cos(b) * 2500));
+    ctx.strokeStyle = 'rgba(117,163,215,.12)'; ctx.lineWidth = 1; ctx.stroke();
+    // 方位标签
+    ctx.fillStyle = 'rgba(140,170,200,.55)'; ctx.font = '11px Consolas';
+    ctx.fillText(d, px(Math.sin(b) * 2850) - 6, py(Math.cos(b) * 2850) + 4);
+  });
+
+  // 已生成的航路
+  Object.keys(cache).forEach(d => {
+    const p = cache[d]; if (!p || !p.waypoints) return;
+    ctx.beginPath();
+    p.waypoints.forEach((w, i) => i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)));
+    ctx.strokeStyle = COLORS[d] + (d === curDir ? 'ff' : '66');
+    ctx.lineWidth = d === curDir ? 2.6 : 1.4;
+    ctx.stroke();
+  });
+
+  // 当前程序
+  if (prog && prog.waypoints && prog.waypoints.length) {
+    const d = prog.direction || curDir;
+    ctx.beginPath();
+    prog.waypoints.forEach((w, i) => i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)));
+    ctx.strokeStyle = COLORS[d] || '#27e0d8';
+    ctx.lineWidth = 3; ctx.stroke();
+    // 方向箭头（沿航迹每隔一段一个）
+    drawDirArrows(ctx, prog.waypoints, px, py, '#ffffff', 5);
+    // 进场 / 离场 标注（放在航迹起始端）
+    const li = Math.max(1, Math.floor(prog.waypoints.length * 0.10));
+    const first = prog.waypoints[li - 1];
+    const second = prog.waypoints[li];
+    const lab = prog.type === 'departure' ? '离场' : '进场';
+    drawTag(ctx, lab, (px(first.x) + px(second.x)) / 2,
+            (py(first.y) + py(second.y)) / 2 - 16, '#cfe3f5');
+
+    // 复飞段
+    if (prog.miss_approach && prog.miss_approach.length) {
+      ctx.beginPath();
+      prog.miss_approach.forEach((w, i) => i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)));
+      ctx.setLineDash([6, 5]); ctx.strokeStyle = 'rgba(255,179,92,.85)';
+      ctx.lineWidth = 1.8; ctx.stroke(); ctx.setLineDash([]);
+      drawDirArrows(ctx, prog.miss_approach, px, py, 'rgba(255,179,92,.9)', 2);
+      const ma = prog.miss_approach;
+      const mi = Math.max(1, Math.floor(ma.length * 0.35));
+      const m0 = ma[mi - 1], m1 = ma[mi];
+      const missLab = prog.type === 'departure' ? '复飞·返场' : '复飞';
+      drawTag(ctx, missLab, (px(m0.x) + px(m1.x)) / 2 + 34,
+              (py(m0.y) + py(m1.y)) / 2 + 20, '#ffb35c');
+    }
+    // 航路点
+    prog.waypoints.forEach((w, i) => {
+      if (prog.waypoints.length > 12 && i % Math.ceil(prog.waypoints.length / 12) !== 0) return;
+      ctx.beginPath(); ctx.arc(px(w.x), py(w.y), 2.6, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+    });
+  }
+
+  // 起降点
+  ctx.beginPath(); ctx.moveTo(cx, cy - 7); ctx.lineTo(cx - 6, cy + 5); ctx.lineTo(cx + 6, cy + 5);
+  ctx.closePath(); ctx.fillStyle = '#eaf4ff'; ctx.fill();
+  ctx.fillStyle = '#8fa5c0'; ctx.font = '11px Microsoft YaHei';
+  ctx.fillText('起降点', cx + 9, cy + 4);
+
+  // 多机航道演示（叠加在最上层）
+  if (fleet.on && fleet.drones.length && typeof drawFleet === 'function') {
+    drawFleet(ctx, px, py);
+  }
+}
+
+function renderP1(prog, meta, comp, sim) {
+  const kv = $('#p1-kv');
+  kv.children[0].querySelector('b').textContent = prog.std_name || '—';
+  kv.children[1].querySelector('b').textContent = prog.source + (meta && meta.mode ? ' / ' + meta.mode : '');
+  kv.children[2].querySelector('b').textContent = (prog.waypoints || []).length + ' 点';
+  const ok = comp && comp.passed && sim && sim.passed;
+  kv.children[3].querySelector('b').textContent = (comp && comp.passed ? '合规✓' : '合规✗') + ' / ' + (sim && sim.passed ? '仿真✓' : '仿真✗');
+  kv.children[3].querySelector('b').style.color = ok ? '#76ecc0' : '#ff98a8';
+
+  $('#p1-title').textContent = (prog.direction || curDir) + ' 方向 ' + (prog.type === 'departure' ? '离场' : '进场') + '程序';
+  const b = [];
+  if (meta && meta.available === false) b.push('<span class="tag red">不可用</span>');
+  else if (meta && meta.fallback) b.push('<span class="tag orange">动态重规划</span>');
+  else b.push('<span class="tag green">方案库直出</span>');
+  if (meta && meta.reason) b.push('<span class="tag">' + meta.reason.slice(0, 40) + '</span>');
+  $('#p1-badges').innerHTML = b.join(' ');
+}
+
+async function generate(type) {
+  const btn = type === 'arrival' ? $('#btn-arr') : $('#btn-dep');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/program/generate', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({program_type: type, direction: curDir, mode: 'template'})
+    });
+    cache[curDir] = r.program;
+    renderP1(r.program, r.meta, r.compliance, r.simulate);
+    drawMap(r.program); drawProfile(r.program);
+    const m = r.meta || {};
+    log('#log1', curDir + ' ' + (type === 'arrival' ? '进场' : '离场') + ' → ' +
+      (r.program.std_name || '') + ' / ' + (m.mode || '') +
+      (m.fallback ? '（模板被替换：' + (m.template_reason || m.reason || '—') + '）' : ''),
+      m.available === false ? 'err' : (m.fallback ? 'warn' : 'ok'));
+  } catch (e) {
+    log('#log1', '生成失败：' + e.message, 'err');
+  } finally { btn.disabled = false; }
+}
+if ($('#btn-rec')) $('#btn-rec').onclick = async () => {
+  const btn = $('#btn-rec'); btn.disabled = true; btn.textContent = '评估中…';
+  try {
+    const d = await api('/api/program/recommend?program_type=arrival');
+    if (d.recommend) {
+      curDir = d.recommend; buildDirs();
+      const n = $('#narr1');
+      if (n) {
+        n.innerHTML = '系统推荐 <b>' + d.recommend + '</b>：<br>' + d.reason.join('<br>');
+      }
+      log('#log1', '自动推荐 → ' + d.recommend + '（' + d.reason.slice(0, 2).join('；') + '）', 'ok');
+      await generate('arrival');
+    } else {
+      log('#log1', '没有可用方向', 'err');
+    }
+  } catch (e) { log('#log1', '推荐失败：' + e.message, 'err'); }
+  btn.disabled = false; btn.textContent = '自动推荐';
+};
+
+$('#btn-arr').onclick = () => generate('arrival');
+$('#btn-dep').onclick = () => generate('departure');
+$('#btn-all').onclick = async () => {
+  for (const [d] of DIRS) {
+    curDir = d; buildDirs();
+    await generate('arrival');
+    await new Promise(r => setTimeout(r, 120));
+  }
+};
+
+/* ================= 二、多设备去重 ================= */
+let timer = null, frame = 0, curPoints = [], lastTracks = [];
+
+// 每架绕自己的中心盘旋：r=半径(米)、w=角速度(rad/s)、ph=初相位
+// 这样画面里每个点都在动，且不会飞出视野（机位可以固定，不会晃）
+const TWO = [
+  {ua: 'UA-0001', dx: 0,   dy: 0,   a: true,  b: true,  bUa: true,  r: 70, w: 0.32, ph: 0.0},
+  {ua: 'UA-0002', dx: 200, dy: 80,  a: true,  b: true,  bUa: false, r: 70, w: -0.32, ph: 1.1},  // B 侧丢 ID
+  {ua: 'UA-0003', dx: 400, dy: 160, a: true,  b: true,  bUa: true,  r: 90, w: 0.32, ph: 2.4},
+  {ua: 'UA-0004', dx: 560, dy: -40, a: true,  b: false, bUa: true,  r: 80, w: -0.32, ph: 0.6},
+  {ua: 'UA-0005', dx: 700, dy: 150, a: true,  b: false, bUa: true,  r: 60, w: 0.32, ph: 3.2},
+  {ua: 'UA-0006', dx: -160, dy: 240, a: false, b: true, bUa: true,  r: 85, w: 0.32, ph: 4.0},
+  {ua: 'UA-0007', dx: 120, dy: -260, a: false, b: true, bUa: true,  r: 60, w: -0.32, ph: 5.1},
+];
+
+function obs(tid, src, ua, x, y, ts, hdg) {
+  const lat0 = 30.0, lon0 = 120.0;
+  const lat = lat0 + y / 111320;
+  const lon = lon0 + x / (111320 * Math.cos(lat0 * Math.PI / 180));
+  const o = {id: tid, source_node: src, ts: ts, lat: lat, lon: lon, alt_msl: 120,
+             speed: 12, heading: (hdg == null ? 45 : hdg), vertical_speed: 0, battery_pct: 80, link_quality: 4,
+             emergency: false, rid_lost: false, model: 'EV-200', phase: 'CRUISE'};
+  // 只有带 ua_id 的观测才同时给 reg_no；丢了 ID 的那架必须两者都为空，
+  // 否则会被 reg_no 强匹配（或反之产生误判）
+  // 融合权重 = 1/σ²。差 10 倍时融合点几乎压在 A 上（看起来像"没融合"），
+  // 这里把差距收窄到 12 / 16，融合点落在两点之间、略靠近 A
+  o.sigma = (src === 'A-RID' ? 12 : 16);
+  if (ua) { o.ua_id = ua; o.reg_no = 'REG-' + ua; }
+  return o;
+}
+
+function frameObs() {
+  const t = Date.now() / 1000;
+  const sec = frame * 1.0;                    // 每秒一帧
+  const out = [], pts = [];
+
+  TWO.forEach(x => {
+    const ang = x.w * sec + x.ph;
+    const px = x.dx + x.r * Math.cos(ang);
+    const py = x.dy + x.r * Math.sin(ang);
+    // 速度沿切线：vx = -rω·sin, vy = rω·cos → 航向 = atan2(vx, vy)（0=北，90=东）
+    let hdg = Math.atan2(-Math.sin(ang) * Math.sign(x.w || 1),
+                         Math.cos(ang) * Math.sign(x.w || 1)) * 180 / Math.PI;
+    hdg = (hdg + 360) % 360;
+    if (x.a) {
+      const o = obs('A-' + (x.tag || x.ua.slice(-1)), 'A-RID', x.ua, px, py, t, hdg);
+      out.push(o); pts.push({id: o.id, src: 'A-RID', x: px, y: py});
+    }
+    if (x.b) {
+      const bx = px + 30, by = py - 18;       // B 设备观测偏差更大，便于肉眼区分
+      const o = obs('B-' + (x.tag || x.ua.slice(-1)), 'B-RID', x.bUa ? x.ua : null, bx, by, t, hdg);
+      out.push(o); pts.push({id: o.id, src: 'B-RID', x: bx, y: by});
+    }
+  });
+  curPoints = pts;
+  return out;
+}
+
+/* 观测用的是 30N/120E 原点，这里做逆换算，保证画图与服务端位置一致 */
+/* ---- 位置插值：每秒一次的数据，画面上按 60fps 平滑移动 ---- */
+const interpTrack = new Map();
+const interpPoint = new Map();
+const SMOOTH_MS = 900;
+
+function feedInterp(tracks, pts) {
+  const now = performance.now();
+  const alive = new Set();
+  tracks.forEach(t => {
+    const [x, y] = trackXY(t);
+    const e = interpTrack.get(t.global_id);
+    interpTrack.set(t.global_id, {fx: e ? e.x : x, fy: e ? e.y : y, x, y, t0: now});
+    alive.add(t.global_id);
+  });
+  [...interpTrack.keys()].forEach(k => { if (!alive.has(k)) interpTrack.delete(k); });
+
+  const liveP = new Set();
+  (pts || []).forEach(p => {
+    const key = p.src + '|' + p.id;
+    const e = interpPoint.get(key);
+    interpPoint.set(key, {fx: e ? e.x : p.x, fy: e ? e.y : p.y, x: p.x, y: p.y, t0: now});
+    liveP.add(key);
+  });
+  [...interpPoint.keys()].forEach(k => { if (!liveP.has(k)) interpPoint.delete(k); });
+}
+
+function lerpPos(e, now) {
+  const k = Math.min(1, (now - e.t0) / SMOOTH_MS);
+  const e2 = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  return [e.fx + (e.x - e.fx) * e2, e.fy + (e.y - e.fy) * e2];
+}
+
+function trackXY(t) {
+  if (t && t._x !== undefined) return [t._x, t._y];   // 已算好的画面坐标（米）
+  const lat0 = 30.0, lon0 = 120.0;
+  const k = 111320 * Math.cos(lat0 * Math.PI / 180);
+  return [(t.lon - lon0) * k, (t.lat - lat0) * 111320];
+}
+
+/* 固定机位：世界范围由每架的盘旋包络一次性算出，之后**永不变化**，
+   这样画面绝对不会抖动；飞机在这个固定框里移动，像雷达屏 */
+let world = null;
+
+function ensureWorld() {
+  if (world) return world;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  TWO.forEach(x => {
+    const m = (x.r || 70) + 45;            // 盘旋半径 + B 设备偏移余量
+    minX = Math.min(minX, x.dx - m); maxX = Math.max(maxX, x.dx + m);
+    minY = Math.min(minY, x.dy - m); maxY = Math.max(maxY, x.dy + m);
+  });
+  const pad = 30;
+  world = {minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad};
+  return world;
+}
+
+/* 每轮演示从零开始：清后端状态 + 本地帧计数 + 插值缓存 */
+async function resetDemo() {
+  frame = 0;
+  for (let i = TWO.length - 1; i >= 0; i--) if (TWO[i].ua.startsWith('UA-9')) TWO.splice(i, 1);
+  interpTrack.clear(); interpPoint.clear(); fxItems.length = 0;
+  try { await fetch(API + '/api/traffic/reset', {method: 'POST'}); } catch (e) {}
+}
+
+/* ---------------- RL 策略在场（影子模式） ---------------- */
+let rlOn = false, rlBusy = false;
+
+async function rlToggle(on) {
+  if (rlBusy) return;
+  rlBusy = true;
+  try {
+    await fetch(API + '/api/traffic/shadow', {
+      method: 'POST', headers: Object.assign({'Content-Type': 'application/json'}, tokenHeader()),
+      body: JSON.stringify({enabled: on, reset: on})
+    });
+    rlOn = on;
+    $('#rl-on').checked = on;
+  } catch (e) { /* 影子接口不可用，忽略 */ }
+  rlBusy = false;
+  rlPoll();
+}
+
+function rlRender(d, suffix) {
+  const st = d.stats || {};
+  const chips = $('#rl-chips' + suffix), tb = $('#rl-table' + suffix + ' tbody');
+  if (!chips || !tb) return;
+  if (!d.enabled) {
+    chips.innerHTML = '<span class="rlchip warn">影子模式未开启</span>';
+    if (suffix === '') $('#rl-hint').textContent = '勾选「让策略跟跑」即可，无需重启服务';
+    return;
+  }
+  const rate = (st.agree_rate == null ? 1 : st.agree_rate) * 100;
+  chips.innerHTML = [
+    '<span class="rlchip ' + (rate >= 95 ? 'good' : 'warn') + '">一致率 <b>' + rate.toFixed(1) + '%</b></span>',
+    '<span class="rlchip">帧 <b>' + (st.frames || 0) + '</b></span>',
+    '<span class="rlchip">观测 <b>' + (st.observations || 0) + '</b></span>',
+    '<span class="rlchip ' + ((st.policy_extra || 0) ? 'warn' : '') + '">多并 <b>' + (st.policy_extra || 0) + '</b></span>',
+    '<span class="rlchip ' + ((st.policy_missed || 0) ? 'warn' : '') + '">少并 <b>' + (st.policy_missed || 0) + '</b></span>',
+  ].join('');
+  if (suffix === '') $('#rl-hint').textContent = '策略与规则并行判定，只写日志、不改变输出';
+
+  const rows = d.rows || [];
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="7" style="color:#5f7794">还没有判定，点「开始上报」喂几帧数据</td></tr>';
+    return;
+  }
+  tb.innerHTML = rows.map(r =>
+    '<tr>'
+    + '<td class="mono">' + r.frame + '</td>'
+    + '<td>' + r.src + '</td>'
+    + '<td class="mono">' + r.lid + '</td>'
+    + '<td class="mono">' + (r.rule_gid || '新建') + '</td>'
+    + '<td class="mono">' + (r.policy_gid || '新建') + '</td>'
+    + '<td class="mono">' + (r.p_max == null ? '—' : r.p_max.toFixed(3)) + '</td>'
+    + '<td style="color:' + (r.agree ? '#49e3ae' : '#ff8f9a') + '">' + (r.agree ? '✓' : '✗') + '</td>'
+    + '</tr>').join('');
+}
+
+async function rlPoll() {
+  let d;
+  try { d = await (await fetch(API + '/api/rl/live?n=8', {cache: 'no-store'})).json(); }
+  catch (e) { return; }
+  rlRender(d, '');
+  rlRender(d, '4');
+  const m4 = $('#rl-live-meta');
+  if (m4) m4.textContent = d.enabled
+    ? '帧 ' + (d.stats.frames || 0) + ' · 观测 ' + (d.stats.observations || 0)
+    : '未开启';
+  return;
+}
+
+const _oldPollBody = true;
+$('#rl-on').onchange = () => rlToggle($('#rl-on').checked);
+$('#rl-on4').onchange = () => { $('#rl-on').checked = $('#rl-on4').checked; rlToggle($('#rl-on4').checked); };
+
+/* ---------------- 场景对比（带真值） ---------------- */
+let cmpData = null;
+
+async function runCompare() {
+  const btn = $('#btn-cmp');
+  btn.disabled = true; btn.textContent = '计算中…（约 15 秒）';
+  $('#cmp-hint').textContent = '正在用带真值的仿真数据跑规则与策略…';
+  try {
+    const d = await api('/api/rl/compare/all');
+    cmpData = d.scenarios || [];
+    renderCompare(cmpData);
+    $('#cmp-hint').textContent = '真值来自仿真：错配 = 把两架不同的飞机并成一条';
+  } catch (e) {
+    $('#cmp-hint').textContent = '对比失败：' + e.message;
+  }
+  btn.disabled = false; btn.textContent = '跑密集场景对比';
+}
+
+function renderCompare(list) {
+  if (!list.length) return;
+  const hard = list.find(x => x.scenario === 'hard_dense') || list[0];
+  $('#cmp-meta').textContent = hard.label + ' · ' + hard.frames + ' 帧 · 阈值 ' + hard.threshold.toFixed(2);
+
+  const card = (title, rv, pv, better) => {
+    const betterIsLower = better === 'lower';
+    const win = betterIsLower ? pv < rv : pv > rv;
+    return '<div class="cmpcard"><div class="t">' + title + '</div>'
+      + '<div class="v"><b class="' + (win ? 'good' : (pv === rv ? 'flat' : 'bad')) + '">' + pv + '</b>'
+      + '<s>规则 ' + rv + '</s></div></div>';
+  };
+  $('#cmp-cards').innerHTML =
+    card('错配（越少越好）', hard.rule.wrong, hard.policy.wrong, 'lower')
+    + card('漏配（越少越好）', hard.rule.miss, hard.policy.miss, 'lower')
+    + card('平均碎片数', hard.rule.frags, hard.policy.frags, 'lower')
+    + card('累计奖励（越高越好）', hard.rule.reward, hard.policy.reward, 'higher');
+
+  const drop = hard.rule.wrong ? Math.round((1 - hard.policy.wrong / hard.rule.wrong) * 100) : 0;
+  $('#cmp-concl').innerHTML = '在 <b>' + hard.label + '</b> 上：错配 <b>'
+    + hard.rule.wrong + ' → ' + hard.policy.wrong + '</b>（降 ' + drop + '%），漏配 <b>'
+    + hard.rule.miss + ' → ' + hard.policy.miss + '</b>，平均碎片 <b>'
+    + hard.rule.frags + ' → ' + hard.policy.frags + '</b>；稀疏场景两者接近，说明策略没有退化成"乱合并"。';
+
+  const tb = $('#cmp-table tbody');
+  tb.innerHTML = list.map(x => {
+    const cell = (v, pv, better) => {
+      const win = better === 'lower' ? pv < v : pv > v;
+      return '<td class="mono" style="color:' + (win ? '#49e3ae' : '#8ea0bd') + '">' + pv + '</td>';
+    };
+    return '<tr style="border-top:1px solid #22314d">'
+      + '<td rowspan="2" style="vertical-align:middle">' + x.label + '</td>'
+      + '<td style="color:#7b90ad">规则</td>'
+      + '<td class="mono">' + x.rule.reward + '</td><td class="mono">' + x.rule.wrong + '</td>'
+      + '<td class="mono">' + x.rule.miss + '</td><td class="mono">' + x.rule.frags + '</td>'
+      + '<td class="mono">' + (x.rule.split * 100).toFixed(0) + '%</td></tr>'
+      + '<tr><td style="color:#7cc7ff">PPO</td>'
+      + cell(x.rule.reward, x.policy.reward, 'higher')
+      + cell(x.rule.wrong, x.policy.wrong, 'lower')
+      + cell(x.rule.miss, x.policy.miss, 'lower')
+      + cell(x.rule.frags, x.policy.frags, 'lower')
+      + '<td class="mono">' + (x.policy.split * 100).toFixed(0) + '%</td></tr>';
+  }).join('');
+
+  drawCompareChart(list);
+}
+
+function drawCompareChart(list) {
+  const cv = $('#cmp-chart'); if (!cv) return;
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const padL = 44, padB = 26, padT = 12;
+  const maxV = Math.max(1, ...list.map(x => Math.max(x.rule.wrong, x.policy.wrong)));
+  const bw = (W - padL - 20) / list.length;
+
+  // 网格 + 标题
+  ctx.strokeStyle = 'rgba(117,163,215,.10)'; ctx.lineWidth = 1;
+  for (let k = 0; k <= 2; k++) {
+    const y = padT + (H - padT - padB) * k / 2;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - 12, y); ctx.stroke();
+  }
+  ctx.fillStyle = '#5f7794'; ctx.font = '10px Consolas'; ctx.textAlign = 'right';
+  ctx.fillText(maxV, padL - 6, padT + 4);
+  ctx.fillText('0', padL - 6, H - padB + 2);
+
+  list.forEach((x, i) => {
+    const cx = padL + bw * i + bw / 2;
+    const h1 = (H - padT - padB) * (x.rule.wrong / maxV);
+    const h2 = (H - padT - padB) * (x.policy.wrong / maxV);
+    const w = bw * 0.26;
+    ctx.fillStyle = '#3f5a80';
+    ctx.fillRect(cx - w - 3, H - padB - h1, w, h1);
+    ctx.fillStyle = x.policy.wrong < x.rule.wrong ? '#49e3ae' : '#ff8f9a';
+    ctx.fillRect(cx + 3, H - padB - h2, w, h2);
+    ctx.fillStyle = '#8ea0bd'; ctx.font = '10px Microsoft YaHei'; ctx.textAlign = 'center';
+    ctx.fillText(x.label, cx, H - 10);
+    ctx.fillStyle = '#cfd9e6'; ctx.font = '10px Consolas';
+    if (x.rule.wrong) ctx.fillText(x.rule.wrong, cx - w / 2 - 3, H - padB - h1 - 4);
+    ctx.fillStyle = x.policy.wrong < x.rule.wrong ? '#49e3ae' : '#ff8f9a';
+    ctx.fillText(x.policy.wrong, cx + w / 2 + 3, H - padB - h2 - 4);
+  });
+  ctx.fillStyle = '#7b90ad'; ctx.font = '10px Microsoft YaHei'; ctx.textAlign = 'left';
+  ctx.fillText('柱高 = 错配数（深蓝=规则，彩色=PPO）', padL, padT + 4);
+}
+
+$('#btn-cmp').onclick = runCompare;
+setInterval(rlPoll, 2000);
+setTimeout(rlPoll, 800);
+
+/* ---------------- 合并动画（飞线 + 脉冲） ---------------- */
+let lastXf = null;
+let fxItems = [];
+const prevIds = new Map();
+
+/* 只记"从哪个观测点"到"哪条航迹"，位置每帧现算 —— 这样光点始终追着移动的飞机 */
+function pushMergeFX(fromKey, gid, dur) {
+  fxItems.push({fromKey, gid, t0: performance.now(), dur: dur || 700});
+  if (fxItems.length > 10) fxItems.shift();
+}
+
+let flowIdx = 0;
+
+/* 对比上一帧的 source_ids：航迹上"新增了一个来源"就放一个飞线；
+   另外每帧轮流给双源航迹放"汇聚流"，让融合过程一直在动 */
+function detectMerges(tracks) {
+  if (!lastXf) return;
+  tracks.forEach(t => {
+    const ids = t.source_ids || {};
+    const keys = Object.keys(ids).map(s => s + ':' + ids[s]);
+    const prev = prevIds.get(t.global_id);
+    if (prev && prev.size > 0) {
+      Object.keys(ids).forEach(src => {
+        if (prev.has(src + ':' + ids[src])) return;
+        if (!curPoints.find(cp => cp.src === src && cp.id === ids[src])) return;
+        pushMergeFX(src + '|' + ids[src], t.global_id);
+      });
+    }
+    prevIds.set(t.global_id, new Set(keys));
+  });
+
+  // 持续汇聚：每帧挑 2 条双源航迹，各画一条从观测点流向圆环的短线
+  const merged = tracks.filter(t => t.merged);
+  for (let n = 0; n < 1 && merged.length; n++) {
+    const t = merged[(flowIdx + n) % merged.length];
+    const ids = t.source_ids || {};
+    const [tx, ty] = trackXY(t);
+    Object.keys(ids).forEach(src => {
+      if (curPoints.find(cp => cp.src === src && cp.id === ids[src])) {
+        pushMergeFX(src + '|' + ids[src], t.global_id, 850);
+      }
+    });
+  }
+  flowIdx += 2;
+}
+
+/* 把合并动画画在当前 ctx 上（叠加在主图之后） */
+function drawFX(ctx, now, tracksD, pointsD) {
+  fxItems = fxItems.filter(it => now - it.t0 < it.dur + 220);
+  if (!fxItems.length || !tracksD) return;
+  const px = lastXf.px, py = lastXf.py;
+
+  fxItems.forEach(it => {
+    const src = pointsD.find(p => p.src + '|' + p.id === it.fromKey);
+    const tr = tracksD.find(t => t.global_id === it.gid);
+    if (!src || !tr) return;                      // 目标消失了就跳过
+    const [tx, ty] = trackXY(tr);
+    it.ax = px(src.x); it.ay = py(src.y);
+    it.bx = px(tx);    it.by = py(ty);
+
+    const k = Math.min(1, (now - it.t0) / it.dur);
+    const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // easeInOutQuad
+    const mx = (it.ax + it.bx) / 2, my = (it.ay + it.by) / 2;
+    const dx = it.bx - it.ax, dy = it.by - it.ay;
+    const len = Math.hypot(dx, dy) || 1;
+    const cx = mx, cy = my;                                          // 直线（不再画弧）
+    const q = t => [
+      (1 - t) * (1 - t) * it.ax + 2 * (1 - t) * t * cx + t * t * it.bx,
+      (1 - t) * (1 - t) * it.ay + 2 * (1 - t) * t * cy + t * t * it.by,
+    ];
+
+    // 轨迹虚线
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const [x, y] = q(i / 24);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.setLineDash([4, 5]);
+    ctx.strokeStyle = 'rgba(73,227,174,' + (0.16 * (1 - k)).toFixed(3) + ')';
+    ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]);
+
+    // 拖尾
+    for (let i = 7; i >= 0; i--) {
+      const tt = Math.max(0, e - i * 0.045);
+      const [x, y] = q(tt);
+      const a = (1 - i / 8) * 0.32 * (1 - Math.max(0, k - .85) * 4);
+      if (a <= 0) continue;
+      ctx.beginPath(); ctx.arc(x, y, 3.6 - i * 0.28, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(73,227,174,' + a.toFixed(3) + ')'; ctx.fill();
+    }
+
+    // 头部亮点
+    const [hx, hy] = q(e);
+    const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, 7);
+    g.addColorStop(0, 'rgba(200,255,235,.55)');
+    g.addColorStop(1, 'rgba(73,227,174,0)');
+    ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); ctx.arc(hx, hy, 1.9, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(234,255,247,.8)'; ctx.fill();
+
+    // 到达后的脉冲
+    if (k > .72) {
+      const kk = (k - .72) / .28;
+      for (let n = 0; n < 2; n++) {
+        const p = Math.min(1, kk - n * .28);
+        if (p <= 0) continue;
+        ctx.beginPath(); ctx.arc(it.bx, it.by, 6 + 11 * p, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(73,227,174,' + (0.20 * (1 - p)).toFixed(3) + ')';
+        ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+  });
+}
+
+function drawDedup(tracks) {
+  const cv = $('#dedup-map');
+  if (!cv) return;
+  const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const now = performance.now();
+  // 插值后的绘制数据（坐标本身不参与判定，只影响画面）
+  const pointsD = curPoints.map(p => {
+    const e = interpPoint.get(p.src + '|' + p.id);
+    if (!e) return p;
+    const [x, y] = lerpPos(e, now);
+    return Object.assign({}, p, {x, y});
+  });
+
+  // 双源航迹的显示位置 = 当前 A/B 观测点按 1/σ² 加权（与观测点同一帧、同一插值，绝不滞后）
+  const fusedXY = (t) => {
+    const ids = t.source_ids || {};
+    let sx = 0, sy = 0, sw = 0;
+    Object.keys(ids).forEach(src => {
+      const p = pointsD.find(q => q.src === src && q.id === ids[src]);
+      if (!p) return;
+      const w = 1 / Math.pow(src === 'A-RID' ? 12 : 16, 2);
+      sx += p.x * w; sy += p.y * w; sw += w;
+    });
+    return sw > 0 ? [sx / sw, sy / sw] : null;
+  };
+
+  const tracksD = tracks.map(t => {
+    if (t.merged) {
+      const f = fusedXY(t);
+      if (f) return Object.assign({}, t, {_x: f[0], _y: f[1]});
+    }
+    const e = interpTrack.get(t.global_id);
+    if (!e) return t;
+    const [x, y] = lerpPos(e, now);
+    return Object.assign({}, t, {_x: x, _y: y});
+  });
+
+
+  const showRaw = $('#show-raw').checked;
+  const pts = [];
+  if (showRaw) pointsD.forEach(p => pts.push([p.x, p.y]));
+  tracksD.forEach(t => pts.push(trackXY(t)));
+
+  if (!pts.length) {
+    ctx.fillStyle = '#5f7794'; ctx.font = '14px Microsoft YaHei';
+    ctx.fillText('点左侧「开始上报」，这里会实时显示两设备的观测与合并结果', 26, 42);
+    return;
+  }
+
+  const wd = ensureWorld();
+  const minX = wd.minX, maxX = wd.maxX, minY = wd.minY, maxY = wd.maxY;
+  const sw = Math.max(240, maxX - minX);
+  const sh = Math.max(240, maxY - minY);
+  const S = Math.min(W / sw, H / sh);
+  const ox = (minX + maxX) / 2, oy = (minY + maxY) / 2;
+  // 机位固定：直接用世界中心的换算，不随数据移动
+  const px = x => W / 2 + (x - ox) * S;
+  const py = y => H / 2 - (y - oy) * S;
+  lastXf = {px, py, W, H};
+
+  // 雷达扫描：裁剪在一个圆里的一条细线（不画扇形/扇面，免得像划痕）
+  const cx0 = px(ox), cy0 = py(oy);
+  const R = Math.min(W, H) * 0.48;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx0, cy0, R, 0, Math.PI * 2); ctx.clip();
+  const ang = (now / 6000) * Math.PI * 2;
+  const g2 = ctx.createLinearGradient(cx0, cy0, cx0 + R * Math.cos(ang), cy0 + R * Math.sin(ang));
+  g2.addColorStop(0, 'rgba(73,227,174,0)');
+  g2.addColorStop(1, 'rgba(73,227,174,.16)');
+  ctx.beginPath();
+  ctx.moveTo(cx0, cy0);
+  ctx.lineTo(cx0 + R * Math.cos(ang), cy0 + R * Math.sin(ang));
+  ctx.strokeStyle = g2; ctx.lineWidth = 1.3; ctx.stroke();
+  ctx.strokeStyle = 'rgba(73,227,174,.05)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx0, cy0, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+
+  // 网格
+  ctx.strokeStyle = 'rgba(117,163,215,.08)'; ctx.lineWidth = 1;
+  const step = sw > 1400 ? 250 : 100;
+  for (let gx = Math.floor(minX / step) * step; gx <= maxX + step; gx += step) {
+    ctx.beginPath(); ctx.moveTo(px(gx), 0); ctx.lineTo(px(gx), H); ctx.stroke();
+  }
+  for (let gy = Math.floor(minY / step) * step; gy <= maxY + step; gy += step) {
+    ctx.beginPath(); ctx.moveTo(0, py(gy)); ctx.lineTo(W, py(gy)); ctx.stroke();
+  }
+
+  // ① 去重后的航迹（圆环 + ID）
+  tracksD.forEach(t => {
+    const [x, y] = trackXY(t);
+    ctx.beginPath(); ctx.arc(px(x), py(y), 5.5, 0, Math.PI * 2);
+    ctx.strokeStyle = t.merged ? '#49e3ae' : '#2f9bff';
+    ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.beginPath(); ctx.arc(px(x), py(y), 2, 0, Math.PI * 2);
+    ctx.fillStyle = t.merged ? '#49e3ae' : '#2f9bff'; ctx.fill();
+
+    ctx.fillStyle = '#9fd8c4'; ctx.font = '10px Consolas';
+    ctx.textAlign = 'center';
+    ctx.fillText(t.ua_id || t.global_id, px(x), py(y) + 26);
+    ctx.textAlign = 'left';
+  });
+
+  // ② 原始观测（A 标签在左、B 标签在右，避免互相压盖）
+  if (showRaw) {
+    pointsD.forEach(p => {
+      const isA = p.src === 'A-RID';
+      ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 3.6, 0, Math.PI * 2);
+      ctx.fillStyle = isA ? '#2f9bff' : '#c084fc'; ctx.fill();
+      ctx.fillStyle = isA ? '#8fc9ff' : '#dcc4ff';
+      ctx.font = '10px Consolas';
+      ctx.textAlign = isA ? 'right' : 'left';
+      ctx.fillText(p.id, px(p.x) + (isA ? -7 : 7), py(p.y) + (isA ? -6 : 14));
+      ctx.textAlign = 'left';
+    });
+  }
+
+  // ③ 判定连线 + "≡"（画在最上层，保证可见）
+  tracksD.forEach(t => {
+    if (!t.merged) return;
+    const ids = t.source_ids || {};
+    const A = pointsD.find(p => p.src === 'A-RID' && p.id === ids['A-RID']);
+    const B = pointsD.find(p => p.src === 'B-RID' && p.id === ids['B-RID']);
+    if (!A || !B) return;
+    const ax = px(A.x), ay = py(A.y), bx = px(B.x), by = py(B.y);
+
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(180,205,235,.95)';
+    ctx.lineWidth = 1.4; ctx.stroke(); ctx.setLineDash([]);
+
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    ctx.beginPath(); ctx.arc(mx, my - 16, 6, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(73,227,174,.18)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(73,227,174,.55)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#49e3ae'; ctx.font = 'bold 10px Consolas';
+    ctx.textAlign = 'center';
+    ctx.fillText('≡', mx, my - 12.5);
+    ctx.textAlign = 'left';
+  });
+
+  drawFX(ctx, now, tracksD, pointsD);
+
+  ctx.fillStyle = 'rgba(123,144,173,.85)'; ctx.font = '10px Microsoft YaHei';
+  ctx.fillText('灰色虚线连接的两条观测 = 判定为同一架；圆环 = 去重后保留的唯一航迹', 14, H - 12);
+}
+
+/* 第二幕可见时以 60fps 重绘：点位平滑移动 + 雷达扫描 + 合并动效 */
+(function animLoop() {
+  const p2 = $('#p2');
+  if (p2 && !p2.classList.contains('hidden') && lastTracks.length && lastXf) {
+    drawDedup(lastTracks);
+  }
+  requestAnimationFrame(animLoop);
+})();
+
+async function runFrame() {
+  const obss = frameObs();
+  try {
+    const r = await api('/api/traffic/ingest', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(obss)
+    });
+    const st = await api('/api/traffic/stats');
+    const tr = (await api('/api/traffic')).traffic;
+    lastTracks = tr;
+    feedInterp(tr, curPoints);          // ← 之前漏了这句：插值缓存不更新，画面就冻住
+    $('#k-in').textContent = r.received;
+    $('#k-out').textContent = r.stored;
+    $('#k-merged').textContent = r.merged;
+    $('#k-tent').textContent = st.tentative || 0;
+
+    const tb = $('#tracks tbody'); tb.innerHTML = '';
+    tr.forEach(t => {
+      const row = el('tr');
+      row.innerHTML = '<td class="mono">' + (t.callsign || t.id) + '</td>' +
+        '<td class="mono">' + (t.ua_id || '—') + '</td>' +
+        '<td>' + (t.sources || []).join(' + ') + '</td>' +
+        '<td class="mono">' + fmt(t.confidence, 2) + '</td>' +
+        '<td>' + (t.merged ? '<span class="tag">双源</span>' : '') + '</td>';
+      tb.appendChild(row);
+    });
+
+    const mb = $('#merges tbody'); mb.innerHTML = '';
+    tr.filter(t => t.merged).forEach(t => {
+      const row = el('tr');
+      const ids = t.source_ids || {};
+      const why = t.ua_id ? 'ua_id 相同' : '时空门限';
+      row.innerHTML = '<td class="mono">' + t.id + '</td>' +
+        '<td class="mono">' + (ids['A-RID'] || '—') + '</td>' +
+        '<td class="mono">' + (ids['B-RID'] || '—') + '</td>' +
+        '<td><span class="tag green">' + why + '</span></td>';
+      mb.appendChild(row);
+    });
+
+    detectMerges(tr);
+    drawDedup(tr);
+    if (frame % 3 === 0) {
+      log('#log2', '第 ' + frame + ' 帧：上报 ' + r.received + ' → 唯一 ' + r.stored + '（融合 ' + r.merged + '）', 'ok');
+    }
+  } catch (e) { log('#log2', '上报失败：' + e.message, 'err'); }
+  frame++;
+}
+
+$('#btn-run').onclick = () => {
+  // 影子模式改为手动勾选：当前版本在浏览器生成的数据上一致率异常（约 14%），
+  // 而 Python 模拟器上是 100%，差异待定位，先不自动开启以免误导演示。
+  if ($('#rl-on') && $('#rl-on').checked) rlToggle(true);
+  resetDemo();
+  if (timer) return;
+  frame = 0; curPoints = [];
+  log('#log2', '开始：A/B 各上报 5 条，共 10 条', '');
+  timer = setInterval(runFrame, 1000);
+  runFrame();
+  $('#btn-run').disabled = true; $('#btn-stop').disabled = false;
+};
+$('#btn-stop').onclick = () => {
+  clearInterval(timer); timer = null;
+  $('#btn-run').disabled = false; $('#btn-stop').disabled = true;
+  log('#log2', '已停止（航迹 15 秒后自动过期）', 'warn');
+};
+$('#btn-bad').onclick = async () => {
+  const t = Date.now() / 1000;
+  // 两架**不同的**飞机，相距约 19m，各自只有一台设备能看到；
+  // 加入主循环（和别的飞机用同样的盘旋参数），这样它们会一直跟着动
+  if (!TWO.some(x => x.ua === 'UA-9001')) {
+    TWO.push({ua: 'UA-9001', tag: 'X1', dx: 330, dy: -170, a: true,  b: false, bUa: true, r: 70, w: 0.14, ph: 0.7});
+    TWO.push({ua: 'UA-9002', tag: 'X2', dx: 345, dy: -158, a: false, b: true,  bUa: true, r: 70, w: 0.14, ph: 0.7});
+  }
+  const a0 = 0.14 * frame + 0.7;
+  const bx0 = 330 + 70 * Math.cos(a0), by0 = -170 + 70 * Math.sin(a0);
+  const a = obs('A-X1', 'A-RID', 'UA-9001', bx0, by0, t);
+  const b = obs('B-X2', 'B-RID', 'UA-9002', bx0 + 15, by0 + 12, t);
+  try {
+    const r = await api('/api/traffic/ingest', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify([a, b])
+    });
+    // 等插入那一帧过完再清零，避免这一帧的瞬态差异污染一致率
+    setTimeout(() => rlToggle(true), 1500);
+    log('#log2', '反例：两架 ua_id 不同、相距约 19 m → 判定为两条独立航迹，未合并（当前可见 ' + r.stored + ' 条）', 'warn');
+    const tr = (await api('/api/traffic')).traffic;
+    lastTracks = tr; feedInterp(tr, curPoints); detectMerges(tr); drawDedup(tr);
+  } catch (e) { log('#log2', '失败：' + e.message, 'err'); }
+};
+
+$('#show-raw').onchange = () => drawDedup(lastTracks);
+
+/* ================= 三、对外推送 ================= */
+async function pushStatus() {
+  try {
+    const s = await api('/api/push/status');
+    const q = s.queue || {};
+    $('#k-sent').textContent = q.sent ?? '—';
+    $('#k-pend').textContent = q.pending ?? '—';
+    $('#k-rate').textContent = s.success_rate == null ? '—' : Math.round(s.success_rate * 100) + '%';
+    $('#k-lat').textContent = q.avg_latency_ms == null ? '—' : fmt(q.avg_latency_ms, 0) + ' ms';
+    $('#push-ep').textContent = (s.mode || '') + ' · ' + (s.endpoint || '') + ' · 节点 ' + (s.node_id || '');
+  } catch (e) { /* 后端未起 */ }
+}
+
+async function uomFeed() {
+  try {
+    const r = await fetch(UOM + '/uom/v1/messages', {cache:'no-store'});
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    const tb = $('#pushed tbody'); tb.innerHTML = '';
+    (d.messages || []).slice(-12).reverse().forEach(m => {
+      const msg = m.message || {};
+      const row = el('tr');
+      row.innerHTML = '<td class="mono">' + (m.received_at || '').slice(11) + '</td>' +
+        '<td>' + (msg.msgType || '') + '</td>' +
+        '<td class="mono">' + (msg.msgId || '').slice(0, 10) + '</td>' +
+        '<td class="mono">' + ((msg.payload || {}).count ?? '—') + '</td>' +
+        '<td>' + (m.signature_ok ? '<span class="tag green">OK</span>' : '<span class="tag red">FAIL</span>') + '</td>';
+      tb.appendChild(row);
+    });
+  } catch (e) {
+    $('#pushed tbody').innerHTML = '<tr><td colspan="5" style="color:#6f88a6">模拟对端未启动：python tools\\mock_uom_server.py</td></tr>';
+  }
+}
+
+$('#btn-test').onclick = async () => {
+  try {
+    const r = await api('/api/push/test', {method: 'POST'});
+    log('#log3', '测试报文已发送：' + (r.msg_id || '').slice(0, 10) + ' → ' + (r.result && r.result.ok ? '成功' : '失败'),
+        r.result && r.result.ok ? 'ok' : 'err');
+    setTimeout(() => { pushStatus(); uomFeed(); }, 400);
+  } catch (e) { log('#log3', '发送失败：' + e.message, 'err'); }
+};
+$('#btn-flush').onclick = async () => {
+  try {
+    const r = await api('/api/push/flush', {method: 'POST'});
+    log('#log3', '立即推送：成功 ' + r.sent + ' 条，失败 ' + r.failed + ' 条', r.failed ? 'warn' : 'ok');
+    pushStatus(); uomFeed();
+  } catch (e) { log('#log3', '推送失败：' + e.message, 'err'); }
+};
+
+setInterval(() => { pushStatus(); uomFeed(); }, 3000);
+
+/* 初始化 + URL 快捷参数（也方便截图/演示跳转）
+   示例：demo.html?tab=p1&dir=NE&gen=arrival
+         demo.html?tab=p2&run=1
+         demo.html?tab=p3 */
+const Q = new URLSearchParams(location.search);
+function switchTab(id) {
+  const t = document.querySelector('.tab[data-tab="' + id + '"]');
+  if (t) t.click();
+}
+(async () => {
+  if (Q.get('dir')) { curDir = Q.get('dir'); buildDirs(); }
+  if (Q.get('tab')) switchTab(Q.get('tab'));
+  await ensureSnapshot();
+  drawMap(); drawProfile(null);
+  pushStatus(); uomFeed();
+  if (Q.get('gen')) setTimeout(() => generate(Q.get('gen')), 400);
+  if (Q.get('run') === '1') setTimeout(() => $('#btn-run').click(), 600);
+  if (Q.get('cmp') === '1') setTimeout(() => $('#btn-cmp').click(), 500);
+  if (Q.get('dbg') === '1') window.__dbg = true;
+  if (Q.get('bad') === '1') setTimeout(() => $('#btn-bad').click(), 2600);
+  var _map = document.getElementById('map');
+  if (_map) _map.addEventListener('click', chooseTrack);
+  ['wx-wind', 'wx-dir', 'wx-rain', 'wx-batt'].forEach(function (id) {
+    var e = document.getElementById(id);
+    if (e) e.addEventListener('input', wxApply);
+  });
+  setTimeout(wxApply, 900);
+  renderSeq();
+  dynDraw();
+  setTimeout(function () { if (!fleet.on) fleetToggle(); }, 1200);
+  var _dr = document.getElementById('dyn-run');
+  if (_dr) { _dr.textContent = '▶ 多机航道演示'; _dr.onclick = fleetToggle; }
+})();
+window.addEventListener('resize', function () { drawMap(cache[curDir]); drawProfile(cache[curDir]); });
+</script>
+
+<div id="boot-bar" style="position:fixed;left:0;right:0;top:0;z-index:9999;
+  background:#1e293b;border-bottom:1px solid #334155;color:#93b4d8;
+  font:13px/1.6 'Microsoft YaHei',sans-serif;padding:6px 14px;text-align:center">
+  正在连接后端服务… <span id="boot-t">0</span>s（首次启动需预热约 40 秒）
+</div>
+<script>
+(function () {
+  var bar = document.getElementById('boot-bar'), t = 0, timer = null;
+  function tick() { t++; var e = document.getElementById('boot-t'); if (e) e.textContent = t; }
+  timer = setInterval(tick, 1000);
+  function done() { clearInterval(timer); if (bar) { bar.style.background = '#14532d';
+      bar.style.color = '#86efac'; bar.innerHTML = '后端已就绪 · http://127.0.0.1:8080';
+      setTimeout(function () { bar.style.display = 'none'; }, 2500); } }
+  function check() {
+    fetch('http://127.0.0.1:8080/api/health', { cache: 'no-store' })
+      .then(function (r) { if (r.ok) done(); else setTimeout(check, 1500); })
+      .catch(function () { setTimeout(check, 1500); });
+  }
+  check();
+})();
+</script>
+
+
+<div id="nav-bar" style="position:fixed;right:14px;bottom:14px;z-index:9998;display:flex;gap:6px;font:12px/1 'Microsoft YaHei',sans-serif">
+  <a href="demo.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#2563eb;color:#fff;border:1px solid #3b82f6">① 主演示台</a>
+  <a href="demo_p1.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">② 航道总览</a>
+  <a href="demo_p1_place.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">③ 航道匹配</a>
+  <a href="rl_lab.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">④ RL 实验室</a>
+</div>
+</body>
+</html>

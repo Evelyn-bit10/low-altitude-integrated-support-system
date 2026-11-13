@@ -1,0 +1,5 @@
+# Capacitor / Android 打包产物
+node_modules/
+www/
+android/
+*.apk

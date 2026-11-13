@@ -1,0 +1,41 @@
+# 低空动态起降飞行程序实时调整系统 Demo —— 一键部署
+# 统一技术栈: PostgreSQL 15 + PostGIS 3.3 + FastAPI(内置前端静态资源)
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: lowalt-db
+    restart: unless-stopped
+    environment:
+      TZ: ${TIME_ZONE:-Asia/Shanghai}
+      POSTGRES_USER: flight
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Flight@2026}
+      POSTGRES_DB: low_flight_program
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flight -d low_flight_program"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lowalt-app
+    restart: unless-stopped
+    environment:
+      TZ: ${TIME_ZONE:-Asia/Shanghai}
+      DATABASE_URL: postgresql+psycopg://flight:${POSTGRES_PASSWORD:-Flight@2026}@db:5432/low_flight_program
+      DISPATCH_INTERVAL: ${DISPATCH_INTERVAL:-2}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pg-data:

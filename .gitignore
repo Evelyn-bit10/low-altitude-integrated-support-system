@@ -1,0 +1,35 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python environments and generated files
+.venv/
+venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Node / Capacitor dependencies and generated assets
+node_modules/
+www/
+android/.gradle/
+android/**/build/
+android/app/src/main/assets/public/
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+*.log
+Thumbs.db
+desktop.ini
+
+# Local databases and runtime state
+*.db
+flight/flycontrol/low-altitude-demo/backend/data/*.json
+device/groundstation/wrjtksf/drone_ground_station/offline_data/stands_custom.json

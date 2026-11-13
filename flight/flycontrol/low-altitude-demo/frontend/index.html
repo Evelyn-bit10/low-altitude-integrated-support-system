@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>低空动态起降飞行程序实时调整系统 · Demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>低空动态起降飞行程序实时调整系统 <span class="badge">DEMO</span></h1>
+      <div class="sub">A* / RRT* / Dubins 平滑 + 简化 OAS·MOC·MSA + 多因子风险加权 · 1~2s 闭环调度</div>
+    </div>
+    <div class="status-pill" id="status-pill">连接中…</div>
+  </header>
+
+  <main>
+    <section class="views">
+      <div class="card plan">
+        <div class="card-title">平面视图 (ENU · 东/北)</div>
+        <canvas id="plan" width="1000" height="900"></canvas>
+      </div>
+      <div class="card profile">
+        <div class="card-title">高度剖面 (航迹距离 vs 高度 AGL)</div>
+        <canvas id="profile" width="1000" height="200"></canvas>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="card risk">
+        <div class="card-title">环境风险评估</div>
+        <div class="risk-score" id="risk-score">--</div>
+        <div class="risk-level" id="risk-level">等待数据</div>
+        <div class="kv"><span>障碍物风险</span><b id="f-obs">--</b></div>
+        <div class="kv"><span>气象风险</span><b id="f-met">--</b></div>
+        <div class="kv"><span>空域风险</span><b id="f-air">--</b></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">当前程序</div>
+        <div class="kv"><span>版本</span><b id="p-ver">--</b></div>
+        <div class="kv"><span>类型</span><b id="p-type">--</b></div>
+        <div class="kv"><span>来源</span><b id="p-src">--</b></div>
+        <div class="kv"><span>航路点数</span><b id="p-wp">--</b></div>
+        <div class="alarm" id="alarm" hidden></div>
+        <div class="event" id="event" hidden></div>
+      </div>
+
+      <div class="card span2">
+        <div class="card-title">校验结果</div>
+        <div id="checks"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">运行控制</div>
+        <button id="btn-crane" class="btn">激活动态塔吊</button>
+        <div class="btn-row">
+          <button id="btn-replan-arr" class="btn">手动重规划(进近)</button>
+          <button id="btn-replan-dep" class="btn">手动重规划(离场)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">气象设置</div>
+        <label>风速 <span id="v-wind">5</span> m/s
+          <input type="range" id="in-wind" min="0" max="25" step="0.5" value="5"></label>
+        <label>能见度 <span id="v-vis">8000</span> m
+          <input type="range" id="in-vis" min="100" max="8000" step="100" value="8000"></label>
+        <label>湍流等级
+          <select id="in-turb"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label>风切变等级
+          <select id="in-shear"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <div class="btn-row">
+          <button id="btn-meteo" class="btn">应用气象</button>
+          <button id="btn-meteo-bad" class="btn warn">恶劣气象</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

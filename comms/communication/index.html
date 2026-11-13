@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>低空起降点—飞行器实时通讯与态势系统（演示）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- ===================== 顶栏 ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">🛫</div>
+      <div>
+        <div class="brand-title">低空起降点—飞行器实时通讯与态势系统</div>
+        <div class="brand-sub">CAAC UAS Vertiport C2 / RID / MET Demo · 依据《无人驾驶航空器飞行管理暂行条例》及 CCAR-92 部演示</div>
+      </div>
+    </div>
+    <div class="topbar-status">
+      <div class="status-item" id="st-sync">本地演示</div>
+      <div class="status-item" id="st-clock">--:--:--</div>
+      <div class="status-item ok" id="st-link">C2链路 正常</div>
+      <div class="status-item ok" id="st-rid">RID 正常</div>
+      <div class="status-item ok" id="st-met">气象 正常</div>
+      <div class="status-item warn" id="st-alert">告警 0</div>
+    </div>
+  </header>
+
+  <!-- ===================== 主体 ===================== -->
+  <main class="layout">
+    <!-- 左：飞行器列表 -->
+    <aside class="panel left">
+      <div class="panel-title">飞行器 / RID 情报 <span class="hint" id="uas-count">0 架在线</span></div>
+      <div class="uas-list" id="uas-list"></div>
+      <div class="mini-block">
+        <div class="panel-title sub">通讯链路质量</div>
+        <div class="link-metrics">
+          <div class="lm"><span>平均时延</span><b id="lm-latency">-- ms</b></div>
+          <div class="lm"><span>丢包率</span><b id="lm-loss">-- %</b></div>
+          <div class="lm"><span>RSSI</span><b id="lm-rssi">-- dBm</b></div>
+          <div class="lm"><span>累计消息</span><b id="lm-msg">0 条</b></div>
+        </div>
+        <div class="compliance">
+          <div class="panel-title sub">通讯要求符合性</div>
+          <table class="comp-table">
+            <tr><td>RID 广播间隔 ≤ 1 s</td><td class="ok">✔ 符合</td></tr>
+            <tr><td>C2 链路可用性 ≥ 99%</td><td class="ok">✔ 符合</td></tr>
+            <tr><td>C2 端到端时延 ≤ 500 ms</td><td id="comp-delay" class="ok">✔ 符合</td></tr>
+            <tr><td>气象更新 ≤ 5 min</td><td class="ok">✔ 符合（演示加速）</td></tr>
+            <tr><td>障碍物情报更新 ≤ 24 h</td><td class="ok">✔ 符合</td></tr>
+            <tr><td>双向链路 (C2 + RID)</td><td class="ok">✔ 在线</td></tr>
+              <tr><td>许可指令有效期 (60 s)</td><td class="ok">✔ 超时需重申请</td></tr>
+              <tr><td>断线降级策略</td><td class="ok">✔ 已启用</td></tr>
+          </table>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中：态势图 -->
+    <section class="panel center">
+      <div class="map-toolbar">
+        <div class="panel-title">起降点周边态势 <span class="hint">含障碍物 / 电子围栏 / 实时 RID 航迹</span></div>
+        <div class="map-controls">
+          <label><input type="checkbox" id="chk-obstacle" checked> 障碍物</label>
+          <label><input type="checkbox" id="chk-fence" checked> 电子围栏</label>
+          <label><input type="checkbox" id="chk-range" checked> 通讯范围</label>
+          <label><input type="checkbox" id="chk-trail" checked> 航迹</label>
+          <select id="zoom-level">
+            <option value="1500">1.5 km</option>
+            <option value="3000">3 km</option>
+            <option value="6000" selected>6 km</option>
+            <option value="12000">12 km</option>
+          </select>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="map" width="900" height="560"></canvas>
+        <div class="map-legend">
+          <span><i class="dot vertiport"></i>起降点</span>
+          <span><i class="dot uas"></i>飞行器</span>
+          <span><i class="dot obstacle"></i>障碍物</span>
+          <span><i class="line fence"></i>电子围栏</span>
+          <span><i class="line range"></i>C2覆盖</span>
+        </div>
+        <div class="selected-info" id="selected-info">点击飞行器查看 RID 详情</div>
+      </div>
+    </section>
+
+    <!-- 右：通讯面板 -->
+    <aside class="panel right">
+      <div class="panel-title">起降点 ↔ 飞行器 通讯 <span class="hint">报文按 MH/T 接口风格组织</span></div>
+      <div class="msg-stream" id="msg-stream"></div>
+      <div class="cmd-row">
+        <select id="cmd-target"></select>
+        <select id="cmd-type">
+          <option value="ATC_CLEARANCE_TAKEOFF">允许起飞</option>
+          <option value="ATC_CLEARANCE_LAND">允许降落</option>
+          <option value="HOLD_INSTRUCTION">原地等待</option>
+          <option value="GO_AROUND">复飞指令</option>
+          <option value="WEATHER_BROADCAST">广播气象</option>
+          <option value="OBSTACLE_ALERT">障碍物告警</option>
+          <option value="LINK_CHECK">链路检查</option>
+        </select>
+        <button id="btn-send">发送指令</button>
+      </div>
+      <div class="cmd-row">
+        <input id="msg-free" type="text" placeholder="输入自定义 C2 报文…" />
+        <button id="btn-free">发送</button>
+      </div>
+      <div class="panel-title sub" style="margin-top:8px">当前选中飞行器</div>
+      <div class="uas-detail" id="uas-detail">尚未选中</div>
+    </aside>
+  </main>
+
+  <!-- ===================== 底栏 ===================== -->
+  <footer class="bottombar">
+    <div class="panel met">
+      <div class="panel-title">🛰 起降点实时气象（MET） <span class="hint" id="met-time">--</span></div>
+      <div class="met-grid">
+        <div class="met-cell"><span>风向</span><b id="met-wind">--</b></div>
+        <div class="met-cell"><span>风速</span><b id="met-speed">--</b></div>
+        <div class="met-cell"><span>阵风</span><b id="met-gust">--</b></div>
+        <div class="met-cell"><span>能见度</span><b id="met-vis">--</b></div>
+        <div class="met-cell"><span>云底高</span><b id="met-ceil">--</b></div>
+        <div class="met-cell"><span>温度/露点</span><b id="met-temp">--</b></div>
+        <div class="met-cell"><span>气压</span><b id="met-press">--</b></div>
+        <div class="met-cell"><span>起降标准</span><b id="met-std">--</b></div>
+      </div>
+    </div>
+    <div class="panel obs">
+      <div class="panel-title">🏗 周边障碍物情报 <span class="hint">相对起降点</span></div>
+      <div class="obs-list" id="obs-list"></div>
+    </div>
+    <div class="panel log">
+      <div class="panel-title">📋 系统事件 <span class="hint">告警 / 记录</span></div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+  </footer>
+</div>
+
+<script src="../../shared/interface.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

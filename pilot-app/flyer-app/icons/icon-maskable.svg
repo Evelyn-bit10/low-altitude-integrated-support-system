@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1930"/>
+      <stop offset="1" stop-color="#050910"/>
+    </linearGradient>
+    <linearGradient id="neon2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2f9bff"/>
+      <stop offset="1" stop-color="#27e0d8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- maskable：内容限制在中间 80% 安全区 -->
+  <rect width="512" height="512" fill="url(#bg2)"/>
+  <circle cx="256" cy="256" r="44" fill="#27e0d8" opacity="0.16"/>
+  <circle cx="256" cy="256" r="86" fill="none" stroke="url(#neon2)" stroke-width="3" stroke-opacity="0.6"/>
+  <circle cx="256" cy="256" r="126" fill="none" stroke="url(#neon2)" stroke-width="2" stroke-dasharray="12 10" stroke-opacity="0.4"/>
+  <g transform="translate(256 252) rotate(38)">
+    <path d="M0 -52 L18 30 L0 18 L-18 30 Z" fill="url(#neon2)"/>
+  </g>
+</svg>

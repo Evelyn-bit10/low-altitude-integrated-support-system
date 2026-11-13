@@ -1,0 +1,6 @@
+# 纯 Python 本地演示(无 Docker)仅需前 4 项; psycopg 用于 PostgreSQL/PostGIS 部署
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlalchemy>=2.0
+pydantic>=2.6
+psycopg[binary]>=3.1

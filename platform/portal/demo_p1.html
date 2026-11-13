@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>航道模板总览 · 进出场程序</title>
+<style>
+  :root{--bg:#070c18;--panel:#0e1526;--line:#1e2b45;--txt:#e6edf7;--dim:#8ea0bd;
+        --dim2:#5f728f;--cyan:#22d3ee;--green:#49e3ae;--amber:#fbbf24;--red:#ff8f9a;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.6 "Microsoft YaHei",system-ui,sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);background:#0b1322}
+  h1{font-size:16px;margin:0}
+  h1 small{font-weight:400;color:var(--dim2);font-size:12px;margin-left:8px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+        border:1px solid var(--line);color:var(--dim);font-size:12px;background:#0b1424}
+  .pill i{width:7px;height:7px;border-radius:50%;background:var(--dim2)}
+  .pill.ok{border-color:#14523f;color:#7ee2b8}.pill.ok i{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .pill.bad{border-color:#5b2330;color:#f3a3ac}.pill.bad i{background:var(--red)}
+  main{display:grid;grid-template-columns:330px 1fr;gap:14px;padding:14px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  section h2{margin:0;padding:10px 14px;font-size:13px;color:#b9c8de;background:#121b30;
+             border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+  section h2 em{font-style:normal;margin-left:auto;font-size:11px;color:var(--dim2)}
+  .body{padding:10px 14px}
+  #map{display:block;width:100%;height:calc(100vh - 150px);background:#06101c}
+  .tpl{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px solid #16233a;font-size:12px}
+  .tpl:last-child{border-bottom:none}
+  .tpl input{accent-color:#22d3ee;cursor:pointer}
+  .sw{width:14px;height:14px;border-radius:3px;flex:0 0 auto}
+  .dir{width:30px;font-weight:600}
+  .meta{color:var(--dim2);font-size:11px;margin-left:auto;text-align:right;line-height:1.35}
+  .tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;margin-left:4px}
+  .tag.dyn{background:#3b2f14;color:#e8c874}
+  .tag.tpl{background:#0f2a3d;color:#7cc7ff}
+  .tag.bad{background:#3a1520;color:#f3a3ac}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:6px 10px;font-size:12px;margin:2px 0}
+.kv span:nth-child(odd){color:var(--dim2)}
+.kv span:nth-child(even){font-family:Consolas,monospace;color:var(--txt);text-align:right}
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;margin-bottom:8px}
+.badge.tpl{background:#0f2a3d;color:#7cc7ff}
+.badge.dyn{background:#3b2f14;color:#e8c874}
+.badge.bad{background:#3a1520;color:#f3a3ac}
+.wp{max-height:190px;overflow:auto;margin-top:8px;font:11px/1.7 Consolas,monospace;color:#86a0bb}
+.wp div{border-bottom:1px solid #16233a;padding:2px 0}
+.legend{display:flex;gap:14px;padding:0 14px 10px;font-size:11px;color:var(--dim2);flex-wrap:wrap}
+  .hint{font-size:11px;color:var(--dim2);line-height:1.7}
+</style>
+</head>
+<body>
+<header>
+  <h1>航道模板总览<small>8 个方向 · 同时显示在俯视图上</small></h1>
+  <span style="flex:1"></span>
+  <span class="pill" id="pill-api"><i></i>连接中…</span>
+  <span class="pill" id="pill-sum">—</span>
+</header>
+
+<main>
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <section>
+      <h2>方向列表<em>勾选显示</em></h2>
+      <div class="body" id="list" style="padding:4px 10px">
+        <div class="hint">正在加载模板…</div>
+      </div>
+    </section>
+    <section>
+      <h2>说明</h2>
+      <div class="body">
+        <div class="hint">
+          <b>蓝色标签 = 模板直出</b>：方案库里预置的 4 点直线进近，2500 m。<br><br>
+          <b>黄色标签 = 动态重规划</b>：模板航迹穿过障碍物或限制空域，
+          系统用 A\* + Dubins 重新规划出可飞航迹（80~90 个航路点）。<br><br>
+          <b>红色标签 = 不可用</b>：重规划后仍不满足合规或仿真要求。
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start">
+  <section>
+    <h2>俯视图<em id="mapinfo">—</em></h2>
+    <canvas id="map" width="1000" height="760"></canvas>
+    <div class="legend">
+      <span>◇ 起降点</span><span>● 障碍物（橙）</span><span>▭ 限制空域（紫）</span>
+      <span>── 航道（箭头指向飞行方向）</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>航道详情<em id="detail-dir">未选择</em></h2>
+    <div class="body" id="detail">
+      <div class="hint">把鼠标移到雷达图的某条航道上，或点击左侧列表中的方向</div>
+    </div>
+  </section>
+  </div>
+</main>
+
+<script>
+const API = (location.protocol === 'file:' ? 'http://127.0.0.1:8080' : location.origin);
+const $ = s => document.querySelector(s);
+
+const COLORS = {
+  N:'#ffd666', NE:'#49e3ae', E:'#7cc7ff', SE:'#c084fc',
+  S:'#ff9f6e', SW:'#f472b6', W:'#22d3ee', NW:'#a3e635'
+};
+
+let snap = null;
+let templates = [];
+let visible = {};
+let hoverDir = null;     // 鼠标悬停的方向
+let pickedDir = null;    // 点击选中的方向
+
+async function api(path) {
+  const r = await fetch(API + path, {cache:'no-store'});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+function enu(lat, lon) {
+  const a = snap.airport, k = 111320 * Math.cos(a.lat * Math.PI / 180);
+  return [(lon - a.lon) * k, (lat - a.lat) * 111320];
+}
+
+/* ---------------- 左侧列表 ---------------- */
+function renderList() {
+  const box = $('#list');
+  box.innerHTML = '';
+  templates.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'tpl';
+    const tag = !t.available ? '<span class="tag bad">不可用</span>'
+      : (t.mode === 'dynamic' ? '<span class="tag dyn">动态重规划</span>'
+                              : '<span class="tag tpl">模板直出</span>');
+    row.innerHTML =
+      '<input type="checkbox" ' + (visible[t.direction] ? 'checked' : '') + '>' +
+      '<span class="sw" style="background:' + COLORS[t.direction] + '"></span>' +
+      '<span class="dir">' + t.direction + '</span>' +
+      '<span class="meta">' + t.points + ' 点 · ' + (t.length_m / 1000).toFixed(2) + ' km' +
+      tag + '</span>';
+    const cb = row.querySelector('input');
+    cb.onchange = () => { visible[t.direction] = cb.checked; draw(); };
+    row.onmouseenter = () => { hoverDir = t.direction; row.style.background = '#131f36'; draw(); };
+    row.onmouseleave = () => { hoverDir = null; row.style.background = 'transparent'; draw(); };
+    row.onclick = (e) => {
+      if (e.target === cb) return;
+      pickedDir = (pickedDir === t.direction) ? null : t.direction;
+      renderDetail(); renderList(); draw();
+      if (pickedDir) fitTo(pickedDir);
+    };
+    box.appendChild(row);
+  });
+}
+
+/* ---------------- 详情面板 ---------------- */
+function renderDetail() {
+  const dir = pickedDir || hoverDir;
+  const box = $('#detail'), tag = $('#detail-dir');
+  if (!dir) {
+    tag.textContent = '未选择';
+    box.innerHTML = '<div class="hint">把鼠标移到雷达图的某条航道上，或点击左侧列表中的方向</div>';
+    return;
+  }
+  const t = templates.find(x => x.direction === dir);
+  if (!t) return;
+  tag.textContent = dir;
+  const cls = !t.available ? 'bad' : (t.mode === 'dynamic' ? 'dyn' : 'tpl');
+  const label = !t.available ? '不可用' : (t.mode === 'dynamic' ? '动态重规划' : '模板直出');
+  const wps = t.waypoints || [];
+  const climb = wps.length > 1 ? (wps[0].z - wps[wps.length - 1].z) : 0;
+  const maxGrad = (function () {
+    let m = 0;
+    for (let i = 1; i < wps.length; i++) {
+      const dh = Math.hypot(wps[i].x - wps[i-1].x, wps[i].y - wps[i-1].y);
+      if (dh > 1) m = Math.max(m, Math.abs(wps[i].z - wps[i-1].z) / dh);
+    }
+    return m;
+  })();
+
+  let html = '<div class="badge ' + cls + '">' + label + '</div>';
+  html += '<div class="kv">';
+  html += '<span>标准程序</span><span>' + (t.std_name || '—') + '</span>';
+  html += '<span>航路点数</span><span>' + t.points + '</span>';
+  html += '<span>航程</span><span>' + (t.length_m / 1000).toFixed(2) + ' km</span>';
+  html += '<span>入口高度</span><span>' + (wps.length ? Math.round(wps[0].z) + ' m' : '—') + '</span>';
+  html += '<span>高差</span><span>' + Math.round(climb) + ' m</span>';
+  html += '<span>最大梯度</span><span>' + (maxGrad * 100).toFixed(1) + '%</span>';
+  html += '</div>';
+
+  if (wps.length) {
+    html += '<div style="margin-top:10px;font-size:11px;color:#5f728f">航路点（前 12 个）</div><div class="wp">';
+    wps.slice(0, 12).forEach((w, i) => {
+      html += '<div>#' + String(i + 1).padStart(2, '0') + '  x=' + Math.round(w.x)
+        + '  y=' + Math.round(w.y) + '  z=' + Math.round(w.z) + ' m</div>';
+    });
+    if (wps.length > 12) html += '<div style="color:#5f728f">… 共 ' + wps.length + ' 个</div>';
+    html += '</div>';
+  }
+  box.innerHTML = html;
+}
+
+/* 把视野缩放到某条航道（可选） */
+function fitTo(dir) { /* 保持全局视野，避免视觉跳动 */ }
+
+/* ---------------- 绘制 ---------------- */
+const cv = $('#map'), ctx = cv.getContext('2d');
+let view = { S: 1, cx: 0, cy: 0 };
+
+function draw() {
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const S = Math.min(W, H) / 4800;
+  const cx = W / 2, cy = H / 2;
+  view = { S, cx, cy };
+  const px = x => cx + x * S, py = y => cy - y * S;
+
+  // 距离环 + 十字
+  ctx.strokeStyle = 'rgba(117,163,215,.10)'; ctx.lineWidth = 1;
+  for (let r = 500; r <= 2000; r += 500) {
+    ctx.beginPath(); ctx.arc(cx, cy, r * S, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(95,114,143,.6)'; ctx.font = '10px Consolas';
+    ctx.fillText((r / 1000) + ' km', cx + 4, cy - r * S - 3);
+  }
+  ctx.beginPath(); ctx.moveTo(px(-2300), cy); ctx.lineTo(px(2300), cy);
+  ctx.moveTo(cx, py(-2300)); ctx.lineTo(cx, py(2300)); ctx.stroke();
+
+  // 方位标注
+  ctx.fillStyle = 'rgba(140,170,200,.5)'; ctx.font = '11px Consolas'; ctx.textAlign = 'center';
+  [['N',0,-1],['E',1,0],['S',0,1],['W',-1,0]].forEach(([n,dx,dy]) => {
+    ctx.fillText(n, cx + dx * (Math.min(W, H) / 2 - 18), cy + dy * (Math.min(W, H) / 2 - 18) + 4);
+  });
+  ctx.textAlign = 'left';
+
+  // 障碍 / 空域
+  if (snap) {
+    (snap.obstacles || []).forEach(o => {
+      const [x, y] = enu(o.lat, o.lon);
+      ctx.beginPath(); ctx.arc(px(x), py(y), Math.max(4, (o.radius || 20) * S), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,138,92,.16)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,138,92,.5)'; ctx.stroke();
+    });
+    (snap.airspaces || []).forEach(a => {
+      ctx.beginPath();
+      a.polygon.forEach(([lat, lon], i) => {
+        const [x, y] = enu(lat, lon);
+        i ? ctx.lineTo(px(x), py(y)) : ctx.moveTo(px(x), py(y));
+      });
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(124,92,255,.10)'; ctx.fill();
+      ctx.setLineDash([5,4]); ctx.strokeStyle = 'rgba(124,92,255,.55)'; ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  // 8 条航道
+  const focus = pickedDir || hoverDir;
+  templates.forEach(t => {
+    if (!visible[t.direction]) return;
+    const dim = focus && focus !== t.direction;
+    const wps = t.waypoints || [];
+    if (wps.length < 2) return;
+    const col = COLORS[t.direction] || '#cfe3f5';
+    ctx.beginPath();
+    wps.forEach((w, i) => i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)));
+    ctx.strokeStyle = t.available ? col : 'rgba(255,143,154,.6)';
+    ctx.globalAlpha = dim ? 0.15 : (focus === t.direction ? 1 : 0.85);
+    ctx.lineWidth = focus === t.direction ? 3.4 : 2.4;
+    ctx.setLineDash([]); ctx.stroke(); ctx.globalAlpha = 1;
+
+    // 方向箭头
+    const stepN = Math.max(3, Math.floor(wps.length / 4));
+    for (let i = stepN; i < wps.length; i += stepN) {
+      const a = wps[i - 1], b = wps[i];
+      const AX = px(a.x), AY = py(a.y), BX = px(b.x), BY = py(b.y);
+      const ang = Math.atan2(BY - AY, BX - AX);
+      ctx.beginPath();
+      ctx.moveTo(BX, BY);
+      ctx.lineTo(BX - 10 * Math.cos(ang) + 5.5 * Math.sin(ang), BY - 10 * Math.sin(ang) - 5.5 * Math.cos(ang));
+      ctx.lineTo(BX - 10 * Math.cos(ang) - 5.5 * Math.sin(ang), BY - 10 * Math.sin(ang) + 5.5 * Math.cos(ang));
+      ctx.closePath(); ctx.fillStyle = col;
+      ctx.globalAlpha = dim ? 0.15 : 1; ctx.fill(); ctx.globalAlpha = 1;
+    }
+
+    // 方位标签（放在入口端）
+    const head = wps[0];
+    ctx.globalAlpha = dim ? 0.2 : 1;
+    ctx.fillStyle = col;
+    ctx.font = (focus === t.direction ? 'bold 15px' : 'bold 12px') + ' Consolas';
+    ctx.textAlign = 'center';
+    ctx.fillText(t.direction, px(head.x), py(head.y) - 10);
+    ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  });
+
+  // 起降点
+  ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx - 6, cy + 6); ctx.lineTo(cx + 6, cy + 6);
+  ctx.closePath(); ctx.fillStyle = '#eaf4ff'; ctx.fill();
+  ctx.fillStyle = '#8fa5c0'; ctx.font = '11px Microsoft YaHei';
+  ctx.fillText('起降点', cx + 10, cy + 4);
+}
+
+/* ---------------- 初始化 ---------------- */
+(async () => {
+  try {
+    snap = await api('/api/sync/snapshot');
+    $('#pill-api').className = 'pill ok';
+    $('#pill-api').lastElementChild.textContent = '已连接 8080';
+  } catch (e) {
+    $('#pill-api').className = 'pill bad';
+    $('#pill-api').lastElementChild.textContent = '未连接';
+    $('#list').innerHTML = '<div class="hint">无法连接后端：' + e.message + '</div>';
+    return;
+  }
+  try {
+    const d = await api('/api/program/templates?program_type=arrival');
+    templates = d.templates || [];
+    templates.forEach(t => { visible[t.direction] = true; });
+    const dyn = templates.filter(t => t.mode === 'dynamic').length;
+    const bad = templates.filter(t => !t.available).length;
+    $('#pill-sum').textContent = templates.length + ' 个方向 · 直出 '
+      + (templates.length - dyn - bad) + ' · 动态 ' + dyn + ' · 不可用 ' + bad;
+    $('#mapinfo').textContent = '视野 ±2.4 km';
+    renderList();
+    draw();
+  } catch (e) {
+    $('#list').innerHTML = '<div class="hint">加载模板失败：' + e.message + '</div>';
+  }
+})();
+
+window.addEventListener('resize', draw);
+
+/* 点击雷达图：选中距离最近的那条航道 */
+cv.addEventListener('click', ev => {
+  const rect = cv.getBoundingClientRect();
+  // 画布 CSS 尺寸和内部像素尺寸**长宽比不同**（width:100% 但 height:calc(...)），
+  // 所以 x/y 必须各自换算，否则点哪儿都会偏
+  const kx = cv.width / rect.width, ky = cv.height / rect.height;
+  const mx = (ev.clientX - rect.left) * kx, my = (ev.clientY - rect.top) * ky;
+  const { S, cx, cy } = view;
+  const ex = (mx - cx) / S, ey = (cy - my) / S;
+  let best = null, bestD = 1e18;
+  templates.forEach(t => {
+    (t.waypoints || []).forEach(w => {
+      const d = Math.hypot(w.x - ex, w.y - ey);
+      if (d < bestD) { bestD = d; best = t.direction; }
+    });
+  });
+  if (best && bestD < 300) {          // 300 m 内算命中
+    pickedDir = (pickedDir === best) ? null : best;
+    renderDetail(); renderList(); draw();
+  } else {
+    pickedDir = null; renderDetail(); renderList(); draw();
+  }
+});
+</script>
+
+<div id="boot-bar" style="position:fixed;left:0;right:0;top:0;z-index:9999;
+  background:#1e293b;border-bottom:1px solid #334155;color:#93b4d8;
+  font:13px/1.6 'Microsoft YaHei',sans-serif;padding:6px 14px;text-align:center">
+  正在连接后端服务… <span id="boot-t">0</span>s（首次启动需预热约 40 秒）
+</div>
+<script>
+(function () {
+  var bar = document.getElementById('boot-bar'), t = 0, timer = null;
+  function tick() { t++; var e = document.getElementById('boot-t'); if (e) e.textContent = t; }
+  timer = setInterval(tick, 1000);
+  function done() { clearInterval(timer); if (bar) { bar.style.background = '#14532d';
+      bar.style.color = '#86efac'; bar.innerHTML = '后端已就绪 · http://127.0.0.1:8080';
+      setTimeout(function () { bar.style.display = 'none'; }, 2500); } }
+  function check() {
+    fetch('http://127.0.0.1:8080/api/health', { cache: 'no-store' })
+      .then(function (r) { if (r.ok) done(); else setTimeout(check, 1500); })
+      .catch(function () { setTimeout(check, 1500); });
+  }
+  check();
+})();
+</script>
+
+
+<div id="nav-bar" style="position:fixed;right:14px;bottom:14px;z-index:9998;display:flex;gap:6px;font:12px/1 'Microsoft YaHei',sans-serif">
+  <a href="demo.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">① 主演示台</a>
+  <a href="demo_p1.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#2563eb;color:#fff;border:1px solid #3b82f6">② 航道总览</a>
+  <a href="demo_p1_place.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">③ 航道匹配</a>
+  <a href="rl_lab.html" style="padding:7px 11px;border-radius:7px;text-decoration:none;background:#1a2436;color:#9fb6d4;border:1px solid #2b3a52">④ RL 实验室</a>
+</div>
+</body>
+</html>
