@@ -3,7 +3,7 @@
 一条命令生成全部参数：
 
 ```powershell
-C:\Users\Lenovo\rl-venv\Scripts\python.exe experiments\rl_dedup\run_all.py
+python experiments\rl_dedup\run_all.py
 # 只重做导出+标定（训练已完成）：
 ... run_all.py --skip-train
 ```

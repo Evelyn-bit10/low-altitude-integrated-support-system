@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
+import os
+from pathlib import Path
+
 from docx import Document
 from docx.shared import Pt, RGBColor, Cm
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 
-OUT = r"C:/Users/Lenovo/Desktop/低空综合保障系统-优化说明.docx"
+# 输出位置可用环境变量覆盖；默认写到「桌面」，找不到桌面就写到脚本旁边
+_DESKTOP = Path(os.environ.get("USERPROFILE", Path.home())) / "Desktop"
+OUT = Path(os.environ.get("OPT_DOC_OUT", str(_DESKTOP / "低空综合保障系统-优化说明.docx")))
+if not OUT.parent.exists():
+    OUT = Path(__file__).resolve().parent / OUT.name
 doc = Document()
 st = doc.styles["Normal"]; st.font.name = "微软雅黑"; st.font.size = Pt(10.5)
 st.element.rPr.rFonts.set(qn("w:eastAsia"), "微软雅黑")

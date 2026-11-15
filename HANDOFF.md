@@ -1,14 +1,17 @@
 # HANDOFF · 会话接手说明
 
 > 用途：上下文压缩或新开会话时，读这一页即可恢复状态。
-> 更新时间：2026-10-29
+> 更新时间：2026-11-15
 
 ---
 
 ## 1. 项目
 
-`G:\yth` —— 挺中航空 · 低空综合保障系统（三大系统 + 两个独立子系统）。
+`D:\低空综合保障系统\低空综合保障系统-全量工程` —— 挺中航空 · 低空综合保障系统（三大系统 + 两个独立子系统）。
 详细说明见仓库根目录 `README.md`、`ONBOARDING.md`。
+
+> 整个工程目录可以整体搬走或改名：启动器内部全用相对路径。下面示例里的绝对路径
+> 按你本地实际位置替换即可。
 
 ## 2. 已完成的工作
 
@@ -39,7 +42,7 @@
 
 ### 强化学习（飞桨）
 - `backend/experiments/rl_dedup/`：`env.py`（MDP）、`train_ppo.py`（PPO + 规则热启动）
-- 一条命令：`C:\Users\Lenovo\rl-venv\Scripts\python.exe experiments\rl_dedup\run_all.py`
+- 一条命令（用任意装了 PaddlePaddle 的 Python 环境）：`python experiments\rl_dedup\run_all.py`
 - 参数：`policy_weights.json`（115 KB）+ `rl_params.json`（阈值 0.80）
 - 结果（验证集）：规则 −1247/错配 909/碎片 2.60 → PPO −959/错配 753/碎片 2.10
 - 文档：`backend/docs/RL_DEDUP.md`
@@ -98,27 +101,31 @@
 - 开关 `AUTO_RECOMMEND=1`；决策见 `/api/metrics` 的 `recommend` 字段
 - 实测：风 5m/s@0° 时程序 S；改成 9m/s@180° 后自动切到 N（1.000 vs 0.645）
 
-### 环境修复
-- 仓库 `backend/.venv` 已用 Python 3.12 重建（原指向不存在的 `C:\Python314`）
-- `pytest tests` → 55 passed
-- RL 专用环境：`C:\Users\Lenovo\rl-venv`（PaddlePaddle 3.3.1 CPU）
+### 环境现状（2026-11-15 核对）
+- `.venv` / `venv` **不入库**（`.gitignore` 已忽略），克隆后按需重建：
+  `cd flight\flycontrol\low-altitude-demo\backend` → `python -m venv .venv` →
+  `.venv\Scripts\pip install -r requirements.txt -r requirements-dev.txt`
+- 启动器已支持回退：有 `.venv` 就用它，没有就用系统 Python
+  （后端只依赖 fastapi / uvicorn / pydantic / sqlalchemy）
+- `python -m pytest tests -q` → **87 passed**（约 2 分钟，系统 Python 3.13 实测）
+- RL 训练另需 PaddlePaddle（CPU 版即可），装在哪个环境都行，不要求固定路径
 
 ## 3. 常用命令
 
 ```powershell
-# 跑测试
-cd G:\yth\flight\flycontrol\low-altitude-demo\backend
-.\.venv\Scripts\python.exe -m pytest tests -q
+# 跑测试（在工程根目录下执行；有 .venv 自动用 .venv，没有就用系统 Python）
+cd flight\flycontrol\low-altitude-demo\backend
+python -m pytest tests -q
 
 # 启动全系统
-双击 G:\yth\启动一体化门户.bat
+双击工程根目录的 启动一体化门户.bat
 
 # 演示台
-双击 G:\yth\启动演示.bat
+双击工程根目录的 启动演示.bat
 
 # 去重基准 / 前后对比
-.\.venv\Scripts\python.exe experiments\dedup_ml\bench_engine.py
-.\.venv\Scripts\python.exe experiments\dedup_ml\bench_compare.py
+python experiments\dedup_ml\bench_engine.py
+python experiments\dedup_ml\bench_compare.py
 ```
 
 ## 4. 未完成 / 待定

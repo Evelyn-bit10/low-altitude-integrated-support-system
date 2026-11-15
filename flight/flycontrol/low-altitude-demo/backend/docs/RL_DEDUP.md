@@ -3,11 +3,11 @@
 > 目标：用 RL 学一个"同一架判定"策略，看能否超过手工规则。
 > 结论：**在密集场景明显更好（奖励 −232 → +764），稀疏场景略降（809 → 746），总体更优。**
 
-运行环境：`C:\Users\Lenovo\rl-venv`（PaddlePaddle 3.3.1 CPU + numpy）
+运行环境：任意装了 PaddlePaddle（CPU 版即可）+ numpy 的 Python 环境
 
 ```powershell
 # 一条命令生成全部参数（训练 + 导出 + 标定）
-C:\Users\Lenovo\rl-venv\Scripts\python.exe experiments\rl_dedup\run_all.py
+python experiments\rl_dedup\run_all.py
 
 # 只重做导出与阈值标定
 ... run_all.py --skip-train

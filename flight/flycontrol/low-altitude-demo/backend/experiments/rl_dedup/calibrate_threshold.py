@@ -7,7 +7,7 @@
     这里按"误配数不超过规则基线"的安全约束反解阈值，再在该约束下最大化奖励。
 
 运行：
-    C:/Users/Lenovo/rl-venv/Scripts/python.exe experiments/rl_dedup/calibrate_threshold.py
+    python experiments/rl_dedup/calibrate_threshold.py
 """
 from __future__ import annotations
 

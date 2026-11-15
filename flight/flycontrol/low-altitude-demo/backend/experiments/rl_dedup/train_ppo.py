@@ -6,7 +6,7 @@
 奖励（逐边，便于信用分配）：正确 +1 ｜ 错配 −6 ｜ 漏配 −2
 
 运行（用装好 paddle 的环境）：
-    C:\\Users\\Lenovo\\rl-venv\\Scripts\\python.exe experiments\\rl_dedup\\train_ppo.py
+    python experiments\\rl_dedup\\train_ppo.py
 """
 
 from __future__ import annotations

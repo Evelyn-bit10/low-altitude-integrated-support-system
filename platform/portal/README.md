@@ -11,7 +11,7 @@
 
 ## 一键运行
 
-双击 `index.bat` 或 `启动一体化门户.bat`。
+双击**工程根目录**的 `启动一体化门户.bat`（它调用根目录的 `start-system.ps1`）。
 
 启动器会：
 
@@ -35,11 +35,20 @@ mock-data.js           canonical、groundstation、业务与图表演示数据
 api.js                 flycontrol REST 统一出口；唯一 baseUrl 配置点
 visuals.js             Canvas 态势图、程序图、剖面与 ECharts 降级
 app.js                 路由、状态、六个页面、详情抽屉和交互
-portal-launcher.ps1    Windows 一键启动核心（拉起三个子系统 + 数据桥 + 门户）
 ground-bridge.py       地面站数据桥（REST: /api/ground，端口 8090，仅标准库）
-start-all.bat          启动器兼容入口
-index.bat              双击入口
-启动一体化门户.bat     中文双击入口
+demo.html              功能演示台（三项能力 + RL 影子模式，启动演示.bat 打开）
+demo_p1.html           演示台第一幕的独立版（进出场程序）
+demo_p1_place.html     演示台第一幕点位投放版
+rl_lab.html            RL 关联实验室（19 维特征 → 策略网络可视化）
+```
+
+本目录**不含**启动脚本：入口在工程根目录——
+
+```text
+..\..\启动一体化门户.bat   双击入口（全系统）
+..\..\start-system.ps1     启动逻辑（拉起后端 / 数据桥 / 门户 / 飞手端）
+..\..\启动演示.bat + start-demo.ps1   功能演示台入口（额外拉起模拟 UOM 8099）
+..\..\启动RL实验室.bat     RL 实验室入口（自动检查后端）
 ```
 
 ## 页面路由
@@ -90,6 +99,8 @@ var defaults = {
 强化学习航迹去重的可视化页面：拖动 19 维特征，实时看策略网络输出概率、
 与规则基线对比、查看训练曲线与特征重要性。
 
-- 打开：双击 `G:\yth\启动RL实验室.bat`，或直接打开 `rl_lab.html`
+- 打开：双击工程根目录的 `启动RL实验室.bat`，或直接打开 `rl_lab.html`
+  （页面自带地址自适应：`file://` 直接开、或经 5500 静态服务打开，都会指向 `http://<当前主机>:8080`；
+   换端口/跨机演示时加 `?api=http://x.x.x.x:端口`）
 - 依赖后端 `GET /api/rl/model`（8080）
 - 文档：`flight/flycontrol/low-altitude-demo/backend/docs/RL_LAB.md`

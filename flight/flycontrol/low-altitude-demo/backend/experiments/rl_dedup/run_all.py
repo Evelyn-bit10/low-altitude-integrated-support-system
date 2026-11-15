@@ -2,7 +2,7 @@
 """一条命令跑完 RL 参数生成流水线：训练 → 导出 → 标定 → 打印参数。
 
 用法：
-    C:/Users/Lenovo/rl-venv/Scripts/python.exe experiments/rl_dedup/run_all.py
+    python experiments/rl_dedup/run_all.py
     ... --skip-train      # 跳过训练，只重做导出 + 标定（调阈值时用）
 """
 from __future__ import annotations

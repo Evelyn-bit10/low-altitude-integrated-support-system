@@ -1,9 +1,11 @@
 (function () {
   'use strict';
 
+  // 主机名自适应：本机 / 手机 / 局域网演示都指向同一后端（换端口时用 window.LAV_CONFIG 覆盖）
+  var HOST = (typeof location !== 'undefined' && location.hostname) || '127.0.0.1';
   var defaults = {
-    baseUrl: 'http://127.0.0.1:8080',    // flycontrol API
-    groundUrl: 'http://127.0.0.1:8090',  // groundstation 数据桥
+    baseUrl: 'http://' + HOST + ':8080',    // flycontrol API
+    groundUrl: 'http://' + HOST + ':8090',  // groundstation 数据桥
     timeoutMs: 2200
   };
   var config = Object.assign({}, defaults, window.LAV_CONFIG || {});

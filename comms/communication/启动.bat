@@ -1,20 +1,21 @@
 @echo off
 setlocal
-title 低空起降点—飞行器实时通讯与态势系统 · 启动器
+title Communication / Situation System - Launcher
 cd /d "%~dp0"
 
 :menu
 cls
 echo ============================================================
-echo    低空起降点—飞行器实时通讯与态势系统  Demo 启动器
+echo    Low-altitude landing point - live communication ^& situation
+echo    Demo launcher
 echo ============================================================
 echo.
-echo    [1] 打开网页演示（推荐，浏览器直接运行）
-echo    [2] 运行 Python 决策引擎原型
-echo    [3] 打开项目文件夹
-echo    [0] 退出
+echo    [1] Open web demo (recommended, runs in the browser)
+echo    [2] Run the Python decision-engine prototype
+echo    [3] Open project folder
+echo    [0] Exit
 echo.
-set /p choice=请输入选项编号并按回车: 
+set /p choice=Enter an option number and press Enter:
 
 if "%choice%"=="1" goto web
 if "%choice%"=="2" goto python
@@ -25,7 +26,7 @@ goto menu
 :web
 start "" "%~dp0index.html"
 echo.
-echo 已在默认浏览器中打开 index.html（网页演示）。
+echo Opened index.html in the default browser.
 echo.
 pause
 goto menu
@@ -42,7 +43,7 @@ if not errorlevel 1 (
     py "%~dp0decision_engine_demo.py"
     goto afterpy
 )
-echo [错误] 未检测到 Python。请先安装 Python 3 并加入 PATH，再试。
+echo [ERROR] Python not found. Install Python 3 and add it to PATH.
 :afterpy
 echo.
 pause

@@ -467,8 +467,17 @@ td{padding:8px 10px;border-bottom:1px solid rgba(117,163,215,.08);color:#aebfd3}
 
 <div id="subtitle"></div>
 <script>
-const API = 'http://127.0.0.1:8080';
-const UOM = 'http://127.0.0.1:8099';
+/* 主机名自适应：本机 / 手机 / 局域网演示都能连到同一后端；?api= 可覆盖 */
+const API = (function () {
+  var q = new URLSearchParams(location.search).get('api');
+  if (q) return q.replace(/\/+$/, '');
+  return 'http://' + (location.hostname || '127.0.0.1') + ':8080';
+})();
+const UOM = (function () {
+  var q = new URLSearchParams(location.search).get('uom');
+  if (q) return q.replace(/\/+$/, '');
+  return 'http://' + (location.hostname || '127.0.0.1') + ':8099';
+})();
 const $ = s => document.querySelector(s);
 const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
 const fmt = (n, d = 0) => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(d);
@@ -2002,10 +2011,10 @@ window.addEventListener('resize', function () { drawMap(cache[curDir]); drawProf
   function tick() { t++; var e = document.getElementById('boot-t'); if (e) e.textContent = t; }
   timer = setInterval(tick, 1000);
   function done() { clearInterval(timer); if (bar) { bar.style.background = '#14532d';
-      bar.style.color = '#86efac'; bar.innerHTML = '后端已就绪 · http://127.0.0.1:8080';
+      bar.style.color = '#86efac'; bar.innerHTML = '后端已就绪 · ' + API;
       setTimeout(function () { bar.style.display = 'none'; }, 2500); } }
   function check() {
-    fetch('http://127.0.0.1:8080/api/health', { cache: 'no-store' })
+    fetch(API + '/api/health', { cache: 'no-store' })
       .then(function (r) { if (r.ok) done(); else setTimeout(check, 1500); })
       .catch(function () { setTimeout(check, 1500); });
   }

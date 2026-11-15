@@ -41,7 +41,7 @@
 ## 二、目录结构
 
 ```
-yth/
+低空综合保障系统-全量工程/
 ├── 启动一体化门户.bat        ★ 全系统一键启动（双击）
 ├── start-system.ps1          启动逻辑（被上面那个 bat 调用）
 ├── README.md                 本说明
@@ -139,6 +139,8 @@ yth/
 - **`shared/` 不要移动层级**：它被 `flight/flycontrol` 的 Python 后端与 `comms/communication` 前端引用。
   飞控后端已改为**向上逐层查找** `shared/interface.py`，只要它还在工程根下就不会断；
   通讯态势前端用的是相对路径 `../../shared/interface.js`，移动 `comms/` 需同步调整。
-- **启动器里的路径是相对的**（基于 `start-system.ps1` 所在目录），整个 `yth/` 文件夹可以整体搬走或改名，不受影响。
-- **各子项目的虚拟环境**（`.venv` / `venv` / `.conda`）已随目录移动验证可用；
-  它们内部记录的是系统 Python 路径（`C:\Python314`），不依赖工程所在位置。
+- **启动器里的路径是相对的**（基于 `start-system.ps1` 所在目录），整个工程文件夹可以整体搬走或改名，不受影响。
+- **虚拟环境不入库**（`.gitignore` 已忽略 `.venv/` / `venv/` / `.conda/`）。启动器会先用各子项目的
+  `.venv`，找不到就回退到系统 Python（`start-system.ps1` 的 `Find-Python`）。
+  需要重建后端环境时：`cd flight\flycontrol\low-altitude-demo\backend` →
+  `python -m venv .venv` → `.venv\Scripts\pip install -r requirements.txt -r requirements-dev.txt`。

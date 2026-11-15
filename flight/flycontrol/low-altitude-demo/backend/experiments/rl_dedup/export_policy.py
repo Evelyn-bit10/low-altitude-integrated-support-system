@@ -2,7 +2,7 @@
 """把飞桨训练的策略导出成纯 JSON 权重 + 纯 Python 推理（线上不依赖 Paddle）。
 
 运行：
-    C:/Users/Lenovo/rl-venv/Scripts/python.exe experiments/rl_dedup/export_policy.py
+    python experiments/rl_dedup/export_policy.py
 """
 from __future__ import annotations
 import json, os, sys

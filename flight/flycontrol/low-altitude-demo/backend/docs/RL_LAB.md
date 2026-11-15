@@ -1,11 +1,11 @@
 # RL 关联实验室（可视化）
 
-> 把训练好的航迹关联策略做成一个**能玩**的页面：拖动 18 个特征滑杆，
+> 把训练好的航迹关联策略做成一个**能玩**的页面：拖动 19 个特征滑杆，
 > 实时看到 5505 个参数的神经网络怎么思考、输出什么概率、和规则差在哪。
 
 打开方式：
 
-- 双击 `G:\yth\启动RL实验室.bat`（会自动检查后端）
+- 双击工程根目录的 `启动RL实验室.bat`（会自动检查后端）
 - 或直接打开 `platform/portal/rl_lab.html`（需后端在 8080 运行）
 
 ---
@@ -15,7 +15,7 @@
 ```
 ┌──────────────┬──────────────────────────┬──────────────┐
 │ 特征输入      │ 策略网络（Canvas 动画）   │ 判定结果      │
-│ 18 个滑杆     │ 18 → 64 → 64 → 1         │ 概率环 + 阈值 │
+│ 19 个滑杆     │ 19 → 64 → 64 → 1         │ 概率环 + 阈值 │
 │ 6 个预设场景  │ 节点亮度 = 激活值         │ 规则 vs 策略  │
 │              │ 连线亮度 = 权重           │ 决策链文字    │
 ├──────────────┴──────────────┬───────────┴──────────────┤
@@ -51,10 +51,10 @@
 
 ## 4. 交互细节
 
-- **滑杆实时推理**：全部在前端 JS 里跑（18→64→64→1 约 5.4k 参数），零网络延迟；
+- **滑杆实时推理**：全部在前端 JS 里跑（19→64→64→1 共 5505 个参数），零网络延迟；
 - **动画**：节点激活带缓动，前向传播过程可见；
 - **URL 参数**：`rl_lab.html?preset=extra` 直接进某个场景（方便截图/演示）；
-- **阈值线**：圆环上的黄点、进度条上的黄线，都是 0.30 的位置；
+- **阈值线**：圆环上的黄点、进度条上的黄线，都取 `/api/rl/model` 返回的 `threshold`（当前 0.80）；
 - **规则基线**：用同一组特征按 `dedup.py` 的几何门限反算，与策略同屏对比。
 
 ## 4.1 实时影子流（边飞边看）
@@ -103,8 +103,8 @@ GET /api/rl/model
 {
   "features": ["距离/门限", "... 共 19 维"],
   "mean": [...], "std": [...],
-  "weights": {"enc0_w": [18][64], "enc0_b": [64], "enc2_w": [64][64], ...},
-  "threshold": 0.30,
+  "weights": {"enc0_w": [19][64], "enc0_b": [64], "enc2_w": [64][64], ...},
+  "threshold": 0.80,
   "expected":    {"reward": -959, "wrong": 753, "miss": 13, "frags": 2.10},
   "rule_baseline":{"reward": -1247, "wrong": 909, "miss": 38, "frags": 2.60},
   "history": [{"iter": 1, "test": -933.5, "wrong": 188}, ... 30 条],
@@ -136,7 +136,7 @@ GET /api/rl/model
 | `platform/portal/rl_lab.html` | 单文件页面（无外部依赖，纯原生 JS + Canvas） |
 | `backend/app/routers/rl_lab.py` | `/api/rl/model` 接口（带 mtime 缓存） |
 | `backend/tests/test_rl_lab.py` | 3 项测试（权重形状、健康检查、手算复现） |
-| `G:\yth\启动RL实验室.bat` | 一键打开 |
+| `启动RL实验室.bat`（工程根目录） | 一键打开 |
 
 
 ---
@@ -154,7 +154,7 @@ GET /api/rl/model
 
 ```powershell
 # 在 cmd 里手动跑，能看到报错
-cd /d G:\yth
+cd /d <工程根目录>
 启动RL实验室.bat
 ```
 
@@ -163,8 +163,9 @@ cd /d G:\yth
 后端没起来。手动启动：
 
 ```powershell
-cd G:\ythlightlycontrol\low-altitude-demoackend
-.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+cd flight\flycontrol\low-altitude-demo\backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+# 若已建好 .venv：.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 ```
 
 确认：`curl http://127.0.0.1:8080/api/rl/health` 应返回 `{"ok": true}`。

@@ -46,10 +46,19 @@ function Find-Python {
 }
 function Get-LanIp {
     try {
-        $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
-               Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
-               Select-Object -First 1).IPAddress
-        if ($ip) { return $ip }
+        # 排除回环、链路本地与各类虚拟网卡（VPN / 虚拟机 / TUN 等），避免把手机地址给成 VPN 的 IP
+        $cands = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+                 Where-Object {
+                     $_.IPAddress -notlike '127.*' -and
+                     $_.IPAddress -notlike '169.254.*' -and
+                     $_.InterfaceAlias -notmatch 'Loopback|vEthernet|VMware|VirtualBox|Hyper-V|Radmin|Tailscale|ZeroTier|TAP|TUN|Bluetooth|蓝牙'
+                 }
+        if (-not $cands) { return $null }
+        $private = $cands | Where-Object { $_.IPAddress -match '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)' }
+        $pool = if ($private) { $private } else { $cands }
+        $pick = $pool | Where-Object { $_.InterfaceAlias -match 'WLAN|Wi-?Fi|以太网|Ethernet' } | Select-Object -First 1
+        if (-not $pick) { $pick = $pool | Select-Object -First 1 }
+        if ($pick) { return $pick.IPAddress }
     }
     catch { }
     return $null
@@ -77,13 +86,14 @@ Write-Host ""
 # ---------------------------------------------------------------- 1 飞控后端
 Write-Host "[1/6] 飞控后端       端口 8080" -NoNewline
 if (Test-Flycontrol) { Write-Host "   已在运行，复用" -ForegroundColor Green }
-elseif (Test-Path -LiteralPath $apiPy) {
-    Start-Process -FilePath $apiPy `
+else {
+    # 有 .venv 就用 .venv，没有就用系统 Python（$python 由 Find-Python 回退得到）
+    $pyLabel = if ($python -eq $apiPy) { "venv" } else { "系统 Python" }
+    Start-Process -FilePath $python `
         -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080") `
         -WorkingDirectory $apiDir -WindowStyle Hidden
-    Write-Host "   已启动" -ForegroundColor Green
+    Write-Host ("   已启动 · " + $pyLabel) -ForegroundColor Green
 }
-else { Write-Host "   跳过（无虚拟环境，门户将回退演示数据）" -ForegroundColor Yellow }
 
 # ---------------------------------------------------------------- 2 数据桥
 Write-Host "[2/6] 门户数据桥     端口 8090" -NoNewline
@@ -129,13 +139,13 @@ if (Test-Path -LiteralPath $groundPy) {
     Start-Process -FilePath $groundPy -ArgumentList @("main.py") -WorkingDirectory $groundDir
     Write-Host "   已启动（独立窗口）" -ForegroundColor Green
 }
-else { Write-Host "   跳过（未找到地面站虚拟环境）" -ForegroundColor Yellow }
+else { Write-Host "   跳过（需 drone_ground_station\venv，内含 PyQt5/PyQtWebEngine）" -ForegroundColor Yellow }
 
 # ---------------------------------------------------------------- 就绪 & 打开
 Write-Host ""
-Write-Host "等待门户就绪..." -NoNewline
-for ($i = 0; $i -lt 20; $i++) {
-    if (Test-Url $portalUrl) { break }
+Write-Host "等待服务就绪..." -NoNewline
+for ($i = 0; $i -lt 25; $i++) {
+    if ((Test-Url $portalUrl) -and (Test-Flycontrol)) { break }
     Start-Sleep -Milliseconds 400
     Write-Host "." -NoNewline
 }
@@ -147,6 +157,11 @@ Write-Host ""
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host "  系统已就绪" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
+if (Test-Flycontrol) {
+    Write-Host "  飞控后端        已就绪" -ForegroundColor Green
+} else {
+    Write-Host "  飞控后端        未就绪（再等几秒刷新；仍失败请手动执行 backend 下的 uvicorn 看报错）" -ForegroundColor Yellow
+}
 Write-Host ("  管理平台门户    " + $portalUrl)
 Write-Host ("  飞手端 App      " + $pilotUrl)
 Write-Host ("  飞控接口文档    http://127.0.0.1:8080/docs")

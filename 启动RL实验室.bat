@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title RL Association Lab - dedup policy
+title RL Association Lab - dedup policy viewer
 cd /d "%~dp0"
 
 echo.
@@ -11,8 +11,9 @@ echo.
 
 set "API=http://127.0.0.1:8080"
 set "BE=%~dp0flight\flycontrol\low-altitude-demo\backend"
-set "PY=%BE%\.venv\Scripts\python.exe"
 set "PAGE=%~dp0platform\portal\rl_lab.html"
+set "PY=%BE%\.venv\Scripts\python.exe"
+if not exist "%PY%" ( where python >nul 2>nul && set "PY=python" )
 
 curl.exe -s -m 2 -o nul "%API%/api/health"
 if errorlevel 1 goto startbe
@@ -21,7 +22,7 @@ goto open
 
 :startbe
 echo  [..] Backend not running, starting it...
-if not exist "%PY%" goto nopy
+if not defined PY goto nopy
 start "flycontrol" /min /d "%BE%" "%PY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 ping -n 9 127.0.0.1 >nul
 
@@ -34,9 +35,8 @@ ping -n 4 127.0.0.1 >nul
 exit /b 0
 
 :nopy
-echo  [ERROR] Python venv not found:
-echo          %PY%
-echo  Rebuild it first, see backend/README.md
+echo  [ERROR] Python not found: neither backend\.venv nor python on PATH.
+echo          Install Python 3.10+ and add it to PATH, or rebuild backend\.venv.
 pause
 exit /b 1
 

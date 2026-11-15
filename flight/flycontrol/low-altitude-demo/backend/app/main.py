@@ -58,22 +58,24 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_warm())
 
     # 预热"点击投放"的常用点位（8 方位 × 3 个半径），让第一次点击就秒回
+    # 后端自身地址用 SELF_BASE_URL 覆盖（换端口 / 换主机时不用改代码）
     async def _warm_join_points():
         import urllib.request
         await asyncio.sleep(8)
+        base = os.getenv("SELF_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
         pts = []
         for deg in range(0, 360, 22):      # 16 个方位
             for r in (500, 1000, 1500, 2000, 2500):
                 pts.append((r * math.sin(math.radians(deg)), r * math.cos(math.radians(deg))))
         ok = 0
         for (px, py) in pts:
-            url = "http://127.0.0.1:8080/api/program/join?x=%.0f&y=%.0f&battery=100" % (px, py)
+            url = "%s/api/program/join?x=%.0f&y=%.0f&battery=100" % (base, px, py)
             try:
                 await asyncio.to_thread(lambda u=url: urllib.request.urlopen(u, timeout=90).read())
                 ok += 1
             except Exception:
                 pass
-        log.info("点击点位预热完成：%d/%d（约 80 个常用点位）", ok, len(pts))
+        log.info("点击点位预热完成：%d/%d（约 80 个常用点位，基址 %s）", ok, len(pts), base)
     asyncio.create_task(_warm_join_points())
 
     push_service.start()

@@ -457,13 +457,15 @@ node selftest.js
 1. **地面站有两套**：PyQt5 真机版 vs PySide6 仿真版，入口/依赖/配置完全不同。先确认看哪套。
 2. **数据库是可选的**：flycontrol 连不上 Postgres 时**静默回退** SQLite/内存，界面照常。排查「重启后数据没了」先看日志里 `数据库不可用, 回退内存演示模式` 与 `store.db_ok`。
 3. **`shared/` 位置是硬约束**，移动会断（Python 向上查找、JS 相对路径）。
-4. **虚拟环境已提交进仓库**（`.venv` / `venv` / `.conda`），内部记录绝对路径（如 `C:\Python314`）。换机器/换 Python 版本可能要重建。
+4. **虚拟环境不入库**（`.gitignore` 已忽略 `.venv` / `venv` / `.conda` / `__pycache__`）。启动器优先用各子项目的
+   `.venv`，没有就回退系统 Python；需要重建后端环境见 `HANDOFF.md` §2 的「环境现状」。
 5. **「有内容」≠「连上了」**：门户和 App 都有 mock 回退，必须看顶栏 `实时 / 演示` 胶囊。
 6. **手机连不上**：常见原因是手机开了 VPN/流量、电脑防火墙未放行 5500/5502/8080/8090，或路由器 AP 隔离。
 7. **PWA 安装需要安全上下文**：`http://192.168.x.x` 下 Android Chrome 不出安装按钮，需用 `adb reverse` 或 `chrome://flags` 白名单。
 8. **`www/` 是打包产物**，改了不生效是改错文件了。
 9. **`start-system.ps1` 里地面站路径**指向 `wrjtksf\drone_ground_station`，不是 `wrjtksf\src`。
-10. **不是 git 仓库**（当前无 `.git`），改动没有版本保护，建议先 `git init`。
+10. **仓库已上 GitHub**：`github.com/Evelyn-bit10/low-altitude-integrated-support-system`（分支 `main`）。
+    `.gitignore` 已排除 `.env` / `*.db` / 运行时 json / 虚拟环境；提交前 `git status` 确认没有夹带本地配置。
 
 ---
 
@@ -503,13 +505,11 @@ node selftest.js
 | 级别 | 项 | 位置 / 说明 |
 | --- | --- | --- |
 | 🔴 高 | **SMTP 账号与授权码硬编码在源码** | `device/groundstation/wrjtksf/drone_ground_station/config.py` 的 `SMTP_*`；建议改为纯环境变量注入并轮换凭据 |
-| 🔴 高 | **仓库无版本控制** | 当前无 `.git` |
 | 🟠 中 | `ground-bridge.py` 是模拟数据生成器 | 未真正读取地面站进程，属演示占位 |
 | 🟠 中 | 交通态势仅内存存储，TTL 6s | `routers/traffic.py` 的 `TrafficStore`；生产需落库 `lp_traffic` |
 | 🟠 中 | 鉴权关闭 + CORS `*` | `main.py`、`AUTH_ENABLED=false` |
 | 🟡 低 | 已清理的历史重复文件 | `wrjtksf/src/main_window.py`、`温度风速雨量/` 已删除；当前仿真入口为 `wrjtksf/src/ui/main_window.py`，传感器调试脚本在 `wrjtksf/sensor/` |
 | 🟡 低 | 超大单文件难维护 | `wrjtksf/src/ui/main_window.py`（114 KB）、`comms/communication/app.js`（1102 行） |
-| 🟡 低 | 虚拟环境与缓存目录入库 | `.venv` / `venv` / `.conda` / `__pycache__` / `.pytest_cache` / `www/` |
 | 🟡 低 | OAS / 风险模型为简化近似 | 生产须替换为完整 PANS-OPS 曲面与 SORA 评估 |
 
 需求文档里也留了后续项（见 `shared/contract.md` §7）：
