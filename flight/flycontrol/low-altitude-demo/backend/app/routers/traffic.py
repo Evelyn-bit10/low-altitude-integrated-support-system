@@ -7,7 +7,8 @@
   POST /api/traffic/ingest  -> 接收各设备/节点回传的飞行器态势, 服务端去重后入库
 
 去重规则见 app/services/dedup.py 与 shared/contract.md §3.8。
-统一接口规范见 yth/shared/contract.md;适配层见 yth/shared/interface.py。
+统一接口规范见 shared/contract.md;适配层见 shared/interface.py（工程根目录下的 shared/：
+飞控后端向上逐层查找它，通讯态势前端用相对路径 ../../shared/ 引用）。
 """
 from __future__ import annotations
 

@@ -14,16 +14,28 @@
 | # | 子系统 | 端口 | 说明 |
 | --- | --- | --- | --- |
 | 1 | 飞控后端（flycontrol API） | 8080 | 统一快照 / 飞行程序 / 风险合规 |
-| 2 | 门户数据桥（ground-bridge） | 8090 | 机位 / RID900 / 传感器数据 |
+| 2 | 门户数据桥（ground-bridge） | 8090 | 机位 / RID900 / 传感器数据（**模拟值**，见第三节） |
 | 3 | 管理平台门户 | 5500 | 浏览器自动打开 |
 | 4 | 飞手端 App（PWA） | 5502 | 手机同 Wi-Fi 可直接访问 |
 | 5 | 通讯态势（communication） | — | 浏览器自动打开 |
-| 6 | 地面站桌面端（groundstation） | — | 独立窗口，若虚拟环境存在 |
+| 6 | 地面站桌面端（groundstation） | 8081 | 独立窗口；需 `drone_ground_station\venv`（含 PyQt5），缺失则跳过 |
 
-服务统一绑定 `0.0.0.0`，手机在同一 Wi-Fi 下可直接访问（启动完成时会打印手机地址）。
+服务统一绑定 `0.0.0.0`，手机在同一 Wi-Fi 下可直接访问（启动完成时会打印本机局域网地址）。
 已在运行的服务会自动复用，不会重复启动。
 
-> 关闭服务：把启动时新开的几个最小化窗口关掉即可。
+**停止服务**：第 1~4 项是以**隐藏窗口**方式启动的——任务栏里看不到，不能靠"关窗口"停。
+用下面一行命令停干净：
+
+```powershell
+Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction SilentlyContinue |
+  Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }
+```
+
+只有第 6 项「地面站桌面端」是独立窗口，关掉那个窗口即可。
+
+> ⚠️ 根目录还有一个名字相近的 **`一键启动.bat`**，它只做一件事：起 8080 后端并打开
+> `platform\portal\demo.html` 与 `rl_lab.html`（英文 Demo Launcher），**不**启动门户 / 数据桥 / 飞手端。
+> 要完整系统请用 `启动一体化门户.bat`。
 
 ---
 
@@ -38,13 +50,34 @@
 它会额外拉起「模拟 UOM 接收端」(8099)，并把后端切到 `PUSH_MODE=http`。
 演示脚本与讲解词见 `flight/flycontrol/low-altitude-demo/backend/docs/DEMO.md`。
 
+> 演示台的后端与页面都只绑定 `127.0.0.1`，**手机打不开**；要用手机演示请走 `真机测试.bat`
+> 或 `启动一体化门户.bat`（那两个会绑 `0.0.0.0`）。
+
+## 一·补二、其它常用入口
+
+| 入口 | 用途 |
+| --- | --- |
+| `启动RL实验室.bat` | RL 关联实验室（19 维特征 → 策略网络可视化），会自动检查并按需拉起 8080 后端 |
+| `自检.bat` | 单元测试（87 项）+ 网页冒烟 + 接口探活，改完代码先跑这个 |
+| `一键启动.bat` | 仅后端 + `demo.html` / `rl_lab.html`（英文 Demo Launcher，首次会自动建 venv） |
+
+---
+
 ## 二、目录结构
 
 ```
 低空综合保障系统-全量工程/
-├── 启动一体化门户.bat        ★ 全系统一键启动（双击）
+├── 启动一体化门户.bat        ★ 全系统一键启动（双击，总入口）
 ├── start-system.ps1          启动逻辑（被上面那个 bat 调用）
+├── 启动演示.bat              功能演示台（三项能力 + 模拟 UOM 8099）
+├── start-demo.ps1            演示台启动逻辑（被上面那个 bat 调用）
+├── 启动RL实验室.bat          RL 关联实验室（自动检查后端）
+├── 一键启动.bat              仅后端 + demo.html / rl_lab.html（英文 Demo Launcher）
+├── 自检.bat                  单元测试 + 网页冒烟 + 接口探活
 ├── README.md                 本说明
+├── ONBOARDING.md             上手必读（架构 / 接口 / 排障 / 已知局限）
+├── HANDOFF.md                接手说明（做到哪 / 关键文件 / 常用命令）
+├── 使用说明.md               面向使用者的操作说明
 │
 ├── 需求/                      需求文档与功能分解
 │   ├── 低空综合保障设备-软件及管理平台需求说明书-整合版.docx
@@ -53,19 +86,32 @@
 │
 ├── platform/                  【二、后台管理平台（B/S）】
 │   ├── portal/                一体化门户（我方可控的网页端）
+│   │   ├── index.html         门户本体（演示数据 / 实时数据双模式）
+│   │   ├── demo.html          功能演示台（三项能力 + RL 影子模式）
+│   │   ├── demo_p1.html       演示台第一幕的独立版（进出场程序）
+│   │   ├── demo_p1_place.html 演示台第一幕点位投放版
+│   │   ├── rl_lab.html        RL 关联实验室（19 维特征可视化）
+│   │   └── ground-bridge.py   门户数据桥（8090，模拟数据生成器）
 │   └── prototype/             同事做的管理平台原型（龙兴机场示例，只读参考）
 │
 ├── device/                    【一、设备端嵌入式软件（节点层）】
-│   └── groundstation/         地面站：机位调度 + RID900 探测 + Modbus 传感器 + 桌面端
+│   └── groundstation/
+│       └── wrjtksf/
+│           ├── drone_ground_station/  PyQt5 真机版地面站（工程默认入口，瓦片服务 8081）
+│           ├── src/                   仿真版地面站（PySide6，独立入口）
+│           └── rid/ sensor/ scripts/ config/ tests/   同级辅助目录（RID / 传感器 / 脚本 / 配置 / 测试）
 │
 ├── flight/                    【二、5.3 飞行程序管理】
-│   └── flycontrol/            动态起降飞行程序实时调整（FastAPI 后端 + 前端）
+│   └── flycontrol/
+│       └── low-altitude-demo/ 动态起降飞行程序实时调整（FastAPI 后端 + 前端）
 │
 ├── comms/                     【二、5.2 监视 / 通讯】
 │   └── communication/         低空起降点—飞行器实时通讯与态势系统
 │
 ├── pilot-app/                 【三、终端 APP】
 │   └── flyer-app/             C 端飞手 App（PWA + Android APK 打包工程）
+│
+├── tools_docs/                文档生成脚本（gen_opt_doc.py → 优化说明 docx）
 │
 └── shared/                    统一接口契约（跨系统，被多个项目引用）
     ├── contract.md            统一数据契约（WGS84 + MSL + snake_case）
@@ -80,10 +126,16 @@
 
 ```
                     ┌──────────────────────┐
-   设备端           │  groundstation       │
+   设备端           │  groundstation       │   PyQt5 桌面端（机位 / RID / 传感器）
    device/          │  机位 / RID / 传感器  │
                     └──────────┬───────────┘
-                               │ ground-bridge.py (8090) 转 REST
+                               ┊  ✗ 尚未接通：桌面站没有把数据交给门户的通道
+                               ▼
+                    ┌──────────────────────┐
+   门户数据桥       │  ground-bridge.py    │   ⚠ 独立的模拟数据生成器
+   platform/portal  │  GET /api/ground     │      数值来自 sin 波形，不读地面站进程
+                    └──────────┬───────────┘
+                               │ REST (8090)
                                ▼
                     ┌──────────────────────┐
    管理平台         │  platform/portal     │◀── 统一快照 /api/sync/snapshot
@@ -108,17 +160,22 @@
 所有跨系统数据都走 `shared/` 里的统一契约（`contract.md`），字段一律 canonical：
 **WGS84 经纬度 + 海拔 MSL + snake_case**。
 
+> 现状说明：上图里「设备端 → 门户数据桥」这一段**在实现上还不存在**——`ground-bridge.py`
+> 是一份自带波浪的模拟数据生成器（`ONBOARDING.md` 的「已知局限」里也注明了"演示占位"）。
+> 门户的「地面站」页面拿到的是这组模拟值，不是真机数据。飞控、通讯态势、飞手端三条链路是真的。
+
 ---
 
 ## 四、端口约定
 
 | 端口 | 用途 |
 | --- | --- |
-| 8080 | 飞控后端 / 机场 UTM 服务 |
-| 8090 | 门户数据桥（地面站数据） |
+| 8080 | 飞控后端 / 机场 UTM 服务（`/docs` 为 Swagger） |
+| 8081 | 地面站本地 DSM 瓦片服务（由地面站桌面端自行启动） |
+| 8090 | 门户数据桥（地面站**模拟**数据） |
+| 8099 | 模拟 UOM 接收端（仅 `启动演示.bat` 拉起） |
 | 5500 | 管理平台门户 |
 | 5502 | 飞手端 App |
-| 8081 | 地面站本地 DSM 瓦片服务（由地面站桌面端自行启动） |
 
 ---
 
@@ -126,9 +183,10 @@
 
 | 子系统 | 入口 |
 | --- | --- |
-| 管理平台门户 | `platform\portal\` — 直接打开 `index.html`，或起静态服务 |
-| 地面站 | `device\groundstation\wrjtksf\drone_ground_station\` — `python main.py` |
-| 飞控 | `flight\flycontrol\low-altitude-demo\启动后端.bat` |
+| 管理平台门户 | `platform\portal\` — 直接打开 `index.html`（默认演示数据模式，不发任何请求），或起静态服务 |
+| 地面站（真机版） | `device\groundstation\wrjtksf\drone_ground_station\` — **需先建 venv**：`python -m venv venv` → `venv\Scripts\pip install -r requirements.txt`（PyQt5 / PyQtWebEngine / pymavlink / pyserial / aiohttp …），再 `venv\Scripts\python main.py`。用系统 Python 直接跑会因缺 PyQt5 报导入错误 |
+| 地面站（仿真版） | `device\groundstation\wrjtksf\src\` — `python main.py`，需 PySide6（见 `wrjtksf\requirements.txt`） |
+| 飞控 | `flight\flycontrol\low-altitude-demo\启动后端.bat`（有 `.venv` 用它，没有则回退系统 Python） |
 | 通讯态势 | `comms\communication\启动.bat` |
 | 飞手端 App | `pilot-app\flyer-app\启动.bat`（本机）/ `真机测试.bat`（手机联调）/ `打包APK.bat`（打安卓包） |
 
