@@ -23,15 +23,11 @@
 服务统一绑定 `0.0.0.0`，手机在同一 Wi-Fi 下可直接访问（启动完成时会打印本机局域网地址）。
 已在运行的服务会自动复用，不会重复启动。
 
-**停止服务**：第 1~4 项是以**隐藏窗口**方式启动的——任务栏里看不到，不能靠"关窗口"停。
-用下面一行命令停干净：
+**停止服务**：双击根目录的 **`停止服务.bat`** —— 它按端口（8080 / 8081 / 8090 / 8099 / 5500 / 5502）
+把本项目启动的 Python 进程连子进程一起结束，并逐条打印停掉了什么、哪些端口本来空闲。
 
-```powershell
-Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction SilentlyContinue |
-  Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }
-```
-
-只有第 6 项「地面站桌面端」是独立窗口，关掉那个窗口即可。
+> 第 1~4 项是**隐藏窗口**，任务栏里看不到，不能靠"关窗口"停；地面站（第 6 项）虽是独立窗口，
+> `停止服务.bat` 也一并处理。端口若被非本项目的程序占着，脚本打印 `[SKIP]` 而不会误杀。
 
 > 其余子系统入口都收在根目录的 **`低空系统.bat`** 里：双击弹菜单，也可带子命令直连，
 > 例如 `低空系统.bat rl`、`低空系统.bat mobile`（完整列表见 `低空系统.bat help`）。
@@ -58,19 +54,21 @@ Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction S
 | --- | --- |
 | `低空系统.bat` | **其余入口的统一调度器**：双击弹菜单，或带子命令直连 —— `portal` / `demo` / `rl` / `api` / `pages` / `apidev` / `app` / `mobile` / `comms` / `decision` / `apk` / `check` / `lanip` / `help` |
 | `自检.bat` | 单元测试（87 项）+ 网页冒烟 + 接口探活，改完代码先跑这个（等同 `低空系统.bat check`） |
+| `停止服务.bat` | 一键停掉全部服务（6 个端口，含地面站），逐条打印结果 |
 
 ---
 
 ## 二、目录结构
 
 ```
-低空综合保障系统-全量工程/
+low-altitude/
 ├── 启动一体化门户.bat        ★ 全系统一键启动（双击，总入口）
 ├── start-system.ps1          启动逻辑（被上面那个 bat 调用；-LanIpOnly 只打印局域网 IP）
 ├── 启动演示.bat              功能演示台（三项能力 + 模拟 UOM 8099）
 ├── start-demo.ps1            演示台启动逻辑（被上面那个 bat 调用）
 ├── 低空系统.bat              统一调度器：双击弹菜单 / 带子命令直连其余入口
 ├── 自检.bat                  单元测试 + 网页冒烟 + 接口探活
+├── 停止服务.bat              一键停止所有服务（按端口结束 Python 进程，含子进程）
 ├── README.md                 本说明
 ├── ONBOARDING.md             上手必读（架构 / 接口 / 排障 / 已知局限）
 ├── HANDOFF.md                接手说明（做到哪 / 关键文件 / 常用命令）
@@ -108,7 +106,7 @@ Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction S
 ├── pilot-app/                 【三、终端 APP】
 │   └── flyer-app/             C 端飞手 App（PWA + Android APK 打包工程）
 │
-├── tools_docs/                文档生成脚本（gen_opt_doc.py → 优化说明 docx）
+├── tools_docs/                文档与生成脚本（gen_opt_doc.py → 优化说明 docx；model-training-notes.docx 模型训练说明）
 │
 └── shared/                    统一接口契约（跨系统，被多个项目引用）
     ├── contract.md            统一数据契约（WGS84 + MSL + snake_case）
@@ -181,7 +179,7 @@ Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction S
 | 子系统 | 入口 |
 | --- | --- |
 | 管理平台门户 | `platform\portal\` — 直接打开 `index.html`（默认演示数据模式，不发任何请求），或起静态服务 |
-| 地面站（真机版） | `device\groundstation\wrjtksf\drone_ground_station\` — **需先建 venv**：`python -m venv venv` → `venv\Scripts\pip install -r requirements.txt`（PyQt5 / PyQtWebEngine / pymavlink / pyserial / aiohttp …），再 `venv\Scripts\python main.py`。用系统 Python 直接跑会因缺 PyQt5 报导入错误 |
+| 地面站（真机版） | `低空系统.bat device`（或双击 `低空系统.bat` 选 `[7]`）。**需先建 venv**：`python -m venv venv` → `venv\Scripts\pip install -r requirements.txt`（PyQt5 / PyQtWebEngine / pymavlink / pyserial / aiohttp / rs1090 …）。**工程路径含中文时**启动器会自动建一个纯 ASCII 的 junction（`%LOCALAPPDATA%\gs-venv`）绕过 Qt 5.15 的 8-bit 路径限制，否则会报 `Could not find the Qt platform plugin "windows"` / `Couldn't mmap icu data file` |
 | 地面站（仿真版） | `device\groundstation\wrjtksf\src\` — `python main.py`，需 PySide6（见 `wrjtksf\requirements.txt`） |
 | 飞控 | `低空系统.bat api`（前台起 8080，看日志）或 `低空系统.bat apidev`（连带打开后端自带前端页） |
 | 通讯态势 | `低空系统.bat comms`（打开页面）；决策引擎原型：`低空系统.bat decision` |

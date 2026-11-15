@@ -14,8 +14,9 @@
 #
 #  参数：
 #    -LanIpOnly   只打印本机局域网 IP 后退出（供 低空系统.bat 复用探测逻辑）
+#    -DeviceOnly  只启动地面站桌面端后退出（供 低空系统.bat device 使用）
 # =============================================================================
-param([switch]$LanIpOnly)
+param([switch]$LanIpOnly, [switch]$DeviceOnly)
 
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -67,6 +68,54 @@ function Get-LanIp {
     }
     catch { }
     return $null
+}
+
+# ---------------------------------------------------------------- 地面站启动
+# Qt 5.15 在 Windows 上用 8-bit 代码页转换路径：工程目录含中文时，Qt 内部拿到的是
+# "D:/????/????-????/..."，于是报
+#   Could not find the Qt platform plugin "windows"
+#   Qt WebEngine resources not found / Couldn't mmap icu data file
+# 解决办法：用一个纯 ASCII 的 junction（目录联接）指向 venv，再从 junction 启动，
+# Qt 看到的就全是英文路径。工程本来就在英文路径下时直接用原路径。
+function Start-GroundStation {
+    $vpy = $groundPy
+    if ($groundDir -match '[^\x00-\x7F]') {
+        $bases = @((Join-Path $env:LOCALAPPDATA 'gs-venv'), (Join-Path $env:SystemDrive 'gs-venv'))
+        foreach ($base in $bases) {
+            if ($base -match '[^\x00-\x7F]') { continue }
+            $parent = Split-Path $base -Parent
+            if (-not (Test-Path -LiteralPath $parent)) { continue }
+            try {
+                if (Test-Path -LiteralPath $base) { cmd /c rmdir "$base" 2>$null | Out-Null }
+                New-Item -ItemType Junction -Path $base -Target (Join-Path $groundDir 'venv') -ErrorAction Stop | Out-Null
+                $cand = Join-Path $base 'Scripts\python.exe'
+                if (Test-Path -LiteralPath $cand) { $vpy = $cand; break }
+            }
+            catch { }
+        }
+    }
+    if (-not (Test-Path -LiteralPath $vpy)) { return $false }
+    Start-Process -FilePath $vpy -ArgumentList @("main.py") -WorkingDirectory $groundDir
+    return $true
+}
+
+# 只启动地面站桌面端就退出（供 低空系统.bat device 使用）
+if ($DeviceOnly) {
+    if (-not (Test-Path -LiteralPath $groundPy)) {
+        Write-Host "[错误] 地面站虚拟环境不存在：" -ForegroundColor Red
+        Write-Host ("       " + $groundPy)
+        Write-Host "       先建环境："
+        Write-Host "         cd device\groundstation\wrjtksf\drone_ground_station"
+        Write-Host "         python -m venv venv"
+        Write-Host "         venv\Scripts\pip install -r requirements.txt"
+        exit 1
+    }
+    if (Start-GroundStation) {
+        Write-Host "[OK] 地面站桌面端已启动（独立窗口，DSM 瓦片服务 8081）" -ForegroundColor Green
+        exit 0
+    }
+    Write-Host "[错误] 地面站启动失败。" -ForegroundColor Red
+    exit 1
 }
 
 # 只输出局域网 IP 就退出：让 低空系统.bat 等调用方复用同一份探测逻辑，
@@ -149,8 +198,10 @@ else { Write-Host "   跳过（未找到 comms\communication\index.html）" -For
 # ---------------------------------------------------------------- 6 地面站桌面端
 Write-Host "[6/6] 地面站桌面端   (groundstation)" -NoNewline
 if (Test-Path -LiteralPath $groundPy) {
-    Start-Process -FilePath $groundPy -ArgumentList @("main.py") -WorkingDirectory $groundDir
-    Write-Host "   已启动（独立窗口）" -ForegroundColor Green
+    if (Start-GroundStation) {
+        Write-Host "   已启动（独立窗口，瓦片服务 8081）" -ForegroundColor Green
+    }
+    else { Write-Host "   启动失败（venv 里的 python 不可用）" -ForegroundColor Yellow }
 }
 else { Write-Host "   跳过（需 drone_ground_station\venv，内含 PyQt5/PyQtWebEngine）" -ForegroundColor Yellow }
 

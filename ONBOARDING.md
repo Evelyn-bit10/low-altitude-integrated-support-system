@@ -464,7 +464,12 @@ node selftest.js
 7. **PWA 安装需要安全上下文**：`http://192.168.x.x` 下 Android Chrome 不出安装按钮，需用 `adb reverse` 或 `chrome://flags` 白名单。
 8. **`www/` 是打包产物**，改了不生效是改错文件了。
 9. **`start-system.ps1` 里地面站路径**指向 `wrjtksf\drone_ground_station`，不是 `wrjtksf\src`。
-10. **仓库已上 GitHub**：`github.com/Evelyn-bit10/low-altitude-integrated-support-system`（分支 `main`）。
+10. **中文路径会让地面站起不来**：Qt 5.15 在 Windows 上用 8-bit 代码页转换路径，工程目录含中文时变成
+    `D:/????/????-????/...`，于是报 `Could not find the Qt platform plugin "windows"` /
+    `Qt WebEngine resources not found` / `Couldn't mmap icu data file`。启动器（`-DeviceOnly`）已自动用
+    纯 ASCII 的 junction（`%LOCALAPPDATA%\gs-venv`）绕过；但手动 `python main.py` 会踩到，
+    最省事的做法仍是把工程放在纯英文路径下。
+11. **仓库已上 GitHub**：`github.com/Evelyn-bit10/low-altitude-integrated-support-system`（分支 `main`）。
     `.gitignore` 已排除 `.env` / `*.db` / 运行时 json / 虚拟环境；提交前 `git status` 确认没有夹带本地配置。
 
 ---

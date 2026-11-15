@@ -27,6 +27,7 @@ if /i "%~1"=="pages"    goto c_pages
 if /i "%~1"=="apidev"   goto c_apidev
 if /i "%~1"=="app"      goto c_app
 if /i "%~1"=="mobile"   goto c_mobile
+if /i "%~1"=="device"   goto c_device
 if /i "%~1"=="comms"    goto c_comms
 if /i "%~1"=="decision" goto c_decision
 if /i "%~1"=="apk"      goto c_apk
@@ -53,12 +54,13 @@ echo     [3]  RL association lab    visualise the dedup policy network
 echo     [4]  Backend only          8080, foreground, shows logs
 echo     [5]  Backend + demo pages  8080 + demo.html + rl_lab.html
 echo     [6]  Backend + built-in frontend page (8080)
-echo     [7]  Flyer app             5502, this PC only
-echo     [8]  Phone / LAN test      8080 + 8090 + 5500 + 5502 on 0.0.0.0
-echo     [9]  Communication page
-echo    [10]  Decision engine prototype (Python)
-echo    [11]  Build Android APK
-echo    [12]  Self-check            pytest + web smoke + API probe
+echo     [7]  Groundstation desktop  PyQt5 window + DSM tiles on 8081
+echo     [8]  Flyer app             5502, this PC only
+echo     [9]  Phone / LAN test      8080 + 8090 + 5500 + 5502 on 0.0.0.0
+echo    [10]  Communication page
+echo    [11]  Decision engine prototype (Python)
+echo    [12]  Build Android APK
+echo    [13]  Self-check            pytest + web smoke + API probe
 echo     [0]  Exit
 echo.
 set "choice="
@@ -69,12 +71,13 @@ if "%choice%"=="3"  goto c_rl
 if "%choice%"=="4"  goto c_api
 if "%choice%"=="5"  goto c_pages
 if "%choice%"=="6"  goto c_apidev
-if "%choice%"=="7"  goto c_app
-if "%choice%"=="8"  goto c_mobile
-if "%choice%"=="9"  goto c_comms
-if "%choice%"=="10" goto c_decision
-if "%choice%"=="11" goto c_apk
-if "%choice%"=="12" goto c_check
+if "%choice%"=="7"  goto c_device
+if "%choice%"=="8"  goto c_app
+if "%choice%"=="9"  goto c_mobile
+if "%choice%"=="10" goto c_comms
+if "%choice%"=="11" goto c_decision
+if "%choice%"=="12" goto c_apk
+if "%choice%"=="13" goto c_check
 if "%choice%"=="0"  goto end
 goto menu
 
@@ -156,6 +159,10 @@ ping -n 9 127.0.0.1 >nul
 :rl_open
 echo  [OK] Opening RL association lab (needs the backend on %API_PORT%).
 start "" "%PORTAL_DIR%\rl_lab.html"
+goto end
+
+:c_device
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-system.ps1" -DeviceOnly
 goto end
 
 :c_app
@@ -269,6 +276,7 @@ echo    rl         RL association lab (starts the backend if needed)
 echo    api        backend only on 8080, foreground, shows logs
 echo    pages      backend + demo.html + rl_lab.html
 echo    apidev     backend + its built-in frontend page
+echo    device     groundstation desktop (PyQt5 window + DSM tiles on 8081)
 echo    app        flyer app on 5502 (this PC only)
 echo    mobile     phone / LAN test (8080 + 8090 + 5500 + 5502 on 0.0.0.0)
 echo    comms      communication / situation page
