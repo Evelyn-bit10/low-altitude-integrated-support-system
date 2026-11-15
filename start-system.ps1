@@ -11,7 +11,12 @@
 #    6. 地面站桌面端        device\groundstation（若存在虚拟环境）
 #
 #  服务统一绑定 0.0.0.0，同一 Wi-Fi 下手机可直接访问。
+#
+#  参数：
+#    -LanIpOnly   只打印本机局域网 IP 后退出（供 低空系统.bat 复用探测逻辑）
 # =============================================================================
+param([switch]$LanIpOnly)
+
 $ErrorActionPreference = "SilentlyContinue"
 
 $root      = $PSScriptRoot
@@ -62,6 +67,14 @@ function Get-LanIp {
     }
     catch { }
     return $null
+}
+
+# 只输出局域网 IP 就退出：让 低空系统.bat 等调用方复用同一份探测逻辑，
+# 避免每个启动脚本各写一遍、选出 VPN 网卡地址。
+if ($LanIpOnly) {
+    $ip = Get-LanIp
+    if ($ip) { Write-Output $ip }
+    exit 0
 }
 
 Write-Host ""

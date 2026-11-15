@@ -12,7 +12,6 @@ communication/
 ├── style.css    深色航空仪表风格样式
 ├── app.js       模拟引擎（RID / C2 报文 / 气象 / 障碍物 / 态势图 / 决策 + 双向同步）
 ├── decision_engine_demo.py  Python 核心决策引擎原型（通信 + 起降许可决策）
-├── 启动.bat     一键启动本 Demo
 └── README.md    本说明
 ```
 
@@ -27,8 +26,8 @@ communication/
 
 **使用步骤：**
 
-1. 先双击 `..\..\flight\flycontrol\low-altitude-demo\启动后端.bat`，启动后端（默认 `http://127.0.0.1:8080`，无 Postgres 自动回退 SQLite）。
-2. 再双击本目录 `启动.bat`（或直接打开 `index.html`）。
+1. 先启动后端：执行 `..\..\低空系统.bat api`（或双击工程根目录的 `低空系统.bat` 选 `[4] Backend only`），默认 `http://127.0.0.1:8080`，无 Postgres 自动回退 SQLite。
+2. 再打开本目录 `index.html`（或执行 `..\..\低空系统.bat comms`）。
 3. communication 顶栏会显示「已连接 flycontrol」，此时：
    - 起降点、障碍物、空域（限飞区）、气象、进近/离场飞行程序全部以 flycontrol 为准，并叠加显示在态势图上；
    - 每 ~1s 把本系统的飞行器态势回传 flycontrol（`GET /api/traffic` 可查）。

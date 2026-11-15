@@ -46,7 +46,7 @@ low-altitude-demo/
 
 ### 方式 A: 双击启动(最简单, Windows)
 
-双击项目根目录的 **`启动Demo.bat`** 即可:
+双击工程根目录的 **`低空系统.bat`** 并选 `[6] Backend + built-in frontend page`（或执行 `低空系统.bat apidev`）即可:
 
 1. 首次运行会自动创建虚拟环境 `backend\.venv` 并安装依赖(需本机已装 Python 3.10+)。
 2. 随后自动启动服务并打开浏览器 http://127.0.0.1:8080 。

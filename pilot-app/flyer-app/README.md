@@ -9,15 +9,17 @@
 
 ## 一、运行方式
 
-**推荐**：双击本目录 `启动.bat`（启动本地服务 `127.0.0.1:5502` 并自动打开浏览器）。
+**推荐**：双击工程根目录的 `低空系统.bat` 选 `[7] Flyer app`（或执行 `低空系统.bat app`）
+—— 启动本地服务 `127.0.0.1:5502` 并自动打开浏览器。
 
 也可以直接双击 `index.html`：界面正常显示，但 **Service Worker / PWA 安装不可用**（需要 http 环境）。
 
 ### 真机测试（手机）
 
-#### 一键启动（推荐）
+#### 联调启动（推荐）
 
-双击本目录 **`真机测试.bat`**。它一次启动四样东西，并把它们都绑到局域网：
+双击工程根目录的 `低空系统.bat` 选 `[8] Phone / LAN test`（或执行 `低空系统.bat mobile`）。
+它一次启动四样东西，并把它们都绑到局域网：
 
 | 服务 | 监听 | 说明 |
 | --- | --- | --- |
@@ -128,9 +130,6 @@ flyer-app/
 │   ├── icon.svg            App 图标
 │   └── icon-maskable.svg   Android 自适应图标
 ├── selftest.js             Node 自测脚本：渲染 + 预判 + 许可 + 后端推导（34 项断言）
-├── 启动.bat                本机一键启动（127.0.0.1:5502）
-├── 真机测试.bat            手机真机联调：后端 + 地面站桥 + App + 门户全部绑局域网
-├── 打包APK.bat             Android APK 一键打包入口
 ├── build-apk.ps1           打包核心：组装资源 → Capacitor → Gradle 出包
 ├── capacitor.config.json   Capacitor 配置（appId / 应用名 / webDir）
 ├── package.json            打包依赖声明
@@ -229,7 +228,7 @@ var defaults = {
 
 ### 一键打包
 
-双击 **`打包APK.bat`**，脚本自动完成 7 步：
+执行 **`低空系统.bat apk`**（或双击根目录 `低空系统.bat` 选 `[11]`），脚本自动完成 7 步：
 
 1. 检查 Node / JDK / Android SDK（缺失时给出下载地址与话术）
 2. 把静态资源组装到 `www/`
@@ -265,7 +264,7 @@ APK 里的页面来自**本地资源**，`location.hostname` 推导会失效（�
 
 3. 点 **「测试连接」** 确认两个服务都通，再点「保存并同步」。地址存在手机里，之后无需再填。
 
-> 电脑侧仍用 `真机测试.bat` 启动（它把服务绑到 `0.0.0.0`，手机才访问得到）。
+> 电脑侧仍用 `低空系统.bat mobile` 启动（它把服务绑到 `0.0.0.0`，手机才访问得到）。
 
 ### 几个已知点
 
@@ -273,7 +272,7 @@ APK 里的页面来自**本地资源**，`location.hostname` 推导会失效（�
 - **CORS**：APK 内页面 origin 是 `https://localhost`，请求电脑后端属跨域；flycontrol 与地面站桥都已开放 `Access-Control-Allow-Origin: *`，无需额外配置。
 - **正式发布**：产出的是 `debug` 包，可直接安装体验；要上架需改 `assembleRelease` 并配置签名 keystore。
 - **iOS**：同一套配置加 `@capacitor/ios` + `npx cap add ios` 即可，但必须在 macOS + Xcode 上构建。
-- **改代码后**：APK 只是外层容器，里面还是这套 HTML/JS。改完 `app.js` 等文件重跑 `打包APK.bat` 即会更新。
+- **改代码后**：APK 只是外层容器，里面还是这套 HTML/JS。改完 `app.js` 等文件重跑 `低空系统.bat apk` 即会更新。
 
 ---
 
@@ -285,7 +284,7 @@ APK 里的页面来自**本地资源**，`location.hostname` 推导会失效（�
 - [x] 态势图支持双指缩放 / 拖动 / 惯性 / 点击选中
 - [x] 375px 移动端布局，底部 TabBar 固定，关键按钮 ≥ 44px
 - [x] PWA 可安装、可离线打开
-- [x] Android APK 打包工程已就绪（`打包APK.bat`）：补装 JDK 17 + Android SDK 即可出包
+- [x] Android APK 打包工程已就绪（`低空系统.bat apk`）：补装 JDK 17 + Android SDK 即可出包
 - [x] App 内已内置连接引导与「测试连接」，解决 APK 无法自动识别后端的问题
 
 ---

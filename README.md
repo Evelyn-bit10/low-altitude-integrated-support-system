@@ -33,9 +33,8 @@ Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction S
 
 只有第 6 项「地面站桌面端」是独立窗口，关掉那个窗口即可。
 
-> ⚠️ 根目录还有一个名字相近的 **`一键启动.bat`**，它只做一件事：起 8080 后端并打开
-> `platform\portal\demo.html` 与 `rl_lab.html`（英文 Demo Launcher），**不**启动门户 / 数据桥 / 飞手端。
-> 要完整系统请用 `启动一体化门户.bat`。
+> 其余子系统入口都收在根目录的 **`低空系统.bat`** 里：双击弹菜单，也可带子命令直连，
+> 例如 `低空系统.bat rl`、`低空系统.bat mobile`（完整列表见 `低空系统.bat help`）。
 
 ---
 
@@ -50,16 +49,15 @@ Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction S
 它会额外拉起「模拟 UOM 接收端」(8099)，并把后端切到 `PUSH_MODE=http`。
 演示脚本与讲解词见 `flight/flycontrol/low-altitude-demo/backend/docs/DEMO.md`。
 
-> 演示台的后端与页面都只绑定 `127.0.0.1`，**手机打不开**；要用手机演示请走 `真机测试.bat`
+> 演示台的后端与页面都只绑定 `127.0.0.1`，**手机打不开**；要用手机演示请走 `低空系统.bat mobile`
 > 或 `启动一体化门户.bat`（那两个会绑 `0.0.0.0`）。
 
 ## 一·补二、其它常用入口
 
 | 入口 | 用途 |
 | --- | --- |
-| `启动RL实验室.bat` | RL 关联实验室（19 维特征 → 策略网络可视化），会自动检查并按需拉起 8080 后端 |
-| `自检.bat` | 单元测试（87 项）+ 网页冒烟 + 接口探活，改完代码先跑这个 |
-| `一键启动.bat` | 仅后端 + `demo.html` / `rl_lab.html`（英文 Demo Launcher，首次会自动建 venv） |
+| `低空系统.bat` | **其余入口的统一调度器**：双击弹菜单，或带子命令直连 —— `portal` / `demo` / `rl` / `api` / `pages` / `apidev` / `app` / `mobile` / `comms` / `decision` / `apk` / `check` / `lanip` / `help` |
+| `自检.bat` | 单元测试（87 项）+ 网页冒烟 + 接口探活，改完代码先跑这个（等同 `低空系统.bat check`） |
 
 ---
 
@@ -68,11 +66,10 @@ Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction S
 ```
 低空综合保障系统-全量工程/
 ├── 启动一体化门户.bat        ★ 全系统一键启动（双击，总入口）
-├── start-system.ps1          启动逻辑（被上面那个 bat 调用）
+├── start-system.ps1          启动逻辑（被上面那个 bat 调用；-LanIpOnly 只打印局域网 IP）
 ├── 启动演示.bat              功能演示台（三项能力 + 模拟 UOM 8099）
 ├── start-demo.ps1            演示台启动逻辑（被上面那个 bat 调用）
-├── 启动RL实验室.bat          RL 关联实验室（自动检查后端）
-├── 一键启动.bat              仅后端 + demo.html / rl_lab.html（英文 Demo Launcher）
+├── 低空系统.bat              统一调度器：双击弹菜单 / 带子命令直连其余入口
 ├── 自检.bat                  单元测试 + 网页冒烟 + 接口探活
 ├── README.md                 本说明
 ├── ONBOARDING.md             上手必读（架构 / 接口 / 排障 / 已知局限）
@@ -186,9 +183,9 @@ Get-NetTCPConnection -State Listen -LocalPort 8080,8090,5500,5502 -ErrorAction S
 | 管理平台门户 | `platform\portal\` — 直接打开 `index.html`（默认演示数据模式，不发任何请求），或起静态服务 |
 | 地面站（真机版） | `device\groundstation\wrjtksf\drone_ground_station\` — **需先建 venv**：`python -m venv venv` → `venv\Scripts\pip install -r requirements.txt`（PyQt5 / PyQtWebEngine / pymavlink / pyserial / aiohttp …），再 `venv\Scripts\python main.py`。用系统 Python 直接跑会因缺 PyQt5 报导入错误 |
 | 地面站（仿真版） | `device\groundstation\wrjtksf\src\` — `python main.py`，需 PySide6（见 `wrjtksf\requirements.txt`） |
-| 飞控 | `flight\flycontrol\low-altitude-demo\启动后端.bat`（有 `.venv` 用它，没有则回退系统 Python） |
-| 通讯态势 | `comms\communication\启动.bat` |
-| 飞手端 App | `pilot-app\flyer-app\启动.bat`（本机）/ `真机测试.bat`（手机联调）/ `打包APK.bat`（打安卓包） |
+| 飞控 | `低空系统.bat api`（前台起 8080，看日志）或 `低空系统.bat apidev`（连带打开后端自带前端页） |
+| 通讯态势 | `低空系统.bat comms`（打开页面）；决策引擎原型：`低空系统.bat decision` |
+| 飞手端 App | `低空系统.bat app`（本机 5502）/ `低空系统.bat mobile`（手机联调）/ `低空系统.bat apk`（打安卓包） |
 
 ---
 

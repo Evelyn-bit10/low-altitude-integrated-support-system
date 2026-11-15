@@ -5,7 +5,7 @@
 
 打开方式：
 
-- 双击工程根目录的 `启动RL实验室.bat`（会自动检查后端）
+- 执行工程根目录的 `低空系统.bat rl`（或双击 `低空系统.bat` 选 `[3]`，会自动检查后端）
 - 或直接打开 `platform/portal/rl_lab.html`（需后端在 8080 运行）
 
 ---
@@ -136,7 +136,7 @@ GET /api/rl/model
 | `platform/portal/rl_lab.html` | 单文件页面（无外部依赖，纯原生 JS + Canvas） |
 | `backend/app/routers/rl_lab.py` | `/api/rl/model` 接口（带 mtime 缓存） |
 | `backend/tests/test_rl_lab.py` | 3 项测试（权重形状、健康检查、手算复现） |
-| `启动RL实验室.bat`（工程根目录） | 一键打开 |
+| `低空系统.bat rl`（工程根目录） | 一键打开 |
 
 
 ---
@@ -155,7 +155,7 @@ GET /api/rl/model
 ```powershell
 # 在 cmd 里手动跑，能看到报错
 cd /d <工程根目录>
-启动RL实验室.bat
+低空系统.bat rl
 ```
 
 ### 页面显示"未连接 8080"

@@ -57,7 +57,7 @@
 - `platform/portal/rl_lab.html`：19 维特征滑杆 + 网络动画 + 判定结果 + 训练曲线
 - `GET /api/rl/model`：暴露权重（mtime 缓存，重训自动刷新）
 - 6 个预设（含 2 个"分歧样本"），`?preset=extra` 可直达
-- 一键打开：`启动RL实验室.bat`
+- 一键打开：`低空系统.bat rl`
 - 文档：`backend/docs/RL_LAB.md`
 
 ### 实时可视化

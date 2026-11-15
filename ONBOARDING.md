@@ -86,9 +86,9 @@ Start-Process http://127.0.0.1:5502/index.html
 | 子系统 | 命令 / 入口 |
 | --- | --- |
 | 门户 | `platform\portal\` 直接开 `index.html`，或 `python -m http.server 5500` |
-| 飞控 | `flight\flycontrol\low-altitude-demo\启动后端.bat`（已有 venv）或 `启动Demo.bat`（首次自动建 venv） |
-| 通讯态势 | `comms\communication\启动.bat` → 选 1（网页）或 2（跑 Python 决策引擎） |
-| 飞手端 | `pilot-app\flyer-app\启动.bat`（本机）/ `真机测试.bat`（局域网联调）/ `打包APK.bat` |
+| 飞控 | `低空系统.bat api`（仅后端，前台看日志）或 `低空系统.bat apidev`（连带打开自带前端页） |
+| 通讯态势 | `低空系统.bat comms`（网页）/ `低空系统.bat decision`（跑 Python 决策引擎） |
+| 飞手端 | `低空系统.bat app`（本机）/ `低空系统.bat mobile`（局域网联调）/ `低空系统.bat apk` |
 | 地面站（真机版） | `device\groundstation\wrjtksf\drone_ground_station\` → `python main.py` |
 | 地面站（仿真版） | `device\groundstation\wrjtksf\` → `python -m src.main` |
 
