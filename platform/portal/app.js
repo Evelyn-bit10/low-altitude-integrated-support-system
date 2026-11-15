@@ -116,18 +116,10 @@
   function renderHome() {
     var s=effectiveSnapshot(),g=state.ground,traffic=s.traffic,occupied=safeArray(g.stands).filter(function(x){return x.status!=='free';}).length;
     var alarms=traffic.filter(function(x){return x.emergency||x.rid_lost;}).length+Number(g.dispatch.deviation_alerts||0);
-    var modules=[
-      ['situation','radar','实时态势','飞行器、RID、C2、空域与周边态势','communication'],
-      ['program','route','飞行程序','动态规划、风险评分、合规与仿真','flycontrol'],
-      ['ground','stand','地面站机位','停靠调度、RID900 与 Modbus 传感器','groundstation'],
-      ['dashboard','chart','数据看板','运行趋势、占用率、告警与气象分析','analytics'],
-      ['business','business','业务管理','许可、实名登记与审计追溯','business']
-    ];
     return '<div class="page home-page">'+breadcrumb('运行总览')+
       '<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span>INTEGRATED SKYPORT OPERATIONS</div><h1>每一次起降<br><em>都有据可循</em></h1><p>贯通感知、通信、规划与业务的低空起降点统一运行门户。数据先于界面到达，决策在同一张图上闭环。</p><div class="hero-actions">'+button('进入实时态势&nbsp; ↗','go-situation','primary')+button('同步运行数据','sync','ghost')+'</div><div class="hero-caption">'+sourceTag(state.source.core)+(usesTrafficOverlay()?badge('态势采用演示目标','warning'):'')+'<span class="mono">'+esc(s.airport.code)+' · '+esc(s.frame)+' / '+esc(s.altitude_ref)+'</span></div></div>'+
       '<div class="hero-visual"><div class="orbital"><span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span><span class="orb-core"><i></i><b>'+esc(s.airport.code)+'</b><small>SKYPORT</small></span><span class="blip b1"></span><span class="blip b2"></span><span class="blip b3"></span></div><div class="hero-reading r1"><small>RUNWAY</small><b class="mono">'+number(s.airport.runway_heading,0)+'°</b></div><div class="hero-reading r2"><small>SAFE RADIUS</small><b class="mono">'+number(s.airport.safe_radius,0)+'m</b></div></div></section>'+
       '<div class="kpi-grid">'+kpi('在线飞行器',String(traffic.length),' 架','进近 '+traffic.filter(function(x){return x.phase==='APPROACH';}).length+' · 离场 '+traffic.filter(function(x){return x.phase==='DEPARTURE';}).length,'plane')+kpi('占用及预约机位',String(occupied),' / '+safeArray(g.stands).length,'地面站当前调度状态','stand')+kpi('开放告警',String(alarms),' 项','RID / 紧急 / 偏航','alert','warn')+kpi('今日运行架次','32',' 架次','较昨日 +14.2%','chart','cyan')+'</div>'+
-      '<div class="section-title"><div><span>系统入口</span><small>SYSTEM MODULES</small></div><b>05 MODULES</b></div><div class="module-grid">'+modules.map(function(m,index){return '<a class="module-card panel" href="#/'+m[0]+'" data-nav="'+m[0]+'"><span class="module-no mono">0'+(index+1)+'</span><span class="module-icon">'+icon(m[1])+'</span><h3>'+m[2]+'</h3><p>'+m[3]+'</p><footer><span>'+m[4]+'</span><b>↗</b></footer></a>';}).join('')+'</div>'+
       '<div class="section-title"><div><span>运行数据链</span><small>OPERATION PIPELINE</small></div><b>END-TO-END</b></div><section class="panel flowline">'+[
         ['ground','01','数据采集','传感器 · RID · 遥测'],['situation','02','通讯态势','识别 · C2 · 周边空域'],['program','03','规划决策','程序 · 风险 · 合规'],['business','04','业务管理','许可 · 飞手 · 审计']
       ].map(function(x,i){return '<a href="#/'+x[0]+'" data-nav="'+x[0]+'" class="flow-node"><span class="flow-index mono">'+x[1]+'</span><div><b>'+x[2]+'</b><small>'+x[3]+'</small></div>'+(i<3?'<i>→</i>':'')+'</a>';}).join('')+'</section></div>';
