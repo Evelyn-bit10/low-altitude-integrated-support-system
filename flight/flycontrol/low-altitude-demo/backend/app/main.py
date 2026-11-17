@@ -93,13 +93,14 @@ app.state.store = store
 app.state.dispatch = dispatch
 app.state.traffic = traffic_store
 app.state.push = push_service
-from app.routers import admin, rl_lab  # noqa: E402
+from app.routers import admin, ai, rl_lab  # noqa: E402
 
 app.include_router(program.router, prefix="/api")
 app.include_router(traffic.router, prefix="/api")
 app.include_router(push.router, prefix="/api")
 app.include_router(rl_lab.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(ai.router, prefix="/api")
 
 # ---- 轻量 RBAC：开启后所有写操作都要带 X-Token（见 app/services/auth.py）----
 app.state.auth_enabled = bool(getattr(settings, "auth_enabled", False))
