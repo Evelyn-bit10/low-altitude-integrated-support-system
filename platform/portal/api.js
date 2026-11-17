@@ -11,9 +11,12 @@
   var config = Object.assign({}, defaults, window.LAV_CONFIG || {});
 
   function requestUrl(url, options) {
+    var opts = options || {};
+    var timeoutMs = opts.timeoutMs || config.timeoutMs;   // AI 调用需要比普通轮询更长的超时
     var controller = typeof AbortController === 'function' ? new AbortController() : null;
-    var timeout = controller ? setTimeout(function () { controller.abort(); }, config.timeoutMs) : null;
-    var init = Object.assign({ method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } }, options || {});
+    var timeout = controller ? setTimeout(function () { controller.abort(); }, timeoutMs) : null;
+    var init = Object.assign({ method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } }, opts);
+    delete init.timeoutMs;
     if (controller) init.signal = controller.signal;
     if (init.body) init.headers = Object.assign({}, init.headers, { 'Content-Type': 'application/json' });
 
@@ -56,6 +59,25 @@
     replan: function (programType) { return request('/api/program/replan', { method:'POST', body:JSON.stringify({ program_type:programType }) }); },
     setMeteo: function (meteo) { return request('/api/env/meteo', { method:'POST', body:JSON.stringify(meteo) }); },
     toggleObstacle: function (id, active) { return request('/api/env/obstacle/toggle', { method:'POST', body:JSON.stringify({ id:id, active:active }) }); },
+
+    // ---- AI 调度建议（只读，不执行）----
+    advice: function (message, programType) {
+      return request('/api/ai/advice', { method:'POST', timeoutMs: 45000,
+        body: JSON.stringify({ message: message, program_type: programType || 'arrival' }) });
+    },
+
+    // ---- 运维 / 台账 / 指标 ----
+    metrics: function () { return request('/api/metrics'); },
+    devices: function () { return request('/api/devices'); },
+    createDevice: function (body) { return request('/api/devices', { method:'POST', body:JSON.stringify(body) }); },
+    deleteDevice: function (id) { return request('/api/devices/' + encodeURIComponent(id), { method:'DELETE' }); },
+    routes: function () { return request('/api/routes'); },
+    createRoute: function (body) { return request('/api/routes', { method:'POST', body:JSON.stringify(body) }); },
+    deleteRoute: function (id) { return request('/api/routes/' + encodeURIComponent(id), { method:'DELETE' }); },
+    shadow: function () { return request('/api/traffic/shadow'); },
+    setShadow: function (enabled) { return request('/api/traffic/shadow', { method:'POST', body:JSON.stringify({ enabled: !!enabled }) }); },
+    rlHealth: function () { return request('/api/rl/health'); },
+
     setBaseUrl: function (value) { config.baseUrl = String(value || defaults.baseUrl).replace(/\/$/, ''); }
   };
 }());

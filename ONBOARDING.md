@@ -104,7 +104,7 @@ Start-Process http://127.0.0.1:5502/index.html
                                 │ ground-bridge.py :8090 (REST)
                                 ▼
 ┌──────────────────── 管理平台 platform/portal :5500 ────────────┐
-│  6 个页面：总览 / 态势 / 飞行程序 / 地面站 / 看板 / 业务          │
+│  8 个页面：总览/态势/程序/AI 决策/地面站/看板/业务/系统            │
 │  演示数据（默认）  ⇄  实时数据（每 5s 轮询 8080 + 8090）          │
 └───────────────▲──────────────────────────────▲─────────────────┘
                 │ /api/sync/snapshot           │ /api/program/current
@@ -269,13 +269,13 @@ backend/app/
 | --- | --- |
 | `index.html` | 页面壳 + 顶部导航 |
 | `styles.css` | 深色科技风 / 响应式 |
-| `app.js` | 路由 + 状态 + 6 个页面渲染 + 详情抽屉 + 事件 |
+| `app.js` | 路由 + 状态 + 8 个页面渲染 + 详情抽屉 + 事件 |
 | `api.js` | **唯一 baseUrl 配置点**（8080 / 8090） |
 | `mock-data.js` | 演示数据（canonical 字段） |
 | `visuals.js` | Canvas 态势图 / 程序图 / 高度剖面 / ECharts 降级 |
 | `ground-bridge.py` | 地面站数据桥（8090，仅标准库） |
 
-**路由**：`#/home` `#/situation` `#/program` `#/ground` `#/dashboard` `#/business`
+**路由**：`#/home` `#/situation` `#/program` `#/decision` `#/ground` `#/dashboard` `#/business` `#/admin`
 
 **两种数据模式**：
 

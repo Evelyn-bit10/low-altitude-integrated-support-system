@@ -4,7 +4,7 @@
 
 门户有两种数据源模式：
 
-- **演示数据（默认）**：完整使用内置演示数据（`mock-data.js`），六个页面全部有内容、全页坐标统一，不依赖任何后端，适合对外演示；
+- **演示数据（默认）**：完整使用内置演示数据（`mock-data.js`），八个页面全部有内容、全页坐标统一，不依赖任何后端，适合对外演示；
 - **实时数据**：接入三个子系统（flycontrol / communication / groundstation），每 5 秒轮询刷新，适合现场联调与后期真实机场对接。
 
 顶栏右上角的状态胶囊可一键切换两种模式；也可用 URL 参数 `?mode=live` 或 `window.LAV_CONFIG.dataMode = 'live'` 指定默认模式。
@@ -34,9 +34,9 @@ styles.css             深色科技风、响应式布局与组件样式
 mock-data.js           canonical、groundstation、业务与图表演示数据
 api.js                 flycontrol REST 统一出口；唯一 baseUrl 配置点
 visuals.js             Canvas 态势图、程序图、剖面与 ECharts 降级
-app.js                 路由、状态、六个页面、详情抽屉和交互
+app.js                 路由、状态、八个页面、详情抽屉和交互
 ground-bridge.py       地面站数据桥（REST: /api/ground，端口 8090，仅标准库）
-demo.html              功能演示台（三项能力 + RL 影子模式，启动演示.bat 打开）
+demo.html              功能演示台（六幕：程序/排序/去重/推送/RL/AI 决策，启动演示.bat 打开）
 demo_p1.html           演示台第一幕的独立版（进出场程序）
 demo_p1_place.html     演示台第一幕点位投放版
 rl_lab.html            RL 关联实验室（19 维特征 → 策略网络可视化）
@@ -57,9 +57,11 @@ rl_lab.html            RL 关联实验室（19 维特征 → 策略网络可视�
 #/home        运行总览
 #/situation   实时态势
 #/program     飞行程序
+#/decision    AI 决策
 #/ground      地面站机位
 #/dashboard   数据看板
 #/business    业务管理
+#/admin       系统管理
 ```
 
 ## 预留接口：后期接入真实机场

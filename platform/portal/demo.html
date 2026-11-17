@@ -28,9 +28,9 @@ a{color:var(--cyan);text-decoration:none}
 .pill i{width:7px;height:7px;border-radius:50%;background:var(--muted)}
 .pill.ok i{background:var(--green);box-shadow:0 0 9px var(--green)}
 .pill.bad i{background:var(--red);box-shadow:0 0 9px var(--red)}
-.tabs{display:flex;gap:8px;padding:16px 30px 0}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;padding:16px 30px 0}
 .tab{padding:10px 18px;border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;
-  background:rgba(9,18,32,.6);color:#8fa5c0;font-size:13px;cursor:pointer}
+  background:rgba(9,18,32,.6);color:#8fa5c0;font-size:13px;cursor:pointer;white-space:nowrap}
 .tab.active{background:var(--panel);color:#eaf4ff;border-color:rgba(47,155,255,.4);box-shadow:0 -2px 0 var(--cyan) inset}
 .wrap{display:grid;grid-template-columns:minmax(320px,380px) 1fr;gap:14px;padding:0 30px 30px}
 .card{border:1px solid var(--line);border-radius:0 12px 12px 12px;background:var(--panel);overflow:hidden}
@@ -141,10 +141,11 @@ td{padding:8px 10px;border-bottom:1px solid rgba(117,163,215,.08);color:#aebfd3}
 
 <div class="tabs">
   <div class="tab active" data-tab="p1">① 进出场程序</div>
-  <div class="tab" data-tab="p2">② 多设备去重</div>
-  <div class="tab" data-tab="p3">③ 对外数据推送</div>
-  <div class="tab" data-tab="p4">④ RL 影子模式</div>
-  <div class="tab" data-tab="p5">⑤ 多机排序</div>
+  <div class="tab" data-tab="p5">② 多机进近排序</div>
+  <div class="tab" data-tab="p2">③ 多设备去重</div>
+  <div class="tab" data-tab="p3">④ 对外数据推送</div>
+  <div class="tab" data-tab="p4">⑤ RL 影子模式</div>
+  <div class="tab" data-tab="p6">⑥ AI 决策</div>
 </div>
 
 <!-- ================= 1. 进出场程序 ================= -->
@@ -415,6 +416,50 @@ td{padding:8px 10px;border-bottom:1px solid rgba(117,163,215,.08);color:#aebfd3}
   </div>
 </div>
 
+<!-- ================= 6. AI 决策（只读建议） ================= -->
+<div class="wrap hidden" id="p6">
+  <div class="left">
+    <section class="card side"><div class="box">
+      <h2>AI 轨迹决策</h2>
+      <p class="sub">大模型读取气象、航道、电量与空域约束后给出建议；<b>只读建议，不执行</b>。</p>
+      <textarea id="ai-q" rows="4" style="width:100%;margin-top:10px;background:#08111f;border:1px solid #1b2c44;border-radius:8px;color:#cfd9e6;padding:10px;font:12px/1.6 inherit;resize:vertical">当前电量与气象条件下，应安排哪条进近航道？请说明理由与风险。</textarea>
+      <div class="row" style="margin-top:10px;gap:8px;align-items:center">
+        <select id="ai-type" style="background:#08111f;border:1px solid #1b2c44;border-radius:8px;color:#cfd9e6;padding:7px 10px">
+          <option value="arrival">进近 arrival</option>
+          <option value="departure">离场 departure</option>
+        </select>
+        <button class="btn primary" id="btn-ai" style="flex:1">请求 AI 建议</button>
+      </div>
+      <div class="hint" id="ai-state" style="margin-top:10px">上下文由后端组装；未配置密钥时接口返回 503，这里会提示。</div>
+    </div></section>
+    <section class="card side"><div class="box">
+      <h3>讲解词</h3>
+      <div class="narr">
+        ① 后端先算好 8 个方向的候选、气象与风险；<br>
+        ② 大模型只<b>读</b>这份上下文并给出建议；<br>
+        ③ 返回固定 <b>validated=false / executed=false</b>；<br>
+        ④ 未配置密钥时不编造，直接提示。
+      </div>
+    </div></section>
+  </div>
+  <div class="right">
+    <section class="card"><div class="box">
+      <h3>AI 建议</h3>
+      <div id="ai-advice" class="narr">尚未请求。</div>
+    </div></section>
+    <section class="card"><div class="box">
+      <h3>候选航道（只读评估）</h3>
+      <div class="feed" style="max-height:260px">
+        <table id="ai-cands"><thead><tr><th>方向</th><th>可用</th><th>评分</th><th>理由</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div></section>
+    <section class="card"><div class="box">
+      <h3>数据与使用限制</h3>
+      <ul id="ai-limits" class="narr" style="margin:0;padding-left:18px"></ul>
+    </div></section>
+  </div>
+</div>
+
 <!-- ================= 3. 对外推送 ================= -->
 <div class="wrap hidden" id="p3">
   <div class="left">
@@ -594,7 +639,40 @@ function renderSeq() {
 }
 setInterval(pollRecommend, 5000); setTimeout(pollRecommend, 1200);
 
-/* ---------------- 导演模式：一键播放四幕 ---------------- */
+/* ---------------- AI 决策幕 ---------------- */
+async function askAi() {
+  const q = (document.getElementById('ai-q').value || '').trim();
+  const type = document.getElementById('ai-type').value;
+  const stateEl = document.getElementById('ai-state');
+  const box = document.getElementById('ai-advice');
+  if (!q) { stateEl.textContent = '请先输入决策问题'; return; }
+  stateEl.textContent = '请求中…（最长 45 秒）';
+  box.textContent = '请求中…';
+  try {
+    const d = await api('/api/ai/advice', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: q, program_type: type})
+    });
+    box.textContent = d.advice || '（空回复）';
+    const ctx = d.context || {};
+    document.querySelector('#ai-cands tbody').innerHTML = (ctx.candidates || []).map(function (c) {
+      const m = c.metrics || {};
+      const detail = (c.reasons || []).join('；') || '—';
+      return '<tr><td>' + (c.direction || '—') + '</td><td>' + (c.available ? '可用' : '不可用') + '</td>' +
+        '<td>' + (c.score != null ? Number(c.score).toFixed(3) : '—') + '</td>' +
+        '<td style="color:#8ea0bd;white-space:normal">' + detail + '</td></tr>';
+    }).join('');
+    document.getElementById('ai-limits').innerHTML = (ctx.limitations || []).map(function (x) { return '<li>' + x + '</li>'; }).join('');
+    stateEl.textContent = '模型 ' + (d.model || '—') + ' · validated=' + d.validated + ' · executed=' + d.executed + ' · 需人工复核';
+  } catch (e) {
+    box.textContent = '请求失败：' + e.message;
+    stateEl.textContent = '检查 backend/.env.deepseek 或 DEEPSEEK_API_KEY，以及后端 8080 是否可访问。';
+  }
+}
+document.getElementById('btn-ai').onclick = askAi;
+
+/* ---------------- 导演模式：一键播放六幕 ---------------- */
 var directorTimer = null, directorOn = false;
 
 function directorSubtitle(html) {
@@ -621,10 +699,12 @@ function runDirector() {
 
   var steps = [
     { ms: 0,     tab: 'p1', cap: '<b>第一幕</b>　进出场程序：点方向 → 方案库取模板；不合格自动 A* 重规划', run: function () { curDir = 'NW'; buildDirs(); generate('arrival'); } },
-    { ms: 14000, tab: 'p2', cap: '<b>第二幕</b>　多设备去重：两台设备看到同一架飞机，10 条观测输出 7 条唯一航迹', run: function () { var e = document.getElementById('btn-run'); if (e) e.click(); } },
-    { ms: 32000, tab: 'p4', cap: '<b>第四幕</b>　RL 影子模式：带真值对比，困难密集场景错配 103 → 1', run: function () { var e = document.getElementById('btn-cmp'); if (e) e.click(); } },
-    { ms: 58000, tab: 'p3', cap: '<b>第三幕</b>　对外推送：落发件箱 → HMAC 签名 → 推送 → 失败重试', run: function () { var e = document.getElementById('btn-test'); if (e) e.click(); } },
-    { ms: 72000, tab: 'p1', cap: '<b>演示结束</b>　感谢观看', run: function () { stopDirector(); } }
+    { ms: 14000, tab: 'p5', cap: '<b>第二幕</b>　多机进近排序：慢飞 + 排序把落地率从 77.3% 提到 98.7%', run: function () {} },
+    { ms: 30000, tab: 'p2', cap: '<b>第三幕</b>　多设备去重：两台设备看到同一架飞机，10 条观测输出 7 条唯一航迹', run: function () { var e = document.getElementById('btn-run'); if (e) e.click(); } },
+    { ms: 50000, tab: 'p3', cap: '<b>第四幕</b>　对外推送：落发件箱 → HMAC 签名 → 推送 → 失败重试', run: function () { var e = document.getElementById('btn-test'); if (e) e.click(); } },
+    { ms: 64000, tab: 'p4', cap: '<b>第五幕</b>　RL 影子模式：带真值对比，困难密集场景错配 103 → 1', run: function () { var e = document.getElementById('btn-cmp'); if (e) e.click(); } },
+    { ms: 90000, tab: 'p6', cap: '<b>第六幕</b>　AI 决策：大模型读取气象 / 航道 / 电量，只给建议、不执行', run: function () {} },
+    { ms: 106000, tab: 'p1', cap: '<b>演示结束</b>　感谢观看', run: function () { stopDirector(); } }
   ];
 
   function at(i) {
@@ -651,7 +731,7 @@ setInterval(ping, 5000); ping();
 /* ---------------- Tab ---------------- */
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
-  ['p1','p2','p3','p4','p5'].forEach(id => $('#' + id).classList.toggle('hidden', id !== t.dataset.tab));
+  ['p1','p2','p3','p4','p5','p6'].forEach(id => $('#' + id).classList.toggle('hidden', id !== t.dataset.tab));
   /* 第一幕已换成新页面 */
   if (t.dataset.tab === 'p4') rlPoll();
 });

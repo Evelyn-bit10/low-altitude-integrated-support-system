@@ -17,8 +17,8 @@
   function number(value, digits) { var n=Number(value); return isFinite(n) ? n.toFixed(digits == null ? 0 : digits) : '—'; }
   function localTime(value) { if (!value) return '—'; var d=new Date(value); return isNaN(d.getTime()) ? String(value) : d.toLocaleString('zh-CN',{hour12:false}); }
   function nowTime() { return new Date().toLocaleTimeString('zh-CN',{hour12:false}); }
-  function routeName(route) { return {home:'运行总览',situation:'实时态势',program:'飞行程序',ground:'地面站机位',dashboard:'数据看板',business:'业务管理'}[route] || '运行总览'; }
-  function parseRoute() { var value=location.hash.replace(/^#\/?/,'').split('?')[0]; return ['home','situation','program','ground','dashboard','business'].indexOf(value)>=0?value:'home'; }
+  function routeName(route) { return {home:'运行总览',situation:'实时态势',program:'飞行程序',decision:'AI 决策',ground:'地面站机位',dashboard:'数据看板',business:'业务管理',admin:'系统管理'}[route] || '运行总览'; }
+  function parseRoute() { var value=location.hash.replace(/^#\/?/,'').split('?')[0]; return ['home','situation','program','decision','ground','dashboard','business','admin'].indexOf(value)>=0?value:'home'; }
 
   var state = {
     route: parseRoute(),
@@ -41,7 +41,20 @@
     selectedTraffic: 'UAV-CQ031',
     businessTab: 'plans',
     adverseWeather: false,
-    actionBusy: false
+    actionBusy: false,
+    // AI 决策页
+    advice: null,
+    adviceLoading: false,
+    adviceError: null,
+    adviceType: 'arrival',
+    // 系统管理页
+    metrics: null,
+    devices: null,
+    routes: null,
+    shadow: null,
+    rl: null,
+    adminLoaded: false,
+    adminBusy: false
   };
 
   function normalizeSnapshot(raw) {
@@ -273,7 +286,7 @@
     return '<div class="page">'+breadcrumb('数据看板')+pageHead('ANALYTICS · OPERATION INSIGHT','运行数据看板','跨系统汇总指标、趋势和运行质量&nbsp; '+sourceTag(state.source.core),button('更新数据','sync','ghost'))+
       '<div class="kpi-grid">'+kpi('今日架次','32',' 架次','较昨日 +14.2%','plane','cyan')+kpi('平均周转时长','18.6',' min','目标 ≤ 22 min','clock')+kpi('机位占用率','66.7',' %','4 / 6 active','stand')+kpi('安全事件','0',' 起','连续 18 天无事故','shield','cyan')+'</div>'+
       '<div class="dashboard-grid">'+chartPanel('traffic-chart','在线架次趋势','过去 12 小时 · 在线 / 离场',badge('12H','info'))+chartPanel('alarm-chart','告警分布','按运行来源归类',badge('24 TOTAL','danger'))+chartPanel('weather-chart','气象走势','风速 / 温度 · 过去 8 小时',badge('METEO','info'))+
-      panel('运行质量','QUALITY TARGET',badge('THIS WEEK','success'),'<div class="quality-list">'+[['程序准时发布率','98.4',98.4],['RID 识别覆盖率','96.8',96.8],['C2 链路可用率','99.9',99.9],['传感器在线率','100',100],['告警闭环率','94.1',94.1]].map(function(q){return '<article><header><span>'+q[0]+'</span><b class="mono">'+q[1]+'%</b></header><div><i style="width:'+q[2]+'%"></i></div></article>';}).join('')+'</div>','quality-panel')+'</div>'+pushPanel()+'</div>';
+      panel('运行质量','QUALITY TARGET',badge('THIS WEEK','success'),'<div class="quality-list">'+[['程序准时发布率','98.4',98.4],['RID 识别覆盖率','96.8',96.8],['C2 链路可用率','99.9',99.9],['传感器在线率','100',100],['告警闭环率','94.1',94.1]].map(function(q){return '<article><header><span>'+q[0]+'</span><b class="mono">'+q[1]+'%</b></header><div><i style="width:'+q[2]+'%"></i></div></article>';}).join('')+'</div>','quality-panel')+'</div>'+runtimePanel()+pushPanel()+'</div>';
   }
 
   function businessTable() {
@@ -287,6 +300,175 @@
     return '<div class="page">'+breadcrumb('业务管理')+pageHead('BUSINESS · PERMIT & AUDIT','业务管理','许可指令、实名登记与全链路审计的演示业务层&nbsp; '+sourceTag('mock','BUSINESS MOCK'),button('新建登记','new-registration','primary'))+
       '<div class="kpi-grid">'+kpi('待审批计划','02',' 项','1 项需安全复核','clock','warn')+kpi('有效许可指令','18',' 条','当前运行窗口','shield','cyan')+kpi('实名登记主体','36',' 个','飞手 + 客户','business')+kpi('审计完整率','100',' %','链路操作已留痕','link','cyan')+'</div>'+
       '<section class="panel business-panel"><header class="business-toolbar"><div class="tabs">'+tabs.map(function(t){return '<button class="tab '+(state.businessTab===t[0]?'active':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div><div>'+badge('INTERNAL DEMO','info')+'</div></header><div class="table-scroll">'+businessTable()+'</div></section><div class="integration-note business-note"><span>i</span><p>业务管理实体尚未纳入当前 canonical REST 契约，本页仅展示需求中明确要求的许可状态、实名登记、指令有效期与审计信息，不向 flycontrol 接口写入这些字段。</p></div></div>';
+  }
+
+  // ---- AI 决策页（只读建议，不执行）与系统管理页 ----
+  var DEMO_CANDIDATES = [
+    {direction:'S',score:1.0,available:true,mode:'template',fallback:false,metrics:{distance_m:2490,eta_s:166,clearance_m:132,crosswind_ms:0},reasons:['逆风 5.0 m/s、侧风 0.0（最优）','航程 2.5 km']},
+    {direction:'N',score:0.92,available:true,mode:'template',fallback:false,metrics:{distance_m:2560,eta_s:171,clearance_m:118,crosswind_ms:1.2},reasons:['顺风 5.0 m/s，能耗略低','超障余度 118 m']},
+    {direction:'SW',score:0.81,available:true,mode:'dynamic',fallback:true,metrics:{distance_m:2980,eta_s:199,clearance_m:96,crosswind_ms:3.4},reasons:['模板不适用，已动态重规划','航程偏长']},
+    {direction:'NE',score:0,available:false,mode:'dynamic',fallback:true,metrics:{},reasons:['合规校验未通过：穿越限飞区']}
+  ];
+  var DEMO_ADVICE = {
+    advice:'（演示数据）当前南向进近侧风为 0、超障余度 132 m，且合规与仿真均通过，建议优先采用 S 方向。若电量降至 40% 以下，应改选航程最短方向并预备就近备降；东北方向穿越限飞区，不可用。',
+    model:'demo-advisory', requires_human_review:true, validated:false, executed:false,
+    context:{captured_at:'—',data_freshness:'unknown',candidates:DEMO_CANDIDATES,
+      limitations:['演示数据，非真实观测','未接入真实空域许可与机型参数','模型输出可能有误，需人工复核后使用']}
+  };
+  var DEMO_DEVICES = [
+    {id:'D-A-RID',name:'A 站 RID 接收机',source_key:'A-RID',kind:'rid',sigma_m:8,status:'online'},
+    {id:'D-B-RID',name:'B 站 RID 接收机',source_key:'B-RID',kind:'rid',sigma_m:22,status:'online'},
+    {id:'D-RADAR-1',name:'场面雷达',source_key:'RADAR-1',kind:'radar',sigma_m:15,status:'offline'}
+  ];
+  var DEMO_ROUTES = [
+    {id:'R-EAST',name:'东侧进场走廊',kind:'corridor',points:[[0,-300],[900,-200],[1500,0]],floor_agl:30,ceiling_agl:120},
+    {id:'R-NOFY',name:'施工禁飞区',kind:'no_fly',points:[[300,300],[600,300],[600,500]],floor_agl:0,ceiling_agl:200}
+  ];
+  var DEMO_METRICS = {
+    metrics:{uptime_sec:0,frames:0,avg_frame_ms:0,frame_ms:{p50:0,p90:0,p99:0,max:0},candidates:{p50:0,p99:0,max:0},unique_tracks:{now:0,p50:0,max:0},counters:{matched:0,created:0,duplicate:0}},
+    kalman:{tracks:0,sigma_mean:0,sigma_max:0,sigma_scale:1}
+  };
+
+  function candidateTable(list) {
+    if(!list.length) return '<div class="empty-state">暂无候选（未请求或后端未返回）</div>';
+    return '<div class="table-scroll"><table><thead><tr><th>方向</th><th>可用</th><th>评分</th><th>模式</th><th>距离</th><th>超障</th><th>侧风</th><th>理由</th></tr></thead><tbody>'+
+      list.map(function(c){var m=c.metrics||{};return '<tr><td class="mono">'+esc(c.direction||'—')+'</td>'+
+        '<td>'+badge(c.available?'可用':'不可用',c.available?'success':'danger')+'</td>'+
+        '<td class="mono">'+number(c.score,3)+'</td><td>'+esc(c.mode||'—')+(c.fallback?' <em>回退</em>':'')+'</td>'+
+        '<td class="mono">'+(m.distance_m!=null?number(m.distance_m,0)+' m':'—')+'</td>'+
+        '<td class="mono">'+(m.clearance_m!=null?number(m.clearance_m,0)+' m':'—')+'</td>'+
+        '<td class="mono">'+(m.crosswind_ms!=null?number(m.crosswind_ms,1)+' m/s':'—')+'</td>'+
+        '<td class="muted-cell">'+esc(safeArray(c.reasons).join('；')||'—')+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }
+
+  function adviceBody(adv,demo) {
+    if(state.adviceLoading) return '<div class="empty-state">正在请求大模型建议…（最长 45 秒）</div>';
+    if(state.adviceError) return '<div class="advice-error"><b>请求失败</b><p>'+esc(state.adviceError)+'</p><p class="mono">检查 backend/.env.deepseek 或 DEEPSEEK_API_KEY 是否配置，以及后端 8080 是否可访问。</p></div>';
+    var shown=adv||(demo?DEMO_ADVICE:null);
+    if(!shown) return '<div class="empty-state">输入问题后点右上角「请求 AI 建议」。</div>';
+    return '<div class="advice-text">'+esc(shown.advice)+'</div>'+
+      '<div class="advice-meta">'+badge('模型 '+(shown.model||'—'),'purple')+badge(shown.validated?'已校验':'未校验',shown.validated?'success':'warning')+badge(shown.executed?'已执行':'未执行','warning')+badge(shown.requires_human_review?'需人工复核':'—','warning')+'</div>'+
+      (demo?'<div class="form-note">当前为演示数据模式，展示的是内置示例；切换顶栏到「实时数据」后可调用真实大模型。</div>':'');
+  }
+
+  function renderDecision() {
+    var demo=state.dataMode!=='live', adv=state.advice;
+    var ctx=adv&&adv.context?adv.context:(demo?DEMO_ADVICE.context:null);
+    var candidates=safeArray(ctx&&ctx.candidates), limitations=safeArray(ctx&&ctx.limitations);
+    var modeBadge=state.adviceLoading?badge('请求中','warning'):(adv?badge(adv.model||'LLM','purple'):(demo?badge('演示数据','warning'):badge('待请求','info')));
+    return '<div class="page">'+breadcrumb('AI 决策')+
+      pageHead('ADVISORY · LLM ASSISTED DECISION','AI 轨迹决策','大模型结合气象、航道、电量与空域约束给出建议；<b>只读建议，不执行、不下发</b>&nbsp; '+badge('READ ONLY','warning'),button('请求 AI 建议','ask-ai','primary')+button('刷新上下文','refresh-decision','ghost'))+
+      '<div class="decision-grid">'+
+        panel('决策问题','QUESTION · 上下文由后端组装后发送',badge(state.adviceType==='departure'?'离场':'进近','info'),
+          '<textarea id="ai-question" class="ai-question" rows="5" placeholder="例如：当前电量 68%、风速 8 m/s，应选择哪条进近航道？需要哪些放行条件？">'+esc(state.adviceQuestion||'当前电量与气象条件下，应安排哪条进近航道？请说明理由与风险。')+'</textarea>'+
+          '<div class="ai-question-row"><label>程序类型 <select id="ai-program-type"><option value="arrival"'+(state.adviceType!=='departure'?' selected':'')+'>进近 arrival</option><option value="departure"'+(state.adviceType==='departure'?' selected':'')+'>离场 departure</option></select></label>'+
+          '<span class="mono ai-hint">POST /api/ai/advice · 超时 45s</span></div>','ai-question-panel')+
+        panel('AI 建议','ADVISORY',modeBadge,adviceBody(adv,demo),'advice-panel')+
+      '</div>'+
+      panel('候选航道（只读评估）','CANDIDATES · '+candidates.length,badge('后端计算','info'),candidateTable(candidates))+
+      (limitations.length?panel('数据与使用限制','LIMITATIONS',badge('必须人工复核','warning'),'<ul class="limitation-list">'+limitations.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'):'')+
+      '</div>';
+  }
+
+  function deviceTable(list,demo) {
+    if(!list.length) return '<div class="empty-state">暂无设备</div>';
+    return '<div class="table-scroll"><table><thead><tr><th>名称</th><th>source_key</th><th>类型</th><th>σ</th><th>状态</th><th></th></tr></thead><tbody>'+
+      list.map(function(d){return '<tr><td>'+esc(d.name||d.id)+'</td><td class="mono">'+esc(d.source_key)+'</td><td>'+esc(d.kind)+'</td>'+
+        '<td class="mono">'+number(d.sigma_m,0)+' m</td><td>'+badge(d.status||'—',d.status==='online'?'success':'warning')+'</td>'+
+        '<td>'+(demo?'<span class="mono">演示</span>':'<button class="text-button danger" data-action="device-del" data-id="'+esc(d.id)+'">删除</button>')+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }
+  function deviceForm(demo) {
+    if(demo) return '<div class="form-note">演示数据模式：切换到「实时数据」后可新增/删除；写操作需要 admin 角色（AUTH_ENABLED=1 时）。</div>';
+    return '<div class="inline-form"><input id="dev-name" class="form-input" placeholder="名称"><input id="dev-key" class="form-input" placeholder="source_key">'+
+      '<select id="dev-kind" class="form-input"><option value="rid">rid</option><option value="adsb">adsb</option><option value="radar">radar</option><option value="camera">camera</option></select>'+
+      '<input id="dev-sigma" class="form-input" placeholder="σ 米" value="15"><button class="button ghost" data-action="device-add">新增设备</button></div>';
+  }
+  function routeTable(list,demo) {
+    if(!list.length) return '<div class="empty-state">暂无路线</div>';
+    return '<div class="table-scroll"><table><thead><tr><th>名称</th><th>类型</th><th>点数</th><th>高度范围</th><th></th></tr></thead><tbody>'+
+      list.map(function(r){return '<tr><td>'+esc(r.name||r.id)+'</td><td>'+badge(esc(r.kind),r.kind==='no_fly'?'danger':r.kind==='corridor'?'info':'success')+'</td>'+
+        '<td class="mono">'+safeArray(r.points).length+'</td><td class="mono">'+number(r.floor_agl,0)+'–'+number(r.ceiling_agl,0)+' m AGL</td>'+
+        '<td>'+(demo?'<span class="mono">演示</span>':'<button class="text-button danger" data-action="route-del" data-id="'+esc(r.id)+'">删除</button>')+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }
+  function routeForm(demo) {
+    if(demo) return '<div class="form-note">演示数据模式：路线台账写入需要 admin 角色。</div>';
+    return '<div class="inline-form"><input id="route-name" class="form-input" placeholder="名称">'+
+      '<select id="route-kind" class="form-input"><option value="corridor">corridor</option><option value="no_fly">no_fly</option><option value="route">route</option></select>'+
+      '<input id="route-points" class="form-input" placeholder="点 x,y;x,y" value="0,-300;900,-200;1500,0">'+
+      '<input id="route-floor" class="form-input" placeholder="下限 AGL" value="30"><input id="route-ceil" class="form-input" placeholder="上限 AGL" value="120">'+
+      '<button class="button ghost" data-action="route-add">新增路线</button></div>';
+  }
+  function policyBody(shadow,rl) {
+    var on=shadow&&shadow.enabled;
+    return '<div class="policy-grid">'+
+      '<div class="policy-item"><small>RL 影子模式</small><b>'+badge(on?'开启':'关闭',on?'success':'warning')+'</b><p>'+esc((shadow&&shadow.reason)||(on?'策略与规则并行记录':'未开启'))+'</p>'+
+        (state.dataMode==='live'?'<button class="button ghost" data-action="shadow-toggle" data-on="'+(on?'0':'1')+'">'+(on?'关闭影子':'开启影子')+'</button>':'<span class="mono">演示模式</span>')+'</div>'+
+      '<div class="policy-item"><small>RL 模型</small><b>'+badge(rl&&Object.keys(rl).length?'已加载':'未知',rl&&Object.keys(rl).length?'success':'warning')+'</b><p class="mono">GET /api/rl/health</p></div>'+
+      '<div class="policy-item"><small>鉴权</small><b>'+badge('AUTH_ENABLED=false','warning')+'</b><p>演示默认关闭；写操作按 admin / operator / viewer 校验（见 docs/ADMIN.md）。</p></div>'+
+      '<div class="policy-item"><small>外部调用</small><b>'+badge('LLM 计费','purple')+'</b><p>AI 建议调用会产生外部 API 请求与费用。</p></div>'+
+      '</div>';
+  }
+
+  function renderAdmin() {
+    var demo=state.dataMode!=='live';
+    var m=(state.metrics&&state.metrics.metrics)||DEMO_METRICS.metrics;
+    var k=(state.metrics&&state.metrics.kalman)||DEMO_METRICS.kalman;
+    var fm=m.frame_ms||{},cand=m.candidates||{},uniq=m.unique_tracks||{};
+    var devices=state.devices||DEMO_DEVICES, routes=state.routes||DEMO_ROUTES;
+    var shadow=state.shadow||{enabled:false,reason:'未开启'}, rl=state.rl||{};
+    return '<div class="page">'+breadcrumb('系统管理')+
+      pageHead('SYSTEM · RUNTIME & LEDGER','系统管理','运行指标、设备台账、路线管理与策略开关&nbsp; '+sourceTag(demo?'mock':'live'),button('刷新','refresh-admin','ghost'))+
+      '<div class="kpi-grid">'+kpi('运行时长',number(Number(m.uptime_sec||0)/3600,1),' h','frames '+number(m.frames,0),'clock')+
+        kpi('帧耗时 p99',number(fm.p99,2),' ms','p50 '+number(fm.p50,2)+' ms','chart','cyan')+
+        kpi('候选边 p99',number(cand.p99,0),' 条','max '+number(cand.max,0),'link')+
+        kpi('唯一航迹',number(uniq.now,0),' 条','σ 均值 '+number(k.sigma_mean,1)+' m','radar','cyan')+'</div>'+
+      '<div class="admin-grid">'+panel('设备台账','DEVICES · source_key 唯一',badge(devices.length+' 台','info'),deviceTable(devices,demo)+deviceForm(demo))+
+        panel('路线台账','ROUTES · corridor / no_fly / route',badge(routes.length+' 条','info'),routeTable(routes,demo)+routeForm(demo))+'</div>'+
+      panel('策略与权限','POLICY & RBAC',badge('演示默认关闭鉴权','warning'),policyBody(shadow,rl))+
+      '</div>';
+  }
+
+  function loadAdmin(force) {
+    if(state.adminBusy) return;
+    if(state.adminLoaded&&!force) return;
+    if(state.dataMode!=='live'){state.adminLoaded=true;return;}
+    state.adminBusy=true;
+    Promise.all([Api.metrics(),Api.devices(),Api.routes(),Api.shadow(),Api.rlHealth()]).then(function(r){
+      if(r[0]&&r[0].ok)state.metrics=r[0].data;
+      if(r[1]&&r[1].ok)state.devices=safeArray(r[1].data&&r[1].data.devices);
+      if(r[2]&&r[2].ok)state.routes=safeArray(r[2].data&&r[2].data.routes);
+      if(r[3]&&r[3].ok)state.shadow=r[3].data;
+      if(r[4]&&r[4].ok)state.rl=r[4].data;
+      state.adminBusy=false;state.adminLoaded=true;
+      if(state.route==='admin')render();
+    }).catch(function(){state.adminBusy=false;state.adminLoaded=true;if(state.route==='admin')render();});
+  }
+
+  function askAdvice() {
+    if(state.adviceLoading) return;
+    var q=document.getElementById('ai-question'), t=document.getElementById('ai-program-type');
+    var message=((q&&q.value)||'').trim();
+    if(!message){toast('请先输入决策问题','warning');return;}
+    state.adviceQuestion=message;state.adviceType=(t&&t.value)||'arrival';
+    if(state.dataMode!=='live'){toast('演示模式：展示内置示例；切换实时数据后可调用大模型','info');render();return;}
+    state.adviceLoading=true;state.adviceError=null;render();
+    Api.advice(message,state.adviceType).then(function(r){
+      state.adviceLoading=false;
+      if(r.ok){state.advice=r.data;state.adviceError=null;}
+      else{state.advice=null;state.adviceError=r.error==='TIMEOUT'?'请求超时（45s）':'后端不可用或模型未配置（HTTP 503/502）';}
+      render();
+    }).catch(function(){state.adviceLoading=false;state.adviceError='请求失败';render();});
+  }
+
+  function runtimePanel() {
+    var m=(state.metrics&&state.metrics.metrics)||DEMO_METRICS.metrics;
+    var k=(state.metrics&&state.metrics.kalman)||DEMO_METRICS.kalman;
+    var fm=m.frame_ms||{},cand=m.candidates||{},uniq=m.unique_tracks||{},ct=m.counters||{};
+    var cells=[['帧数',number(m.frames,0)],['平均帧耗时',number(m.avg_frame_ms,2)+' ms'],['p50 / p99',number(fm.p50,2)+' / '+number(fm.p99,2)+' ms'],
+      ['候选边 p50 / p99',number(cand.p50,0)+' / '+number(cand.p99,0)],['唯一航迹',number(uniq.now,0)],['匹配 / 新建 / 重复',number(ct.matched,0)+' / '+number(ct.created,0)+' / '+number(ct.duplicate,0)],
+      ['σ 均值 / 上限',number(k.sigma_mean,1)+' / '+number(k.sigma_max,1)+' m'],['σ 标定尺度',number(k.sigma_scale,2)]];
+    return panel('后端运行指标','RUNTIME METRICS · 环形缓冲 600 帧',badge(state.dataMode==='live'?'LIVE':'DEMO',state.dataMode==='live'?'success':'warning'),
+      '<div class="metrics-grid">'+cells.map(function(c){return '<div class="metrics-cell"><small>'+esc(c[0])+'</small><b class="mono">'+esc(c[1])+'</b></div>';}).join('')+'</div>','metrics-panel');
   }
 
   // ---- 局部 DOM 更新：数据刷新时只改变化的部分，不重建整页（避免闪烁）----
@@ -323,7 +505,7 @@
     state.route=nextRoute;
     document.querySelectorAll('[data-nav]').forEach(function(node){node.classList.toggle('active',node.getAttribute('data-nav')===state.route);});
     document.body.classList.remove('nav-open');
-    var views={home:renderHome,situation:renderSituation,program:renderProgram,ground:renderGround,dashboard:renderDashboard,business:renderBusiness};
+    var views={home:renderHome,situation:renderSituation,program:renderProgram,decision:renderDecision,ground:renderGround,dashboard:renderDashboard,business:renderBusiness,admin:renderAdmin};
     var html=(views[state.route]||renderHome)();
     if(routeChanged||!app.firstChild){app.innerHTML=html;}
     else{var tpl=document.createElement('template');tpl.innerHTML=html;morphChildren(app,tpl.content);}
@@ -347,6 +529,7 @@
       if(state.dataMode==='live'&&!state.plansLoaded)loadPlans();
       var p=state.program.program||effectiveSnapshot().program||Mock.snapshot.program;Visuals.program(document.getElementById('program-map'),effectiveSnapshot(),p);Visuals.profile(document.getElementById('profile-map'),p);}
     if(state.route==='dashboard'){cleanup.push(Visuals.dashboard(Mock.analytics));Visuals.loadECharts(function(ok){if(ok&&state.route==='dashboard'){Visuals.disposeCharts();cleanup.push(Visuals.dashboard(Mock.analytics));}});}
+    if(state.route==='admin'){loadAdmin(false);}
   }
 
   function updateConnection() {
@@ -427,6 +610,21 @@
     if(action==='toggle-obstacle'){toggleObstacle();return;}
     if(action==='weather-scenario'){weatherScenario();return;}
     if(action==='refresh-ground'){syncData(true);return;}
+    if(action==='ask-ai'){askAdvice();return;}
+    if(action==='refresh-decision'){state.advice=null;state.adviceError=null;render();return;}
+    if(action==='refresh-admin'){loadAdmin(true);return;}
+    if(action==='shadow-toggle'){var on=element.getAttribute('data-on')==='1';Api.setShadow(on).then(function(r){if(r.ok){toast('影子模式已'+(on?'开启':'关闭'),'success');loadAdmin(true);}else toast('切换失败：影子模式未加载','warning');});return;}
+    if(action==='device-del'){var did=element.getAttribute('data-id');Api.deleteDevice(did).then(function(r){if(r.ok){toast('设备已删除','success');loadAdmin(true);}else toast('删除失败（需 admin 角色）','warning');});return;}
+    if(action==='device-add'){var dn=document.getElementById('dev-name'),dk=document.getElementById('dev-key'),dkind=document.getElementById('dev-kind'),ds=document.getElementById('dev-sigma');
+      var device={name:(dn&&dn.value)||'',source_key:(dk&&dk.value)||'',kind:(dkind&&dkind.value)||'rid',sigma_m:Number(ds&&ds.value)||15};
+      if(!device.name||!device.source_key){toast('名称与 source_key 不能为空','warning');return;}
+      Api.createDevice(device).then(function(r){if(r.ok){toast('设备已新增','success');loadAdmin(true);}else toast('新增失败：source_key 可能重复','warning');});return;}
+    if(action==='route-del'){var rid=element.getAttribute('data-id');Api.deleteRoute(rid).then(function(r){if(r.ok){toast('路线已删除','success');loadAdmin(true);}else toast('删除失败（需 admin 角色）','warning');});return;}
+    if(action==='route-add'){var rn=document.getElementById('route-name'),rk=document.getElementById('route-kind'),rp=document.getElementById('route-points'),rf=document.getElementById('route-floor'),rc=document.getElementById('route-ceil');
+      var points=((rp&&rp.value)||'').split(';').map(function(pair){var xy=pair.split(',');return [Number(xy[0])||0,Number(xy[1])||0];});
+      var route={name:(rn&&rn.value)||'',kind:(rk&&rk.value)||'corridor',points:points,floor_agl:Number(rf&&rf.value)||0,ceiling_agl:Number(rc&&rc.value)||120};
+      if(!route.name){toast('路线名称不能为空','warning');return;}
+      Api.createRoute(route).then(function(r){if(r.ok){toast('路线已新增','success');loadAdmin(true);}else toast('新增失败（需 admin 角色）','warning');});return;}
     if(action==='new-registration'){toast('当前为业务演示数据，登记写入接口尚未提供','warning');}
   }
 

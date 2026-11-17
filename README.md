@@ -40,7 +40,7 @@
 
 | 页面 | 地址 | 内容 |
 | --- | --- | --- |
-| 功能演示台 | http://127.0.0.1:5500/demo.html | ① 进出场程序　② 多设备去重　③ 对外数据推送 |
+| 功能演示台 | http://127.0.0.1:5500/demo.html | ① 进出场程序　② 多机进近排序　③ 多设备去重　④ 对外数据推送　⑤ RL 影子模式　⑥ AI 决策 |
 
 它会额外拉起「模拟 UOM 接收端」(8099)，并把后端切到 `PUSH_MODE=http`。
 演示脚本与讲解词见 `flight/flycontrol/low-altitude-demo/backend/docs/DEMO.md`。
@@ -64,7 +64,7 @@
 low-altitude/
 ├── 启动一体化门户.bat        ★ 全系统一键启动（双击，总入口）
 ├── start-system.ps1          启动逻辑（被上面那个 bat 调用；-LanIpOnly 只打印局域网 IP）
-├── 启动演示.bat              功能演示台（三项能力 + 模拟 UOM 8099）
+├── 启动演示.bat              功能演示台（六幕能力 + 模拟 UOM 8099）
 ├── start-demo.ps1            演示台启动逻辑（被上面那个 bat 调用）
 ├── 低空系统.bat              统一调度器：双击弹菜单 / 带子命令直连其余入口
 ├── 自检.bat                  单元测试 + 网页冒烟 + 接口探活
@@ -82,7 +82,7 @@ low-altitude/
 ├── platform/                  【二、后台管理平台（B/S）】
 │   ├── portal/                一体化门户（我方可控的网页端）
 │   │   ├── index.html         门户本体（演示数据 / 实时数据双模式）
-│   │   ├── demo.html          功能演示台（三项能力 + RL 影子模式）
+│   │   ├── demo.html          功能演示台（六幕：程序/排序/去重/推送/RL/AI 决策）
 │   │   ├── demo_p1.html       演示台第一幕的独立版（进出场程序）
 │   │   ├── demo_p1_place.html 演示台第一幕点位投放版
 │   │   ├── rl_lab.html        RL 关联实验室（19 维特征可视化）
