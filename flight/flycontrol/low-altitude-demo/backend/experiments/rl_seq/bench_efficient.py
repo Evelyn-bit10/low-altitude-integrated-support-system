@@ -114,7 +114,7 @@ if __name__ == "__main__":
     for T in (20, 40, 60, 80):
         r = run(policy_threshold(T))
         print("   T=%2ds  落地 %5.1f%% | 耗尽 %5.1f%% | 奖励 %8.2f" % (T, r[1]*100, r[2]*100, r[0]))
-        if best is None or r[1] > best[1]:
+        if best is None or r[1] > best[1][1]:
             best = (T, r)
 
     print("\n③ 对比")
