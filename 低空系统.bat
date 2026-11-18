@@ -176,7 +176,7 @@ if not defined PY (
 echo.
 echo  Flyer app: http://127.0.0.1:%APP_PORT%/index.html   (close the minimized window to stop)
 echo.
-start "flyer-app-server" /min /d "%APP_DIR%" "%PY%" -m http.server %APP_PORT% --bind 127.0.0.1
+start "flyer-app-server" /min /d "%APP_DIR%" "%PY%" "%PORTAL_DIR%\serve.py" %APP_PORT% --host 127.0.0.1
 timeout /t 2 /nobreak >nul
 start "" "http://127.0.0.1:%APP_PORT%/index.html"
 goto end
@@ -194,9 +194,9 @@ start "flycontrol-api" /min /d "%BE%" "%PY%" -m uvicorn app.main:app --host 0.0.
 echo  [2/4] ground bridge     0.0.0.0:%GROUND_PORT%
 start "ground-bridge" /min "%PY%" "%PORTAL_DIR%\ground-bridge.py" --host 0.0.0.0 --port %GROUND_PORT%
 echo  [3/4] flyer app         0.0.0.0:%APP_PORT%
-start "flyer-app" /min /d "%APP_DIR%" "%PY%" -m http.server %APP_PORT% --bind 0.0.0.0
+start "flyer-app" /min /d "%APP_DIR%" "%PY%" "%PORTAL_DIR%\serve.py" %APP_PORT% --host 0.0.0.0
 echo  [4/4] portal            0.0.0.0:%PORTAL_PORT%
-start "portal" /min /d "%PORTAL_DIR%" "%PY%" -m http.server %PORTAL_PORT% --bind 0.0.0.0
+start "portal" /min /d "%PORTAL_DIR%" "%PY%" "%PORTAL_DIR%\serve.py" %PORTAL_PORT% --host 0.0.0.0
 echo.
 echo  Waiting for services ...
 timeout /t 5 /nobreak >nul

@@ -122,7 +122,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 
 # 3) 静态服务（再开一个窗口）
 cd ..\..\..\platform\portal
-python -m http.server 5500 --bind 127.0.0.1
+python serve.py 5500 --host 127.0.0.1
 
 # 4) 打开
 start http://127.0.0.1:5500/demo.html

@@ -91,7 +91,7 @@ cd yth
 python ground-bridge.py --host 0.0.0.0 --port 8090
 
 cd yth\pilot-app\flyer-app
-python -m http.server 5502 --bind 0.0.0.0
+python ..\..\platform\portal\serve.py 5502 --host 0.0.0.0
 ```
 
 #### 手机打不开？

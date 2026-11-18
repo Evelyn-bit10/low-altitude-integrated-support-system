@@ -23,6 +23,7 @@ $ErrorActionPreference = "SilentlyContinue"
 $root      = $PSScriptRoot
 $portalDir = Join-Path $root "platform\portal"
 $bridgePy  = Join-Path $portalDir "ground-bridge.py"
+$servePy   = Join-Path $portalDir "serve.py"
 $apiDir    = Join-Path $root "flight\flycontrol\low-altitude-demo\backend"
 $apiPy     = Join-Path $apiDir ".venv\Scripts\python.exe"
 $commHtml  = Join-Path $root "comms\communication\index.html"
@@ -172,7 +173,7 @@ Write-Host "[3/6] 管理平台门户   端口 5500" -NoNewline
 if (Test-Url $portalUrl) { Write-Host "   已在运行，复用" -ForegroundColor Green }
 else {
     Start-Process -FilePath $python `
-        -ArgumentList @("-m", "http.server", "5500", "--bind", "0.0.0.0") `
+        -ArgumentList @($servePy, "5500", "--host", "0.0.0.0") `
         -WorkingDirectory $portalDir -WindowStyle Hidden
     Write-Host "   已启动" -ForegroundColor Green
 }
@@ -182,7 +183,7 @@ Write-Host "[4/6] 飞手端 App     端口 5502" -NoNewline
 if (Test-Url $pilotUrl) { Write-Host "   已在运行，复用" -ForegroundColor Green }
 else {
     Start-Process -FilePath $python `
-        -ArgumentList @("-m", "http.server", "5502", "--bind", "0.0.0.0") `
+        -ArgumentList @($servePy, "5502", "--host", "0.0.0.0", "--dir", $pilotDir) `
         -WorkingDirectory $pilotDir -WindowStyle Hidden
     Write-Host "   已启动" -ForegroundColor Green
 }

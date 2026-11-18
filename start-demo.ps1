@@ -13,6 +13,7 @@ $portalDir = Join-Path $root "platform\portal"
 $apiDir    = Join-Path $root "flight\flycontrol\low-altitude-demo\backend"
 $apiPy     = Join-Path $apiDir ".venv\Scripts\python.exe"
 $mockPy    = Join-Path $apiDir "tools\mock_uom_server.py"
+$servePy   = Join-Path $portalDir "serve.py"
 
 $demoUrl   = "http://127.0.0.1:5500/demo.html"
 $apiHealth = "http://127.0.0.1:8080/api/health"
@@ -75,7 +76,7 @@ Write-Host "[3/4] 演示页面 5500" -NoNewline
 if (Test-Url $portalUrl) { Write-Host "   已在运行，复用" -ForegroundColor Green }
 else {
     Start-Process -FilePath $python `
-        -ArgumentList @("-m", "http.server", "5500", "--bind", "127.0.0.1") `
+        -ArgumentList @($servePy, "5500", "--host", "127.0.0.1") `
         -WorkingDirectory $portalDir -WindowStyle Hidden
     Write-Host "   已启动" -ForegroundColor Green
 }

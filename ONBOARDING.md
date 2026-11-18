@@ -47,8 +47,8 @@
 | --- | --- | --- | --- |
 | 1 | 飞控后端 flycontrol | 8080 | `backend\.venv\Scripts\python.exe -m uvicorn app.main:app` |
 | 2 | 门户数据桥 ground-bridge | 8090 | `python ground-bridge.py`（仅标准库） |
-| 3 | 管理平台门户 | 5500 | `python -m http.server 5500 --bind 0.0.0.0` |
-| 4 | 飞手端 App | 5502 | `python -m http.server 5502 --bind 0.0.0.0` |
+| 3 | 管理平台门户 | 5500 | `python serve.py 5500 --host 0.0.0.0`（no-store，改完刷新即生效） |
+| 4 | 飞手端 App | 5502 | `python serve.py 5502 --host 0.0.0.0 --dir ..\..\pilot-app\flyer-app` |
 | 5 | 通讯态势 | — | 浏览器打开 `comms\communication\index.html` |
 | 6 | 地面站桌面端 | — | `wrjtksf\drone_ground_station\venv\Scripts\python.exe main.py`（若 venv 存在） |
 
@@ -85,7 +85,7 @@ Start-Process http://127.0.0.1:5502/index.html
 
 | 子系统 | 命令 / 入口 |
 | --- | --- |
-| 门户 | `platform\portal\` 直接开 `index.html`，或 `python -m http.server 5500` |
+| 门户 | `platform\portal\` 直接开 `index.html`，或 `python serve.py 5500` |
 | 飞控 | `低空系统.bat api`（仅后端，前台看日志）或 `低空系统.bat apidev`（连带打开自带前端页） |
 | 通讯态势 | `低空系统.bat comms`（网页）/ `低空系统.bat decision`（跑 Python 决策引擎） |
 | 飞手端 | `低空系统.bat app`（本机）/ `低空系统.bat mobile`（局域网联调）/ `低空系统.bat apk` |
@@ -471,6 +471,8 @@ node selftest.js
     最省事的做法仍是把工程放在纯英文路径下。
 11. **仓库已上 GitHub**：`github.com/Evelyn-bit10/low-altitude-integrated-support-system`（分支 `main`）。
     `.gitignore` 已排除 `.env` / `*.db` / 运行时 json / 虚拟环境；提交前 `git status` 确认没有夹带本地配置。
+12. **改了前端代码看不到变化**：启动器现在用 `platform/portal/serve.py`（所有响应带 `Cache-Control: no-store`），普通刷新即可；
+    若你手动用了 `python -m http.server`，浏览器会启发式缓存 HTML/JS/CSS，需要 Ctrl+F5。
 
 ---
 
