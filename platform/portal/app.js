@@ -174,8 +174,8 @@
   }
 
   function planCards(type){
-    if(!state.plansLoaded) return '<div class="empty-state">正在加载方案库…</div>';
     if(state.dataMode!=='live') return '<div class="empty-state">切换顶栏到「实时数据」后可查询方案库</div>';
+    if(!state.plansLoaded) return '<div class="empty-state">正在加载方案库…</div>';
     var list = safeArray((state.plansLib[type]||[])).filter(function(p){ return !p.direction || p.direction===state.direction; });
     if(!list.length) return '<div class="empty-state">该方向暂无方案</div>';
     return list.map(function(p){
@@ -331,8 +331,11 @@
 
   function candidateTable(list) {
     if(!list.length) return '<div class="empty-state">暂无候选（未请求或后端未返回）</div>';
+    var best = null;
+    list.forEach(function(c){ if(c.available && (!best || Number(c.score) > Number(best.score))) best = c; });
+    var bestId = best ? best.direction : null;
     return '<div class="table-scroll"><table><thead><tr><th>方向</th><th>可用</th><th>评分</th><th>模式</th><th>距离</th><th>超障</th><th>侧风</th><th>理由</th></tr></thead><tbody>'+
-      list.map(function(c){var m=c.metrics||{};return '<tr><td class="mono">'+esc(c.direction||'—')+'</td>'+
+      list.map(function(c){var m=c.metrics||{}, rec=(c.direction===bestId);return '<tr'+(rec?' class="candidate-rec"':'')+'><td class="mono">'+esc(c.direction||'—')+(rec?' <span class="rec-tag">推荐</span>':'')+'</td>'+
         '<td>'+badge(c.available?'可用':'不可用',c.available?'success':'danger')+'</td>'+
         '<td class="mono">'+number(c.score,3)+'</td><td>'+esc(c.mode||'—')+(c.fallback?' <em>回退</em>':'')+'</td>'+
         '<td class="mono">'+(m.distance_m!=null?number(m.distance_m,0)+' m':'—')+'</td>'+
