@@ -17,7 +17,7 @@
   .pill.ok{border-color:#14523f;color:#7ee2b8}.pill.ok i{background:var(--green);box-shadow:0 0 8px var(--green)}
   .pill.bad{border-color:#5b2330;color:#f3a3ac}.pill.bad i{background:var(--red)}
   main{display:grid;grid-template-columns:330px 1fr;gap:14px;padding:14px}
-  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
   section h2{margin:0;padding:10px 14px;font-size:13px;color:#b9c8de;background:#121b30;
              border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
   section h2 em{font-style:normal;margin-left:auto;font-size:11px;color:var(--dim2)}
@@ -44,6 +44,7 @@
 .wp div{border-bottom:1px solid #16233a;padding:2px 0}
 .legend{display:flex;gap:14px;padding:0 14px 10px;font-size:11px;color:var(--dim2);flex-wrap:wrap}
   .hint{font-size:11px;color:var(--dim2);line-height:1.7}
+  @media(max-width:1200px){main{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -60,6 +61,17 @@
       <h2>方向列表<em>勾选显示</em></h2>
       <div class="body" id="list" style="padding:4px 10px">
         <div class="hint">正在加载模板…</div>
+      </div>
+    </section>
+    <section>
+      <h2>多机航道演示<em id="fleet-state">待启动</em></h2>
+      <div class="body">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button id="btn-fleet" style="padding:6px 12px;border-radius:7px;border:1px solid #22d3ee;background:#0b2b3a;color:#8ff0ff;cursor:pointer;font-size:12px">▶ 开始演示</button>
+          <label style="font-size:11px;color:#8ea0bd">风 <input id="fleet-wind" type="range" min="0" max="15" value="5" style="width:76px;vertical-align:middle"> <b id="fleet-wind-v" style="color:#cfd9e6">5</b> m/s</label>
+          <label style="font-size:11px;color:#8ea0bd">雨 <input id="fleet-rain" type="range" min="0" max="15" value="0" style="width:76px;vertical-align:middle"> <b id="fleet-rain-v" style="color:#cfd9e6">0</b> mm/h</label>
+        </div>
+        <div id="fleet-log" class="hint" style="height:86px;overflow:auto;margin-top:8px;padding:6px 8px;background:#0a1120;border:1px solid #16233a;border-radius:6px"></div>
       </div>
     </section>
     <section>
@@ -299,7 +311,162 @@ function draw() {
   ctx.closePath(); ctx.fillStyle = '#eaf4ff'; ctx.fill();
   ctx.fillStyle = '#8fa5c0'; ctx.font = '11px Microsoft YaHei';
   ctx.fillText('起降点', cx + 10, cy + 4);
+
+  // 多机航道演示（3 架同时进近）
+  drawFleet(ctx, px, py);
 }
+
+/* ---------------- 多机航道演示（从 demo.html 移植） ---------------- */
+const DIR_BEARING = {N:0,NE:45,E:90,SE:135,S:180,SW:225,W:270,NW:315};
+const fleet = { on:false, drones:[], timer:null };
+
+function entryPoint(dir) {
+  const b = (DIR_BEARING[dir] || 0) * Math.PI / 180;
+  return { x: Math.sin(b) * 2500, y: Math.cos(b) * 2500 };
+}
+
+function fleetInit(n) {
+  const seed = [[1500,-1200],[-1800,900],[300,1600],[-900,-1500],[1200,1400]];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = seed[i % seed.length];
+    out.push({ id:'U' + (i + 1), x:p0[0], y:p0[1], battery:1, dir:'S', prog:0, switches:0,
+      color:['#ffd666','#49e3ae','#7cc7ff'][i % 3] });
+  }
+  return out;
+}
+
+/* 选航道：挑「当前位置 → 该方向入口 → 跑道」最短的那条 */
+function pickDir(d) {
+  let best = d.dir, bestLen = 1e18;
+  for (const k in DIR_BEARING) {
+    const e = entryPoint(k);
+    const len = Math.hypot(e.x - d.x, e.y - d.y) + 2500;
+    if (len < bestLen) { bestLen = len; best = k; }
+  }
+  return best;
+}
+
+/* 航道折线：当前位置 → 方向入口 → 模板航路点（保持与真实模板一致的拐弯） */
+function fleetPath(d) {
+  const t = templates.find(x => x.direction === d.dir && x.available)
+    || templates.find(x => x.direction === d.dir);
+  const wps = (t && t.waypoints) || [];
+  const arr = [{ x:d.x, y:d.y }, entryPoint(d.dir)];
+  if (wps.length > 1) {
+    for (let i = 1; i < wps.length; i++) arr.push({ x:wps[i].x, y:wps[i].y });
+  } else {
+    arr.push({ x:0, y:0 });
+  }
+  return arr;
+}
+
+function fleetLog(text, color) {
+  const box = $('#fleet-log');
+  if (!box) return;
+  const line = document.createElement('div');
+  line.textContent = text;
+  line.style.color = color || '#8ea0bd';
+  box.appendChild(line);
+  while (box.childElementCount > 60) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+
+function fleetStep() {
+  if (!fleet.on) return;
+  const windEl = document.getElementById('fleet-wind');
+  const rainEl = document.getElementById('fleet-rain');
+  const wind = (windEl && parseFloat(windEl.value)) || 0;
+  const rain = (rainEl && parseFloat(rainEl.value)) || 0;
+  const drain = 0.006 + wind * 0.0012 + rain * 0.0018;
+
+  fleet.drones.forEach(d => {
+    d.battery -= drain;
+    d.prog += 0.045;
+
+    // 电量告急 → 重新选航道
+    if (d.battery < (1 - d.prog) * 0.55 && d.switches < 4) {
+      const nd = pickDir(d);
+      if (nd !== d.dir) {
+        d.dir = nd; d.switches += 1;
+        fleetLog(d.id + ' 电量 ' + Math.round(d.battery * 100) + '% → 改选 ' + nd + ' 航道', '#fbbf24');
+      }
+    }
+    if (d.battery <= 0) {
+      d.battery = 0; d.dead = true;
+      fleetLog(d.id + ' 电量耗尽', '#ff8f9a');
+    }
+    if (d.prog >= 1) {
+      fleetLog(d.id + ' 安全落地（剩余 ' + Math.round(d.battery * 100) + '%，改航 ' + d.switches + ' 次）', '#49e3ae');
+      d.prog = 0; d.battery = 1; d.switches = 0; d.dead = false;
+      const p0 = [[1500,-1200],[-1800,900],[300,1600],[-900,-1500],[1200,1400]][Math.floor(Math.random() * 5)];
+      d.x = p0[0]; d.y = p0[1];
+      d.dir = pickDir({ x:d.x, y:d.y, dir:'S' });
+    }
+  });
+  draw();
+}
+
+function drawFleet(ctx, px, py) {
+  if (!fleet.on) return;
+  fleet.drones.forEach(d => {
+    const path = fleetPath(d);
+    ctx.beginPath();
+    path.forEach((w, i) => i ? ctx.lineTo(px(w.x), py(w.y)) : ctx.moveTo(px(w.x), py(w.y)));
+    ctx.strokeStyle = d.color; ctx.globalAlpha = d.dead ? 0.2 : 0.5;
+    ctx.setLineDash([7, 5]); ctx.lineWidth = 2; ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    // 沿折线插值出飞机位置
+    const k = Math.min(0.999, d.prog) * (path.length - 1);
+    const i0 = Math.floor(k), t = k - i0;
+    const a = path[i0], b = path[Math.min(i0 + 1, path.length - 1)];
+    const dx = px(a.x + (b.x - a.x) * t), dy = py(a.y + (b.y - a.y) * t);
+
+    ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = d.dead ? '#5f7794' : d.color; ctx.fill();
+    ctx.strokeStyle = '#0b1424'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = d.dead ? '#5f7794' : d.color;
+    ctx.font = 'bold 10px Microsoft YaHei'; ctx.textAlign = 'center';
+    ctx.fillText(d.id + ' ' + d.dir, dx, dy - 10);
+    ctx.font = '9px Consolas'; ctx.fillStyle = 'rgba(200,215,235,.85)';
+    ctx.fillText(Math.round(d.battery * 100) + '%', dx, dy + 16);
+    ctx.textAlign = 'left';
+  });
+}
+
+function fleetToggle() {
+  const btn = $('#btn-fleet');
+  const st = $('#fleet-state');
+  if (fleet.on) {
+    fleet.on = false;
+    if (fleet.timer) { clearInterval(fleet.timer); fleet.timer = null; }
+    if (btn) btn.textContent = '▶ 开始演示';
+    if (st) st.textContent = '已停止';
+    draw();
+    return;
+  }
+  if (!templates.length) { fleetLog('模板尚未加载，请稍候', '#ff8f9a'); return; }
+  fleet.drones = fleetInit(3);
+  fleet.drones.forEach(d => { d.dir = pickDir(d); });
+  fleet.on = true;
+  if (btn) btn.textContent = '■ 停止演示';
+  if (st) st.textContent = '运行中 · 3 架';
+  fleetLog('多机航道：3 架同时进近，各自选择航道', '#49e3ae');
+  fleet.timer = setInterval(fleetStep, 420);
+  draw();
+}
+
+const fleetBtn = document.getElementById('btn-fleet');
+if (fleetBtn) fleetBtn.onclick = fleetToggle;
+['fleet-wind','fleet-rain'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.oninput = () => {
+    const v = document.getElementById(id + '-v');
+    if (v) v.textContent = el.value;
+  };
+});
 
 /* ---------------- 初始化 ---------------- */
 (async () => {
