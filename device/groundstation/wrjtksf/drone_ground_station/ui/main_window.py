@@ -7,13 +7,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 import base64
 import json
+import queue
 import re
 import time
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
                              QTextEdit, QGroupBox, QSplitter, QFrame,
                              QScrollArea, QPushButton, QMessageBox, QTabWidget, QLabel, QGridLayout,
                              QComboBox)
-from PyQt5.QtCore import QUrl, QObject, pyqtSlot, QTimer, Qt, pyqtSignal
+from PyQt5.QtCore import QUrl, QObject, pyqtSlot, QTimer, Qt, pyqtSignal, QThread
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, QWebEngineProfile
 from PyQt5.QtWebChannel import QWebChannel
 
@@ -167,7 +168,7 @@ class _RadarPanel(QFrame):
         # ADS-B 串口自动刷新定时器（与 RID 一致，每 2 秒检测新插入的串口设备）
         self._adsb_port_timer = QTimer(self)
         self._adsb_port_timer.timeout.connect(self._auto_refresh_adsb_ports)
-        self._adsb_port_timer.start(2000)
+        self._adsb_port_timer.start(4000)
 
         self.radar_widget = RadarWidget(self)
         self.radar_widget.setMinimumHeight(160)
@@ -175,7 +176,7 @@ class _RadarPanel(QFrame):
 
         self.title_timer = QTimer(self)
         self.title_timer.timeout.connect(self._refresh_title)
-        self.title_timer.start(500)
+        self.title_timer.start(2000)
         self._refresh_title()
 
     def append(self, text: str):
@@ -286,6 +287,69 @@ class _RadarPanel(QFrame):
                 "font-size: 10px; color: #8b949e; background: transparent; font-weight: 600;")
 
 
+class _WeatherWorker(QThread):
+    """后台线程 + 独立事件循环：天气请求不再阻塞主线程。
+
+    原来 update_weather() 在主线程里 run_until_complete()，天气接口慢或超时
+    （还有 2s/4s 退避重试）时整个窗口会「未响应」，连关闭按钮都点不动。
+    """
+    ready = pyqtSignal(dict)
+
+    def __init__(self, manager, parent=None):
+        super().__init__(parent)
+        self._manager = manager
+        self._queue = queue.Queue()
+        self._loop = None
+
+    def request(self, lat, lng):
+        self._queue.put((lat, lng))
+
+    def stop(self):
+        self._queue.put(None)
+
+    def run(self):
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        try:
+            while True:
+                item = self._queue.get()
+                if item is None:
+                    break
+                lat, lng = item
+                try:
+                    data = self._loop.run_until_complete(self._manager.get_weather(lat, lng))
+                except Exception:
+                    data = {}
+                self.ready.emit(data if isinstance(data, dict) else {})
+        finally:
+            try:
+                self._loop.close()
+            except Exception:
+                pass
+
+
+class _LocateWorker(QThread):
+    """一次性定位任务：WinRT（Windows GPS）在无定位权限时会卡很久，放后台跑。"""
+    done = pyqtSignal(object, object, object)
+
+    def run(self):
+        lat = lng = source = None
+        try:
+            lat, lng = get_pi_gps_sync()
+            if lat is not None and lng is not None:
+                source = "树莓派GPS"
+        except Exception:
+            pass
+        if lat is None or lng is None:
+            try:
+                lat, lng = get_location_sync()
+                if lat is not None and lng is not None:
+                    source = "Windows GPS"
+            except Exception:
+                pass
+        self.done.emit(lat, lng, source)
+
+
 class MapWindow(QMainWindow):
     """主窗口"""
 
@@ -341,6 +405,8 @@ class MapWindow(QMainWindow):
         self.adsb_reader = None
         self.is_adsb_connected = False
         self._rid_on_map: set = set()  # 已在地图上绘制的 RID 目标序列号
+        self._weather_worker = None
+        self._locate_worker = None
         self.sim_bridge = None
         self.sim_control_panel = None
         self._sim_drone_positions: dict = {}  # drone_id -> (lat, lng) for map
@@ -379,7 +445,7 @@ class MapWindow(QMainWindow):
     def _init_adsb(self):
         self.adsb_timer = QTimer(self)
         self.adsb_timer.timeout.connect(self.refresh_adsb_targets)
-        self.adsb_timer.start(1000)
+        self.adsb_timer.start(2000)
         # 连接 ADS-B 面板的信号
         if hasattr(self.info_display, 'adsbConnectRequested'):
             self.info_display.adsbConnectRequested.connect(self._on_adsb_connect_requested)
@@ -1145,15 +1211,8 @@ class MapWindow(QMainWindow):
             self.info_display.append(f"❌ 错误: 找不到地图文件: {html_path}")
             return
 
-        # 禁用浏览器缓存，确保每次启动都加载最新 map.html
-        profile = QWebEngineProfile.defaultProfile()
-        profile.setHttpCacheType(QWebEngineProfile.NoCache)
-        profile.clearHttpCache()
-        # 也清除当前 page 的 profile
-        page_profile = self.browser.page().profile()
-        page_profile.setHttpCacheType(QWebEngineProfile.NoCache)
-        page_profile.clearHttpCache()
-
+        # 保留 WebEngine 磁盘缓存：高德瓦片缓存后二次启动明显更快。
+        # map.html 本身用 URL 上的 _t= 时间戳绕过缓存，既能拿到最新页面，又不用每次重下瓦片。
         self.channel = QWebChannel()
         self.channel.registerObject("bridge", self.bridge)
         self.browser.page().setWebChannel(self.channel)
@@ -1180,29 +1239,17 @@ class MapWindow(QMainWindow):
             # 定期同步 RID 探测无人机到地图（每 2 秒）
             self._rid_sync_timer = QTimer(self)
             self._rid_sync_timer.timeout.connect(self._sync_rid_drones_to_map)
-            self._rid_sync_timer.start(2000)
+            self._rid_sync_timer.start(3000)
             # 推出仿真配置中的障碍物和禁飞区到地图区域系统
             QTimer.singleShot(2000, self._push_sim_zones_to_map)
         else:
             self.info_display.append("❌ 地图加载失败")
 
     def _periodic_position_refresh(self):
-        """定期检查是否有更好的定位源可用。"""
+        """定期检查是否有更好的定位源可用（复用后台定位，不阻塞 UI）。"""
         if self.current_location and self.current_location != DEFAULT_MAP_CENTER:
             return  # 已有有效位置（非默认值），不必刷新
-        lat, lng, source = self._get_best_position()
-        if lat is not None and lng is not None and self.current_location != (lat, lng):
-            self.info_display.append(f"🔄 定位源切换: {source}")
-            self.current_location = (lat, lng)
-            self._update_ground_station_panel(lat, lng)
-            lat_gcj, lng_gcj = wgs84_to_gcj02(lat, lng)
-            js_code = f"""
-            if (typeof updateGroundStation === 'function') {{
-                updateGroundStation({lat_gcj}, {lng_gcj}, {{}});
-            }}
-            """
-            self.browser.page().runJavaScript(js_code)
-            self.update_weather()
+        self.get_location_and_update_map()
 
     def _sync_rid_drones_to_map(self):
         """定期将 RID 探测到的无人机同步到地图上。"""
@@ -1908,7 +1955,33 @@ class MapWindow(QMainWindow):
         return (None, None, None)
 
     def get_location_and_update_map(self):
-        lat_wgs84, lng_wgs84, source = self._get_best_position()
+        """后台定位：WinRT / 串口定位可能卡数秒，放线程里跑，UI 不阻塞。"""
+        if getattr(self, "_locate_worker", None) and self._locate_worker.isRunning():
+            return
+        worker = _LocateWorker(self)
+        worker.done.connect(self._on_located)
+        self._locate_worker = worker
+        worker.start()
+
+    def _on_located(self, lat_wgs84, lng_wgs84, source):
+        # 后台只查 GPS；RID 心跳 / 遥测兜底仍在主线程做
+        if lat_wgs84 is None or lng_wgs84 is None:
+            try:
+                if hasattr(self, "rid_card") and self.rid_card:
+                    rid_lat, rid_lng = self.rid_card.get_heartbeat_position()
+                    if rid_lat is not None and rid_lng is not None:
+                        lat_wgs84, lng_wgs84, source = rid_lat, rid_lng, "RID设备GPS"
+            except Exception:
+                pass
+        if lat_wgs84 is None or lng_wgs84 is None:
+            try:
+                for target in self.radar_targets.values():
+                    t_lat, t_lon = target.get("lat"), target.get("lon")
+                    if t_lat is not None and t_lon is not None:
+                        lat_wgs84, lng_wgs84, source = t_lat, t_lon, "无人机遥测"
+                        break
+            except Exception:
+                pass
 
         if lat_wgs84 is not None and lng_wgs84 is not None:
             source_info = f" (来源: {source})" if source else ""
@@ -1948,23 +2021,34 @@ class MapWindow(QMainWindow):
         self.browser.page().runJavaScript(js_code)
 
     def update_weather(self):
-        if not self.current_location: return
-        try:
-            if self._asyncio_loop is None or self._asyncio_loop.is_closed():
-                self._asyncio_loop = asyncio.new_event_loop()
-            loop = self._asyncio_loop
-            asyncio.set_event_loop(loop)
-            lat, lng = self.current_location
-            weather_data = loop.run_until_complete(self.weather_manager.get_weather(lat, lng))
+        if not self.current_location:
+            return
+        # 后台线程拉取：主线程只投递请求，界面不再被网络请求卡住
+        if not getattr(self, "_weather_worker", None):
+            self._weather_worker = _WeatherWorker(self.weather_manager, self)
+            self._weather_worker.ready.connect(self._on_weather_ready)
+            self._weather_worker.start()
+        self._weather_worker.request(*self.current_location)
 
-            self.last_weather_data = weather_data
-            updated_at = weather_data.get("last_updated") if isinstance(weather_data, dict) else None
-            self._update_ground_station_panel(lat, lng, updated_at)
-            if isinstance(weather_data, dict):
-                self.weather_card.update_weather(weather_data)
-        except Exception: pass
+    def _on_weather_ready(self, weather_data):
+        if not isinstance(weather_data, dict) or not weather_data:
+            return
+        self.last_weather_data = weather_data
+        updated_at = weather_data.get("last_updated")
+        try:
+            if self.current_location:
+                self._update_ground_station_panel(self.current_location[0], self.current_location[1], updated_at)
+            self.weather_card.update_weather(weather_data)
+        except Exception:
+            pass
 
     def closeEvent(self, event):
+        try:
+            if getattr(self, "_weather_worker", None):
+                self._weather_worker.stop()
+                self._weather_worker.wait(1500)
+        except Exception:
+            pass
         self.weather_timer.stop()
         try:
             self.adsb_timer.stop()
