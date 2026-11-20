@@ -54,18 +54,19 @@ button.connection-pill{cursor:pointer;background:transparent;font-family:inherit
 .dedup-sources .clk{color:#5f7794;font:9px var(--mono);border-style:dashed}
 
 /* ---- AI 决策页 ---- */
-.decision-grid{display:grid;grid-template-columns:minmax(320px,.9fr) minmax(420px,1.4fr);gap:12px;margin-bottom:12px}.ai-question{width:100%;min-height:132px;margin-top:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:rgba(4,13,24,.55);color:var(--text);font:12px/1.7 var(--sans);resize:vertical;outline:0}
+.decision-grid{display:grid;grid-template-columns:minmax(320px,.9fr) minmax(420px,1.4fr);gap:12px;margin-top:12px}.ai-question{width:100%;min-height:88px;margin-top:10px;padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:rgba(4,13,24,.55);color:var(--text);font:12px/1.7 var(--sans);resize:vertical;outline:0}
 .ai-question:focus{border-color:rgba(39,224,216,.45)}
-.ai-question-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;color:#7f94af;font-size:10px}
+.ai-question-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-bottom:14px;color:#7f94af;font-size:10px}
 .ai-question-row select{min-height:30px;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:rgba(4,13,24,.7);color:#cfe3f5;font-size:10px}
 .ai-hint{color:#5f7794;font-size:9px}
-.advice-panel .advice-text{padding:16px;color:#c4d8ea;font-size:12px;line-height:1.85;white-space:pre-wrap}
+.advice-panel .advice-text{padding:16px;color:#c4d8ea;font-size:12px;line-height:1.85;white-space:pre-wrap;max-height:520px;overflow:auto}
 .advice-meta{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 16px}
 .advice-error{margin:14px 16px;padding:12px;border:1px solid rgba(255,98,121,.3);border-radius:8px;background:rgba(255,98,121,.06)}
 .advice-error b{display:block;color:#ff9aa9;font-size:11px}
 .advice-error p{margin:6px 0 0;color:#b98d97;font-size:9px;line-height:1.6}
 .limitation-list{margin:0;padding:14px 16px 16px 32px;color:#8497ae;font-size:10px;line-height:1.8}
 .muted-cell{color:#7f94af;font-size:9px;white-space:normal;line-height:1.5}
+.decision-question{margin-bottom:12px}
 
 /* ---- 系统管理页 ---- */
 .admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
@@ -100,3 +101,22 @@ button.connection-pill{cursor:pointer;background:transparent;font-family:inherit
 tr.candidate-rec{background:rgba(39,224,216,.07)}
 tr.candidate-rec td{color:#d9fff9}
 .rec-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:rgba(39,224,216,.16);color:#8ff7ef;font:9px var(--mono)}
+
+/* ---------- AI 决策：引擎结论 / 分歧 / 降级 ---------- */
+.verdict-panel .verdict-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.verdict-head>span{color:#6f86a2;font-size:10px}
+.verdict-recommend{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px 12px;align-items:baseline;padding:14px 16px;border-bottom:1px solid var(--line)}
+.verdict-recommend>span{color:#6f86a2;font-size:9px}
+.verdict-recommend>b{font-size:20px;color:#8ffff0}
+.verdict-reasons{grid-column:1/-1;display:grid;gap:4px;padding-top:4px;color:#8aa0bb;font-size:9px;line-height:1.6}
+.verdict-redline{margin:12px 16px;padding:10px 12px;border:1px solid rgba(255,98,121,.28);border-radius:8px;background:rgba(255,98,121,.06);color:#c98d98;font-size:9px;line-height:1.6}
+.verdict-redline b{display:block;color:#ff9aa9;font-size:10px;margin-bottom:4px}
+.verdict-redline.ok{border-color:rgba(73,227,174,.24);background:rgba(73,227,174,.05);color:#7fae9c}
+.verdict-constraints{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px}
+.verdict-constraints span{padding:5px 9px;border:1px solid rgba(117,163,215,.14);border-radius:6px;color:#647d9a;font-size:9px}
+.verdict-constraints b{color:#9fd8ff}
+.divergence-banner,.refusal-banner,.fallback-banner{margin:12px 16px;padding:10px 12px;border-radius:8px;font-size:9px;line-height:1.6}
+.divergence-banner{border:1px solid rgba(255,98,121,.36);background:rgba(255,98,121,.08);color:#e7a3ad}
+.divergence-banner b,.refusal-banner b,.fallback-banner b{display:block;font-size:10px;margin-bottom:4px}
+.refusal-banner{border:1px solid rgba(255,179,92,.3);background:rgba(255,179,92,.07);color:#d3b184}
+.fallback-banner{border:1px solid rgba(47,155,255,.3);background:rgba(47,155,255,.07);color:#9cc4e8}

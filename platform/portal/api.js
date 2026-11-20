@@ -65,6 +65,9 @@
       return request('/api/ai/advice', { method:'POST', timeoutMs: 45000,
         body: JSON.stringify({ message: message, program_type: programType || 'arrival' }) });
     },
+    verdict: function (programType) {
+      return request('/api/ai/verdict?program_type=' + encodeURIComponent(programType || 'arrival'));
+    },
 
     // ---- 运维 / 台账 / 指标 ----
     metrics: function () { return request('/api/metrics'); },

@@ -15,6 +15,20 @@ def _program_score(program, comp, sim, env):
     return recommend.program_score(program, SimpleNamespace(is_pass=comp.is_pass, checks=checks), sim, env)
 
 
+def clearance_from_compliance(comp):
+    """从合规校验里提取超障余度（MOC 项 margin，米）。
+
+    找不到或没有 margin 时返回 None，前端据此显示「—」而不是编一个数。
+    """
+    try:
+        for item in getattr(comp, "checks", []) or []:
+            if getattr(item, "name", "").startswith("MOC") and item.margin is not None:
+                return round(float(item.margin), 1)
+    except (TypeError, ValueError, AttributeError):
+        return None
+    return None
+
+
 def calculate_candidate(env, rules, plans_lib, program_type, direction):
     """Calculate and check one candidate without accessing or changing a Store."""
     def dynamic():
@@ -63,6 +77,12 @@ def rank_candidates(env, rules, plans_lib, program_type):
         row["entry_heading"] = heading
         row["mode"] = meta["mode"]
         row["fallback"] = meta["fallback"]
+        # 超障余度只在候选可用时才有意义；失败候选保持为空，前端显示「—」。
+        # 无 MOC 富余量（附近无障碍物）时 margin 为 None，仍保留字段以稳定 schema。
+        if row.get("available"):
+            row["metrics"]["clearance_m"] = clearance_from_compliance(comp)
+        else:
+            row["metrics"].setdefault("clearance_m", None)
         rows.append(row)
     ranked = recommend.rank(rows)
     return [{key: row[key] for key in ("direction", "score", "available", "metrics", "reasons", "mode", "fallback")}
