@@ -1,18 +1,14 @@
-# -*- coding: utf-8 -*-
-"""轻量 RBAC：Token -> 角色 -> 权限。
+"""轻量 RBAC：Token -> 个人身份 + 角色 -> 权限。
 
 演示阶段默认关闭（`auth_enabled=False`），开启后所有**写操作**都要带 token。
 
-角色
-----
-    viewer   : 只读（GET）
-    operator : 读 + 业务写（推程序、开关去重、发推送）
-    admin    : 全部，含设备台账/路线管理/影子模式开关
-
 Token 来源（按优先级）
 ----------------------
-    1. 环境变量 `DEMO_TOKENS`，形如  `admin-token:admin,op-token:operator,view-token:viewer`
-    2. 默认内置三个演示 token（见 _DEFAULT_TOKENS），方便评审直接试
+    1. 环境变量 `DEMO_TOKENS`，形如 `admin-token:admin,op-token:operator`
+    2. 环境变量 `DEMO_IDENTITIES`，形如 `admin-token:alice,op-token:bob`
+    3. 默认内置三个演示 token；其身份为对应的 demo 用户。
+
+身份标识不是从请求体中读取，而是由服务端令牌配置绑定。
 """
 from __future__ import annotations
 
@@ -26,6 +22,11 @@ _DEFAULT_TOKENS = {
     "demo-operator": "operator",
     "demo-admin": "admin",
 }
+_DEFAULT_IDENTITIES = {
+    "demo-viewer": "demo-viewer",
+    "demo-operator": "demo-operator",
+    "demo-admin": "demo-admin",
+}
 
 
 def _load_tokens() -> Dict[str, str]:
@@ -38,14 +39,29 @@ def _load_tokens() -> Dict[str, str]:
         if not item or ":" not in item:
             continue
         tok, role = item.rsplit(":", 1)
-        if role in ROLE_LEVEL:
+        if role in ROLE_LEVEL and tok.strip():
             out[tok.strip()] = role
-    return out or dict(_DEFAULT_TOKENS)
+    return out
+
+
+def _load_identities() -> Dict[str, str]:
+    raw = os.environ.get("DEMO_IDENTITIES", "").strip()
+    if not raw:
+        return dict(_DEFAULT_IDENTITIES)
+    out: Dict[str, str] = {}
+    for item in raw.split(","):
+        item = item.strip()
+        if ":" not in item:
+            continue
+        tok, identity = item.rsplit(":", 1)
+        if tok.strip() and identity.strip():
+            out[tok.strip()] = identity.strip()
+    return out
 
 
 TOKENS = _load_tokens()
+IDENTITIES = _load_identities()
 
-# 写操作最低角色要求（按路径前缀匹配，长的优先）
 RULES = [
     ("/api/devices", "admin"),
     ("/api/routes", "admin"),
@@ -64,8 +80,13 @@ def role_of(token: Optional[str]) -> Optional[str]:
     return TOKENS.get(token.strip())
 
 
+def identity_of(token: Optional[str]) -> Optional[str]:
+    if not token or token.strip() not in TOKENS:
+        return None
+    return IDENTITIES.get(token.strip())
+
+
 def required_role(path: str, method: str) -> Optional[str]:
-    """返回该请求要求的最低角色；None 表示不需要鉴权。"""
     if method in ("GET", "HEAD", "OPTIONS"):
         return None
     for prefix, role in RULES:

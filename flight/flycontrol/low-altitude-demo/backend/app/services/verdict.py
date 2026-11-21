@@ -2,7 +2,8 @@
 """确定性建议结论码（advisory 的权威结论来源）。
 
 模型只能解释这份结论，不能改写它。所有字段都是纯函数计算、无副作用，
-这样 /api/ai/advice 和 /api/ai/verdict 能拿到完全一致的结果。
+这样 /api/ai/advice 和 /api/ai/verdict 对相同输入使用相同规则；
+两次请求分别采集数据，结果可能不同。
 """
 from __future__ import annotations
 
@@ -51,7 +52,14 @@ def build_verdict(context: Dict[str, Any], limits: Optional[Dict[str, Any]] = No
     available = _available(candidates)
     no_current = not context.get("current_program")
 
-    if no_current:
+    if context.get("data_freshness") != "fresh":
+        code = CONCLUSION_INSUFFICIENT
+        refusal_reason = "数据来源或观测时间未经验证，未调用大模型。"
+        if context.get("data_freshness") == "stale":
+            refusal_reason = "观测数据已过期，未调用大模型。"
+        elif context.get("data_freshness") == "future":
+            refusal_reason = "观测时间在未来，请核对数据源时钟。未调用大模型。"
+    elif no_current:
         code = CONCLUSION_INSUFFICIENT
         refusal_reason = "没有当前飞行程序，无法进行确定性风险评估，已拒绝调用大模型。"
     elif not available:
@@ -62,7 +70,7 @@ def build_verdict(context: Dict[str, Any], limits: Optional[Dict[str, Any]] = No
         refusal_reason = None
 
     recommended: Optional[Dict[str, Any]] = None
-    if available:
+    if code == CONCLUSION_AVAILABLE and available:
         rec = available[0]  # rank_candidates 已按评分排序
         recommended = {
             "direction": rec.get("direction"),
@@ -86,6 +94,11 @@ def build_verdict(context: Dict[str, Any], limits: Optional[Dict[str, Any]] = No
     hard_forbid_reasons.extend(
         _meteo_redlines(context, max_crosswind, MIN_VISIBILITY_M))
 
+    if hard_forbid_reasons:
+        code = CONCLUSION_INSUFFICIENT
+        refusal_reason = "引擎检查命中限制，未调用大模型。"
+        recommended = None
+
     return {
         "code": code,
         "label": CONCLUSION_LABELS[code],
@@ -93,7 +106,7 @@ def build_verdict(context: Dict[str, Any], limits: Optional[Dict[str, Any]] = No
         "recommended": recommended,
         "available_count": len(available),
         "total_count": len(candidates),
-        "no_current_program": bool(no_current),
+        "no_current_program": bool(no_current) if context.get("data_freshness") == "fresh" else None,
         "hard_forbid": bool(hard_forbid_reasons),
         "hard_forbid_reasons": hard_forbid_reasons,
         "constraints": {

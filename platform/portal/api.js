@@ -66,7 +66,7 @@
         body: JSON.stringify({ message: message, program_type: programType || 'arrival' }) });
     },
     verdict: function (programType) {
-      return request('/api/ai/verdict?program_type=' + encodeURIComponent(programType || 'arrival'));
+      return request('/api/ai/verdict?program_type=' + encodeURIComponent(programType || 'arrival'), {timeoutMs: 45000});
     },
 
     // ---- 运维 / 台账 / 指标 ----

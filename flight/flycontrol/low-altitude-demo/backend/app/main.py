@@ -116,11 +116,21 @@ async def _rbac(request, call_next):
                 role = role_of(request.headers.get("x-token"))
                 if not allow(role, need):
                     from fastapi.responses import JSONResponse
+                    status = 403 if role else 401
+                    if request.url.path == "/api/ai/advice":
+                        ai._audit_access_denied("ai/advice", status, role,
+                                                "insufficient_permissions" if role else "invalid_credentials")
                     return JSONResponse(
                         {"detail": "需要 %s 权限（请在 X-Token 头里带 token）" % need},
-                        status_code=403 if role else 401)
+                        status_code=status)
     except Exception:
-        pass
+        from fastapi.responses import JSONResponse
+        if request.url.path in ("/api/ai/advice", "/api/ai/audit"):
+            try:
+                ai._audit_access_denied(request.url.path.removeprefix("/api/"), 503, None, "auth_check_failed")
+            except Exception:
+                pass
+        return JSONResponse({"detail": "权限检查失败"}, status_code=503)
     return await call_next(request)
 
 

@@ -75,6 +75,50 @@ def test_rbac_matrix():
     assert not auth.allow(None, "operator")
 
 
+def test_invalid_custom_tokens_do_not_enable_demo_tokens(monkeypatch):
+    monkeypatch.setenv("DEMO_TOKENS", "invalid,unused:unknown")
+    assert auth._load_tokens() == {}
+
+
+def test_rbac_failure_denies_request(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    def fail(*args):
+        raise RuntimeError("permission check failed")
+
+    monkeypatch.setenv("ADVISORY_AUDIT_FILE", str(tmp_path / "audit.jsonl"))
+    monkeypatch.setitem(app.state._state, "auth_enabled", True)
+    monkeypatch.setattr(auth, "required_role", fail)
+    client = TestClient(app)
+    response = client.post("/api/ai/advice", json={"message": "review"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "权限检查失败"}
+    record = json.loads((tmp_path / "audit.jsonl").read_text(encoding="utf-8"))
+    assert record["reason"] == "auth_check_failed"
+    assert record["endpoint"] == "ai/advice"
+    assert "permission check failed" not in json.dumps(record)
+
+
+def test_ai_auth_denials_are_audited(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("ADVISORY_AUDIT_FILE", str(path))
+    monkeypatch.setitem(app.state._state, "auth_enabled", True)
+    monkeypatch.setattr(auth, "TOKENS", {"viewer-secret": "viewer", "admin-secret": "admin"})
+    client = TestClient(app)
+    assert client.post("/api/ai/advice", headers={"X-Token": "viewer-secret"}, json={"message": "private body"}).status_code == 403
+    assert client.get("/api/ai/audit", headers={"X-Token": "bad-secret"}).status_code == 401
+    response = client.get("/api/ai/audit", headers={"X-Token": "admin-secret"})
+    assert response.status_code == 200
+    records = response.json()["records"]
+    assert [(r["endpoint"], r["status"]) for r in records] == [("ai/audit", 401), ("ai/advice", 403)]
+    data = path.read_text(encoding="utf-8")
+    assert all(value not in data for value in ("viewer-secret", "bad-secret", "admin-secret", "private body"))
+
+
 def test_ledger_feeds_engine(tmp_data, monkeypatch):
     """台账里的 σ 必须真的进入去重引擎（否则台账就是摆设）。"""
     from app.services import ledger

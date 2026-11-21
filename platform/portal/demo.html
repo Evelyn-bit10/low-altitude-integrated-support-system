@@ -654,7 +654,7 @@ async function askAi() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({message: q, program_type: type})
     });
-    box.textContent = d.advice || '（空回复）';
+    box.textContent = d.refusal ? d.refusal.reason : d.fallback ? d.fallback.message : d.advice || '暂无模型正文';
     const ctx = d.context || {};
     document.querySelector('#ai-cands tbody').innerHTML = (ctx.candidates || []).map(function (c) {
       const m = c.metrics || {};
@@ -664,10 +664,10 @@ async function askAi() {
         '<td style="color:#8ea0bd;white-space:normal">' + detail + '</td></tr>';
     }).join('');
     document.getElementById('ai-limits').innerHTML = (ctx.limitations || []).map(function (x) { return '<li>' + x + '</li>'; }).join('');
-    stateEl.textContent = '模型 ' + (d.model || '—') + ' · validated=' + d.validated + ' · executed=' + d.executed + ' · 需人工复核';
+    stateEl.textContent = (ctx.demo_only ? '仅供演示，不可用于运行 · ' : '') + '数据状态 ' + (ctx.data_freshness || '未知') + ' · 未执行 · 需人工独立复核';
   } catch (e) {
     box.textContent = '请求失败：' + e.message;
-    stateEl.textContent = '检查 backend/.env.deepseek 或 DEEPSEEK_API_KEY，以及后端 8080 是否可访问。';
+    stateEl.textContent = '请检查后端连接或请求内容。';
   }
 }
 document.getElementById('btn-ai').onclick = askAi;

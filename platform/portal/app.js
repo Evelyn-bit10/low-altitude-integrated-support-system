@@ -313,7 +313,7 @@
     {direction:'NE',score:0,available:false,mode:'dynamic',fallback:true,metrics:{},reasons:['合规校验未通过：穿越限飞区']}
   ];
   var DEMO_ADVICE = {
-    advice:'（演示数据）当前南向进近侧风为 0、超障余度 132 m，且合规与仿真均通过，建议优先采用 S 方向。若电量降至 40% 以下，应改选航程最短方向并预备就近备降；东北方向穿越限飞区，不可用。',
+    advice:'（演示示例）数据来源和观测时间需要核验。候选结果仅用于展示，不能作为放行或运行依据。',
     model:'demo-advisory', requires_human_review:true, validated:false, executed:false,
     context:{captured_at:'—',data_freshness:'unknown',candidates:DEMO_CANDIDATES,
       limitations:['演示数据，非真实观测','未接入真实空域许可与机型参数','模型输出可能有误，需人工复核后使用']}
@@ -340,14 +340,11 @@
 
   function candidateTable(list) {
     if(!list.length) return '<div class="empty-state">暂无候选（未请求或后端未返回）</div>';
-    var best = null;
-    list.forEach(function(c){ if(c.available && (!best || Number(c.score) > Number(best.score))) best = c; });
-    var bestId = best ? best.direction : null;
     return '<div class="table-scroll"><table><thead><tr><th>方向</th><th>可用</th><th>评分</th><th>模式</th><th>距离</th><th>超障</th><th>侧风</th><th>理由</th></tr></thead><tbody>'+
-      list.map(function(c){var m=c.metrics||{}, rec=(c.direction===bestId);
+      list.map(function(c){var m=c.metrics||{};
         var distance=(m.distance_m!=null?m.distance_m:m.length_m);
         var crosswind=(m.crosswind_ms!=null?m.crosswind_ms:m.crosswind_mps);
-        return '<tr'+(rec?' class="candidate-rec"':'')+'><td class="mono">'+esc(c.direction||'—')+(rec?' <span class="rec-tag">推荐</span>':'')+'</td>'+
+        return '<tr><td class="mono">'+esc(c.direction||'—')+'</td>'+
         '<td>'+badge(c.available?'可用':'不可用',c.available?'success':'danger')+'</td>'+
         '<td class="mono">'+number(c.score,3)+'</td><td>'+esc(c.mode||'—')+(c.fallback?' <em>回退</em>':'')+'</td>'+
         '<td class="mono">'+(distance!=null?number(distance,0)+' m':'—')+'</td>'+
@@ -358,24 +355,26 @@
 
   function verdictPanel(v, demo) {
     var verdict=v||(demo?DEMO_VERDICT:null);
-    if(!verdict) return '<div class="empty-state">切换到实时数据后自动加载确定性引擎结论；或点击「刷新上下文」。</div>';
-    var rec=verdict.recommended||{}, m=rec.metrics||{}, cst=verdict.constraints||{};
+    if(!verdict) return '<div class="empty-state" role="status">'+(state.verdictLoaded?'未能加载引擎结果，请刷新上下文。':'正在加载引擎结果…')+'</div>';
+    var rec=demo||verdict.demo_only?{}:(verdict.recommended||{}), cst=verdict.constraints||{};
     var codeTone=verdict.code==='AVAILABLE_CANDIDATES'?'success':(verdict.code==='NO_AVAILABLE_CANDIDATE'?'warning':'danger');
     var head='<div class="verdict-head"><span>结论码</span><b>'+badge(verdict.code+' · '+verdict.label,codeTone)+'</b></div>';
     var recHtml=rec.direction?
       '<div class="verdict-recommend"><span>推荐方向</span><b class="mono">'+esc(rec.direction)+'</b>'+
       '<span>评分 '+number(rec.score,3)+'</span><span>'+esc(rec.mode||'—')+(rec.fallback?' · 回退':'')+'</span>'+
       '<div class="verdict-reasons">'+safeArray(rec.reasons).map(function(r){return '<div>'+esc(r)+'</div>';}).join('')+'</div></div>':
-      '<div class="verdict-recommend"><span>无推荐方向</span><p>没有可用候选或数据不足。</p></div>';
-    var redline=verdict.hard_forbid
-      ?'<div class="verdict-redline"><b>红线命中</b><div>'+safeArray(verdict.hard_forbid_reasons).map(esc).join('</div><div>')+'</div></div>'
-      :'<div class="verdict-redline ok">未命中硬红线（禁飞级风险 / 超侧风 / 低能见度）</div>';
+      '<div class="verdict-recommend"><span>未提供推荐方向</span><p>'+esc(verdict.refusal_reason||(demo?'内置演示不提供运行建议。':'暂无推荐方向。'))+'</p></div>';
+    var redline=verdict.code==='INSUFFICIENT_DATA'&&!verdict.hard_forbid
+      ?'<div class="verdict-redline">数据不足，无法判定运行限制。</div>'
+      :verdict.hard_forbid
+      ?'<div class="verdict-redline"><b>限制条件命中</b><div>'+safeArray(verdict.hard_forbid_reasons).map(esc).join('</div><div>')+'</div></div>'
+      :'<div class="verdict-redline ok">演示检查未发现列出的限制；不代表运行安全。</div>';
     var constraints='<div class="verdict-constraints">'+
       '<span>侧风上限 <b class="mono">'+number(cst.max_crosswind_ms,0)+' m/s</b></span>'+
       '<span>能见度下限 <b class="mono">'+number(cst.min_visibility_m,0)+' m</b></span>'+
       '<span>超障余度 <b class="mono">'+number(cst.moc_approach_m!=null?cst.moc_approach_m:cst.moc_departure_m,0)+' m</b></span></div>';
-    return head+recHtml+redline+constraints+
-      '<div class="form-note">结论码由确定性引擎计算，模型只能解释、不得改写；数据新鲜度当前为 <b class="mono">unknown</b>。</div>';
+    return head+recHtml+redline+(verdict.code==='INSUFFICIENT_DATA'?'':constraints)+
+      '<div class="form-note">'+(demo||verdict.demo_only?'仅供演示，不可用于运行。':'数据状态：'+esc(verdict.data_freshness||'未知')+'。')+' 模型输出未经验证，需人工独立复核。</div>';
   }
 
   function adviceDivergence(adv) {
@@ -388,7 +387,7 @@
       items.push('引擎命中硬红线，模型输出仍须以引擎结论为准，不得据此放行。');
     }
     if(!items.length) return '';
-    return '<div class="divergence-banner"><b>⚠ 需人工复核的分歧</b>'+items.map(function(x){return '<div>'+esc(x)+'</div>';}).join('')+'</div>';
+    return '<div class="divergence-banner"><b>检测到可能需要复核的措辞</b>'+items.map(function(x){return '<div>'+esc(x)+'</div>';}).join('')+'</div>';
   }
 
   function adviceBody(adv,demo) {
@@ -402,7 +401,7 @@
     var adviceText=shown.advice?('<div class="advice-text">'+esc(shown.advice)+'</div>'):'<div class="empty-state">无模型陈述，请以左侧引擎结论为准。</div>';
     return divergence+refusal+fallback+adviceText+
       '<div class="advice-meta">'+badge('模型 '+(shown.model||'—'),'purple')+badge(shown.validated?'已校验':'未校验',shown.validated?'success':'warning')+badge(shown.executed?'已执行':'未执行','warning')+badge(shown.requires_human_review?'需人工复核':'—','warning')+'</div>'+
-      (demo?'<div class="form-note">当前为演示数据模式，展示的是内置示例；切换顶栏到「实时数据」后可调用真实大模型。</div>':'');
+      (demo?'<div class="form-note">当前为内置演示示例，不可用于运行。</div>':'');
   }
 
   function renderDecision() {
@@ -415,7 +414,7 @@
     var modeBadge=state.adviceLoading?badge('请求中','warning'):(adv?badge(adv.model||'LLM','purple'):(demo?badge('演示数据','warning'):badge('待请求','info')));
     var verdictBadge=verdict?badge('确定性引擎','success'):badge('待加载','info');
     return '<div class="page">'+breadcrumb('AI 决策')+
-      pageHead('ADVISORY · LLM ASSISTED DECISION','AI 轨迹决策','大模型结合气象、航道、电量与空域约束给出建议；<b>只读建议，不执行、不下发</b>&nbsp; '+badge('READ ONLY','warning'),button('请求 AI 建议','ask-ai','primary')+button('刷新上下文','refresh-decision','ghost'))+
+      pageHead('ADVISORY · LLM ASSISTED DECISION','AI 轨迹决策','数据须经独立核验；<b>只读建议，不执行、不下发</b>&nbsp; '+badge('READ ONLY','warning'),button('请求 AI 建议','ask-ai','primary')+button('刷新上下文','refresh-decision','ghost'))+
       panel('决策问题','QUESTION · 上下文由后端组装后发送',badge(state.adviceType==='departure'?'离场':'进近','info'),
         '<textarea id="ai-question" class="ai-question" rows="3" placeholder="例如：当前电量 68%、风速 8 m/s，应选择哪条进近航道？需要哪些放行条件？">'+esc(state.adviceQuestion||'当前电量与气象条件下，应安排哪条进近航道？请说明理由与风险。')+'</textarea>'+
         '<div class="ai-question-row"><label>程序类型 <select id="ai-program-type"><option value="arrival"'+(state.adviceType!=='departure'?' selected':'')+'>进近 arrival</option><option value="departure"'+(state.adviceType==='departure'?' selected':'')+'>离场 departure</option></select></label>'+
@@ -424,7 +423,7 @@
         panel('引擎结论（确定性）','ENGINE VERDICT · 结论码模型不可改写',verdictBadge,verdictPanel(verdict,demo),'verdict-panel')+
         panel('AI 建议（模型陈述）','ADVISORY',modeBadge,adviceBody(adv,demo),'advice-panel')+
       '</div>'+
-      panel('候选航道（只读评估）','CANDIDATES · '+candidates.length,badge('后端计算','info'),candidateTable(candidates))+
+      panel(verdict&&verdict.demo_only||demo?'候选航道（仅供演示，不可用于运行）':'候选航道（只读评估）','CANDIDATES · '+candidates.length,badge(verdict&&verdict.demo_only||demo?'演示':'后端计算','warning'),candidateTable(candidates))+
       (limitations.length?panel('数据与使用限制','LIMITATIONS',badge('必须人工复核','warning'),'<ul class="limitation-list">'+limitations.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'):'')+
       '</div>';
   }
@@ -503,18 +502,26 @@
     }).catch(function(){state.adminBusy=false;state.adminLoaded=true;if(state.route==='admin')render();});
   }
 
+  var decisionGeneration = 0;
+  var verdictGeneration = 0;
+
+  function resetDecision() {
+    decisionGeneration++; verdictGeneration++;
+    state.advice=null;state.adviceLoading=false;state.adviceError=null;
+    state.verdict=null;state.verdictBusy=false;state.verdictLoaded=false;
+  }
+
   function loadVerdict(force) {
-    if(state.verdictBusy) return;
-    if(state.verdictLoaded&&!force) return;
-    if(state.dataMode!=='live'){state.verdictLoaded=true;return;}
+    if(state.dataMode!=='live'||state.verdictBusy||(state.verdictLoaded&&!force)) return;
     state.verdictBusy=true;
+    var generation=++verdictGeneration;
     Api.verdict(state.adviceType).then(function(r){
+      if(generation!==verdictGeneration) return;
       state.verdictBusy=false;
-      if(r.ok){state.verdict=r.data.engine_verdict;state.verdict.candidates=r.data.candidates;state.verdict.limitations=r.data.limitations;}
-      else{state.verdict=null;}
       state.verdictLoaded=true;
+      state.verdict=r.ok?Object.assign({},r.data.engine_verdict,r.data,{engine_verdict:undefined}):null;
       if(state.route==='decision')render();
-    }).catch(function(){state.verdictBusy=false;state.verdict=null;state.verdictLoaded=true;if(state.route==='decision')render();});
+    });
   }
 
   function askAdvice() {
@@ -523,19 +530,22 @@
     var message=((q&&q.value)||'').trim();
     if(!message){toast('请先输入决策问题','warning');return;}
     state.adviceQuestion=message;state.adviceType=(t&&t.value)||'arrival';
-    if(state.dataMode!=='live'){toast('演示模式：展示内置示例；切换实时数据后可调用大模型','info');render();return;}
-    state.adviceLoading=true;state.adviceError=null;render();
+    if(state.dataMode!=='live'){toast('当前展示内置示例，不调用模型','info');return;}
+    var generation=++decisionGeneration;
+    state.advice=null;state.adviceLoading=true;state.adviceError=null;render();
     Api.advice(message,state.adviceType).then(function(r){
+      if(generation!==decisionGeneration) return;
       state.adviceLoading=false;
       if(r.ok){
-        state.advice=r.data;state.adviceError=null;
-        // 让左侧引擎结论与本次请求的上下文一致（避免两边各自采样造成错位）
-        var ev=r.data.context&&r.data.context.engine_verdict;
-        if(ev){ev.candidates=r.data.context.candidates;ev.limitations=r.data.context.limitations;state.verdict=ev;state.verdictLoaded=true;}
-      }
-      else{state.advice=null;state.adviceError=r.error==='TIMEOUT'?'请求超时（45s）':'后端不可用或模型未配置（HTTP 503/502）';}
-      render();
-    }).catch(function(){state.adviceLoading=false;state.adviceError='请求失败';render();});
+        state.advice=r.data;
+        var ctx=r.data.context;
+        if(ctx&&ctx.engine_verdict){
+          verdictGeneration++;state.verdictBusy=false;state.verdictLoaded=true;
+          state.verdict=Object.assign({},ctx.engine_verdict,ctx,{engine_verdict:undefined});
+        }
+      }else{state.adviceError=r.error==='TIMEOUT'?'请求超时，请刷新上下文后重试。':'建议请求未完成，请检查后端或调整问题。';}
+      if(state.route==='decision')render();
+    });
   }
 
   function runtimePanel() {
@@ -643,15 +653,14 @@
 
   function toggleDataMode() {
     state.dataMode = state.dataMode==='live' ? 'demo' : 'live';
-    // 数据源切换后，旧的后端缓存结论/建议一律作废，避免展示错配的上下文
-    state.advice=null;state.adviceError=null;
-    state.verdict=null;state.verdictLoaded=false;
+    resetDecision();
     state.metrics=null;state.devices=null;state.routes=null;state.shadow=null;state.rl=null;state.adminLoaded=false;
     if(state.dataMode==='demo'){
       applyDemoData();render();
       toast('已切换到演示数据（内置完整演示数据）','info');
     }else{
       toast('已切换到实时数据，正在接入三个子系统…','info');
+      if(state.route==='decision')render();
       syncData(true);
     }
   }
@@ -694,7 +703,7 @@
     if(action==='weather-scenario'){weatherScenario();return;}
     if(action==='refresh-ground'){syncData(true);return;}
     if(action==='ask-ai'){askAdvice();return;}
-    if(action==='refresh-decision'){state.advice=null;state.adviceError=null;state.verdict=null;state.verdictLoaded=false;render();loadVerdict(true);return;}
+    if(action==='refresh-decision'){resetDecision();render();return;}
     if(action==='refresh-admin'){loadAdmin(true);return;}
     if(action==='shadow-toggle'){var on=element.getAttribute('data-on')==='1';Api.setShadow(on).then(function(r){if(r.ok){toast('影子模式已'+(on?'开启':'关闭'),'success');loadAdmin(true);}else toast('切换失败：影子模式未加载','warning');});return;}
     if(action==='device-del'){var did=element.getAttribute('data-id');Api.deleteDevice(did).then(function(r){if(r.ok){toast('设备已删除','success');loadAdmin(true);}else toast('删除失败（需 admin 角色）','warning');});return;}
@@ -712,6 +721,13 @@
   }
 
   document.addEventListener('click',function(event){var nav=event.target.closest('[data-nav]');if(nav){document.body.classList.remove('nav-open');return;}var tab=event.target.closest('[data-tab]');if(tab){state.businessTab=tab.getAttribute('data-tab');render();return;}var entity=event.target.closest('[data-entity]');if(entity){openDrawer(entity.getAttribute('data-entity'),entity.getAttribute('data-id'));return;}var action=event.target.closest('[data-action]');if(action){handleAction(action.getAttribute('data-action'),action,event);}});
+  document.addEventListener('change',function(event){
+    if(event.target.id!=='ai-program-type')return;
+    var question=document.getElementById('ai-question');
+    if(question)state.adviceQuestion=question.value;
+    state.adviceType=event.target.value;
+    resetDecision();render();
+  });
   document.getElementById('nav-toggle').addEventListener('click',function(){document.body.classList.toggle('nav-open');});
   window.addEventListener('hashchange',render);
   window.addEventListener('resize',function(){clearTimeout(resizeTimer);resizeTimer=setTimeout(function(){if(state.route==='program'||state.route==='dashboard')render();},160);});
