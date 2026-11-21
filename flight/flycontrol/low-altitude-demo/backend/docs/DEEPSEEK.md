@@ -33,7 +33,10 @@
 - 消息命中指令覆盖黑名单（如「忽略之前 / 忽略上述 / 系统提示词 / 直接放行 / ignore previous instructions / jailbreak」等）时返回 400，且不发送给模型。
 - 模型输出命中关键词时，正文被隐藏并提示需要复核。关键词可能误报、漏报，不能证明内容安全，也不构成语义分歧检测。
 
-## 只读确定性接口
+`GET /api/ai/verdict` 和 `POST /api/ai/advice` 现在返回 `missing_information` 与 `follow_up`。问题由服务端固定规则生成，包含任务编号、航空器状态、空域许可、周边交通态势，以及不新鲜的气象/障碍物/空域来源元数据。它们是安全关键的补充项；列表为空才表示没有这组追问，仍不表示已获批准。
+
+`POST /api/ai/follow-up` 接收 `{assessment_id, answers:[{question_id, value}]}`，每轮由客户端携带累计回答，仅具名非演示管理员可访问。服务端不保存回答，只返回剩余问题；来源问题必须由服务端数据接入与核验，不能通过客户端回答解除。回答未经验证，不会修改原快照、重新计算评估或调用模型。
+
 
 ```
 GET /api/ai/verdict?program_type=arrival

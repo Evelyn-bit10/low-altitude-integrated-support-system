@@ -23,7 +23,7 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as URLRequest, urlopen
 
@@ -187,6 +187,8 @@ def build_context(store, program_type):
             "current_program": None, "risk": None, "candidates": [],
             "limitations": ["数据来源或观测时间未经验证，暂无法提供评估。"],
         }
+        context["missing_information"] = _missing_information(context)
+        context["follow_up"] = {"status": "required", "questions": context["missing_information"]}
         context["engine_verdict"] = build_verdict(context)
         return context
     if demo:
@@ -231,8 +233,90 @@ def build_context(store, program_type):
             context["data_sources"] = sources
             context["candidates"] = []
             context["limitations"].append("计算期间观测数据已失效或时间异常。")
+    missing_information = _missing_information(context)
+    context["missing_information"] = missing_information
+    context["follow_up"] = {"status": "required" if missing_information else "complete",
+                            "questions": missing_information}
     context["engine_verdict"] = build_verdict(context, env.limits.__dict__, rules)
     return context
+
+
+_FOLLOW_UP_FIELDS = (
+    ("flight_task", "flight_task", "航班或任务编号", "string"),
+    ("aircraft_id", "aircraft_id", "航空器识别标识", "string"),
+    ("aircraft_state", "aircraft_state", "航空器实时状态与性能限制", "string"),
+    ("airspace_clearance", "airspace_clearance", "当前空域许可及有效时段", "string"),
+    ("traffic_picture", "traffic_picture", "周边有人机与无人机态势及观测时间", "string"),
+)
+
+
+def _missing_information(context: Dict[str, Any]) -> list[dict]:
+    missing = []
+    sources = context.get("data_sources") or {}
+    for field, question_id, label, value_type in _FOLLOW_UP_FIELDS:
+        missing.append({
+            "id": question_id,
+            "field": field,
+            "label": label,
+            "prompt": f"请补充{label}。",
+            "value_type": value_type,
+            "status": "missing",
+            "safety_critical": True,
+        })
+    for source_name, label in (("meteo", "气象"), ("obstacles", "障碍物"), ("airspace", "空域")):
+        source = sources.get(source_name) or {}
+        if source.get("status") != "fresh":
+            missing.append({
+                "id": f"source_{source_name}",
+                "field": f"data_sources.{source_name}",
+                "label": f"{label}数据来源和观测时间",
+                "prompt": f"请提供经业务方确认的{label}权威来源、接入状态与允许时效。",
+                "value_type": "server_source_metadata",
+                "status": source.get("status", "unknown"),
+                "safety_critical": True,
+            })
+    return missing
+
+
+class FollowUpAnswer(BaseModel):
+    question_id: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    value: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("value")
+    @classmethod
+    def nonblank(cls, value):
+        if not value.strip():
+            raise ValueError("answer must not be blank")
+        return value.strip()
+
+
+class FollowUpRequest(BaseModel):
+    assessment_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    answers: list[FollowUpAnswer] = Field(min_length=1, max_length=20)
+
+
+@router.post("/ai/follow-up")
+def follow_up(body: FollowUpRequest, request: Request):
+    _require_reviewer(request)
+    snapshot = _find_snapshot(body.assessment_id)
+    questions = snapshot.get("context", {}).get("missing_information") or []
+    allowed = {row["id"] for row in questions if row["value_type"] != "server_source_metadata"}
+    answers = {answer.question_id: answer.value for answer in body.answers}
+    if len(answers) != len(body.answers):
+        raise HTTPException(status_code=422, detail="Duplicate question IDs")
+    unknown = sorted(set(answers) - allowed)
+    if unknown:
+        raise HTTPException(status_code=422, detail={"unknown_or_server_only_question_ids": unknown})
+    remaining = [row for row in questions if row["id"] not in answers]
+    return {
+        "assessment_id": body.assessment_id,
+        "provided_answer_ids": sorted(answers),
+        "remaining_questions": remaining,
+        "status": "required" if remaining else "answers_provided_reassessment_required",
+        "answers_verified": False,
+        "model_called": False,
+        "assessment_changed": False,
+    }
 
 
 class AdviceRequest(BaseModel):
@@ -552,6 +636,8 @@ def verdict(request: Request, program_type: str = "arrival"):
         "data_sources": context["data_sources"],
         "demo_only": context["demo_only"],
         "engine_verdict": context["engine_verdict"],
+        "missing_information": context["missing_information"],
+        "follow_up": context["follow_up"],
         "candidates": context["candidates"],
         "limitations": context["limitations"],
     }

@@ -385,6 +385,62 @@ def test_advice_validation_rejection_is_audited(client, monkeypatch, tmp_path, p
     assert "message_sha256" not in record
 
 
+def test_missing_information_and_follow_up_are_structured_and_non_authoritative(client, monkeypatch, tmp_path):
+    from app.services import auth
+    client.app.state.auth_enabled = True
+    monkeypatch.setattr(auth, "TOKENS", {"review-token": "admin"})
+    monkeypatch.setattr(auth, "IDENTITIES", {"review-token": "reviewer"})
+    headers = {"X-Token": "review-token"}
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "must-not-be-called")
+    monkeypatch.setattr(ai, "urlopen", lambda *args, **kwargs: pytest.fail("model called for missing data"))
+    first = client.post("/api/ai/advice", json={"message": "请给出调度建议"}).json()
+    context = first["context"]
+    assert first["conclusion"] == "INSUFFICIENT_DATA"
+    ids = {row["id"] for row in context["missing_information"]}
+    assert {"flight_task", "aircraft_state", "airspace_clearance", "traffic_picture"} <= ids
+    assert not {"source_meteo", "source_obstacles", "source_airspace"} & ids
+    assert context["follow_up"]["status"] == "required"
+    assert client.post("/api/ai/follow-up", json={"assessment_id": context["assessment_id"], "answers": [{"question_id": "flight_task", "value": "x"}]}).status_code == 401
+    assert client.post("/api/ai/follow-up", headers=headers, json={
+        "assessment_id": context["assessment_id"],
+        "answers": [{"question_id": "unknown", "value": "x"}],
+    }).status_code == 422
+    partial = client.post("/api/ai/follow-up", headers=headers, json={
+        "assessment_id": context["assessment_id"],
+        "answers": [{"question_id": "flight_task", "value": "TASK-7"}],
+    })
+    assert partial.status_code == 200
+    result = partial.json()
+    assert result["provided_answer_ids"] == ["flight_task"]
+    assert result["remaining_questions"]
+    assert result["model_called"] is False and result["assessment_changed"] is False
+    again = client.post("/api/ai/advice", json={"message": "第二轮，请继续"}).json()
+    assert again["conclusion"] == "INSUFFICIENT_DATA"
+    assert again["context"]["assessment_id"] != context["assessment_id"]
+    second = client.post("/api/ai/follow-up", headers=headers, json={
+        "assessment_id": context["assessment_id"],
+        "answers": [{"question_id": "flight_task", "value": "TASK-7"},
+                    {"question_id": "aircraft_id", "value": "UAV-1"}],
+    }).json()
+    assert {"flight_task", "aircraft_id"}.isdisjoint({row["id"] for row in second["remaining_questions"]})
+    assert second["answers_verified"] is False
+    assert not (tmp_path / "follow_ups.jsonl").exists()
+    assert "TASK-7" not in (tmp_path / "ai_audit.jsonl").read_text(encoding="utf-8")
+
+
+def test_fresh_assessment_still_reports_operational_unknowns(client, monkeypatch):
+    result = client.get("/api/ai/verdict?program_type=arrival").json()
+    assert result["data_freshness"] == "fresh"
+    assert result["follow_up"]["status"] == "required"
+    assert "aircraft_state" in {row["id"] for row in result["missing_information"]}
+    monkeypatch.setattr(client.app.state.store, "snapshot", lambda: Store(Settings.from_env()).snapshot())
+    stale = client.get("/api/ai/verdict?program_type=arrival").json()
+    assert stale["data_freshness"] == "unknown"
+    assert {"source_meteo", "source_obstacles", "source_airspace"} <= {
+        row["id"] for row in stale["missing_information"]
+    }
+
+
 def test_named_admin_can_replay_and_record_review(client, monkeypatch, tmp_path):
     from app.services import auth
 
