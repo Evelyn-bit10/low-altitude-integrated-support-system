@@ -413,6 +413,18 @@ td{padding:8px 10px;border-bottom:1px solid rgba(117,163,215,.08);color:#aebfd3}
         <span style="color:#5f7794">指令丢 40% 落地率仍是 97.3%，因为"能不能落"只靠一条广播就能自判</span>
       </div>
     </div></section>
+    <section class="card"><div class="box">
+      <h3>在线排序建议（确定性）</h3>
+      <div class="row" style="margin:8px 0;gap:8px;align-items:center">
+        <button class="btn primary" id="btn-seq-order">生成排序建议</button>
+        <span class="hint" id="seq-order-state">示例：3 架同时进近</span>
+      </div>
+      <div class="feed" style="max-height:220px">
+        <table id="seq-order-table"><thead><tr><th>顺序</th><th>飞行器</th><th>着陆时刻</th><th>等待</th><th>剩余电量</th><th>紧急</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="concl" id="seq-order-concl" style="margin-top:10px"></div>
+      <ul id="seq-order-reasons" style="margin:8px 0 0 18px;color:#8ea0bd;font-size:12px;line-height:1.7"></ul>
+    </div></section>
   </div>
 </div>
 
@@ -671,6 +683,44 @@ async function askAi() {
   }
 }
 document.getElementById('btn-ai').onclick = askAi;
+
+/* ---------------- 在线排序建议（确定性引擎） ---------------- */
+const SEQ_SAMPLE = [
+  {id:'UAS-A', eta_sec:60, battery_pct:34},
+  {id:'UAS-B', eta_sec:75, battery_pct:31},
+  {id:'UAS-C', eta_sec:90, battery_pct:62, emergency:true}
+];
+async function runSeqOrder() {
+  const st = document.getElementById('seq-order-state');
+  const btn = document.getElementById('btn-seq-order');
+  if (st) st.textContent = '计算中…';
+  if (btn) btn.disabled = true;
+  try {
+    const d = await api('/api/seq/order', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({flights: SEQ_SAMPLE, runway_free_sec: 0, min_separation_sec: 45, slow_flight: true})
+    });
+    const tb = document.querySelector('#seq-order-table tbody');
+    tb.innerHTML = d.order.map(function (r, i) {
+      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + r.id + '</td>' +
+        '<td class="mono">' + r.land_at_sec.toFixed(0) + 's</td>' +
+        '<td class="mono">' + r.wait_sec.toFixed(0) + 's</td>' +
+        '<td class="mono">' + r.battery_after_pct.toFixed(0) + '%</td>' +
+        '<td>' + (r.emergency ? '是' : '—') + '</td></tr>';
+    }).join('');
+    document.getElementById('seq-order-concl').innerHTML =
+      '方法 <b>' + d.method + '</b> · 落地 <b>' + d.landed_count + '/' + d.order.length +
+      '</b> · 总等待 <b>' + d.total_wait_sec.toFixed(0) + 's</b>';
+    document.getElementById('seq-order-reasons').innerHTML =
+      (d.rationale || []).map(function (x) { return '<li>' + x + '</li>'; }).join('');
+    if (st) st.textContent = '已生成';
+  } catch (e) {
+    if (st) st.textContent = '请求失败：' + e.message;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+document.getElementById('btn-seq-order').onclick = runSeqOrder;
 
 /* ---------------- 导演模式：一键播放六幕 ---------------- */
 var directorTimer = null, directorOn = false;
