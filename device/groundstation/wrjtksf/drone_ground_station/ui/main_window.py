@@ -22,9 +22,11 @@ from config import (WINDOW_SIZE, RIGHT_PANEL_MIN_WIDTH, LEFT_RIGHT_SPLIT_RATIO,
                     DEFAULT_DRONES, WEATHER_API_KEY, WEATHER_UPDATE_INTERVAL,
                     DEFAULT_MAP_CENTER, DRONE_SVG_PATH, GROUND_STATION_SVG_PATH,
                     SMTP_ENABLED, SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD,
-                    SMTP_USE_SSL, SMTP_USE_STARTTLS, MAIL_SENDER)
+                    SMTP_USE_SSL, SMTP_USE_STARTTLS, MAIL_SENDER,
+                    GROUND_REPORT_ENABLED, GROUND_BRIDGE_URL, GROUND_REPORT_INTERVAL)
 from config_stands import DRONE_STANDS, DRONE_WIND_RESISTANCE
 from utils import get_location_sync, wgs84_to_gcj02, get_pi_gps_sync
+from utils.ground_reporter import GroundReporter
 from api import WeatherManager
 from ui.drone_card import DroneInfoCard
 from ui.drone_card_stack import DroneCardStack
@@ -389,6 +391,110 @@ class MapWindow(QMainWindow):
                 )
         except Exception as e:
             print(f"[Email] 初始化失败: {e}")
+
+        # 地面站 → 门户数据桥：上报机位 / 传感器 / RID（缺口一）
+        self.ground_reporter = None
+        self.ground_report_timer = None
+        if GROUND_REPORT_ENABLED:
+            try:
+                self.ground_reporter = GroundReporter(
+                    GROUND_BRIDGE_URL, GROUND_REPORT_INTERVAL * 1000, self)
+                self.ground_reporter.start()
+                self.ground_report_timer = QTimer(self)
+                self.ground_report_timer.timeout.connect(self._report_ground_state)
+                self.ground_report_timer.start(max(1000, GROUND_REPORT_INTERVAL * 1000))
+            except Exception as e:
+                print(f"[GroundReport] 初始化失败: {e}")
+
+    def _collect_ground_report(self):
+        """收集机位 / 传感器 / RID 状态，供门户数据桥使用。"""
+        assigned = {}
+        for drone_id, info in (self.stand_assignments or {}).items():
+            sid = info.get("id") if isinstance(info, dict) else None
+            if sid:
+                assigned[sid] = str(drone_id)
+
+        stands = []
+        for s in DRONE_STANDS:
+            sid = s.get("id")
+            stands.append({
+                "id": sid,
+                "name": s.get("name"),
+                "type": s.get("type"),
+                "status": "occupied" if sid in assigned else "free",
+                "occupied_by": assigned.get(sid),
+                "charge_kw": None,
+                "max_size_m": None,
+                "priority": s.get("priority"),
+            })
+
+        w = self.last_weather_data if isinstance(self.last_weather_data, dict) else {}
+        wind_dir_map = {
+            "N": 0, "NNE": 22.5, "NE": 45, "ENE": 67.5, "E": 90, "ESE": 112.5,
+            "SE": 135, "SSE": 157.5, "S": 180, "SSW": 202.5, "SW": 225, "WSW": 247.5,
+            "W": 270, "WNW": 292.5, "NW": 315, "NNW": 337.5,
+        }
+        try:
+            wind_dir = wind_dir_map.get(str(w.get("wind_dir", "")).upper(), 0)
+        except Exception:
+            wind_dir = 0
+        sensor = {
+            "wind_speed": round(float(w.get("wind_speed") or 0) / 3.6, 1),
+            "wind_dir": wind_dir,
+            "temperature": w.get("temperature"),
+            "humidity": w.get("humidity"),
+            "pressure": w.get("pressure"),
+            "light": None,
+            "rainfall": w.get("precipitation"),
+        }
+
+        rid_targets = []
+        try:
+            tracker = getattr(getattr(self, "rid_card", None), "tracker", None)
+            if tracker is not None:
+                for d in tracker.get_all():
+                    lat = getattr(d, "drone_latitude", None)
+                    lon = getattr(d, "drone_longitude", None)
+                    if lat is None or lon is None:
+                        continue
+                    rid_targets.append({
+                        "id": getattr(d, "drone_serial_num", "—"),
+                        "vendor": getattr(d, "product_type_str", "—"),
+                        "model": str(getattr(d, "drone_type", "—")),
+                        "lat": lat,
+                        "lon": lon,
+                        "alt_msl": getattr(d, "height", None) or 0,
+                        "heading": 0,
+                        "speed": getattr(d, "speed_kmh", None) or 0,
+                        "vertical_speed": 0,
+                        "rssi": 0,
+                        "snr": 0,
+                        "pilot_lat": 0,
+                        "pilot_lon": 0,
+                    })
+        except Exception:
+            pass
+
+        return {
+            "airport_code": "CQ-LX01",
+            "stands": stands,
+            "sensor": sensor,
+            "dispatch": {
+                "waiting_count": 0,
+                "inbound": "—",
+                "outbound": "—",
+                "deviation_alerts": 0,
+            },
+            "rid_targets": rid_targets,
+        }
+
+    def _report_ground_state(self):
+        if getattr(self, "ground_reporter", None) is None:
+            return
+        try:
+            self.ground_reporter.submit(self._collect_ground_report())
+        except Exception:
+            pass
 
     def _init_variables(self):
         self.current_location = None
@@ -2043,6 +2149,14 @@ class MapWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
+        try:
+            if getattr(self, "ground_report_timer", None):
+                self.ground_report_timer.stop()
+            if getattr(self, "ground_reporter", None):
+                self.ground_reporter.stop()
+                self.ground_reporter.wait(1000)
+        except Exception:
+            pass
         try:
             if getattr(self, "_weather_worker", None):
                 self._weather_worker.stop()

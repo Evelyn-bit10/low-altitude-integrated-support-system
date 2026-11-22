@@ -14,7 +14,7 @@
   function safeArray(value) { return Array.isArray(value) ? value : []; }
   function safeObject(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
   function esc(value) { return String(value == null || value === '' ? '—' : value).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-  function number(value, digits) { var n=Number(value); return isFinite(n) ? n.toFixed(digits == null ? 0 : digits) : '—'; }
+  function number(value, digits) { if(value==null||value==='') return '—'; var n=Number(value); return isFinite(n) ? n.toFixed(digits == null ? 0 : digits) : '—'; }
   function localTime(value) { if (!value) return '—'; var d=new Date(value); return isNaN(d.getTime()) ? String(value) : d.toLocaleString('zh-CN',{hour12:false}); }
   function nowTime() { return new Date().toLocaleTimeString('zh-CN',{hour12:false}); }
   function routeName(route) { return {home:'运行总览',situation:'实时态势',program:'飞行程序',decision:'AI 决策',ground:'地面站机位',dashboard:'数据看板',business:'业务管理',admin:'系统管理'}[route] || '运行总览'; }
@@ -88,7 +88,8 @@
 
   function normalizeGround(raw) {
     raw=safeObject(raw);
-    return { stands:safeArray(raw.stands), rid_targets:safeArray(raw.rid_targets), sensor:safeObject(raw.sensor), dispatch:safeObject(raw.dispatch) };
+    return { stands:safeArray(raw.stands), rid_targets:safeArray(raw.rid_targets), sensor:safeObject(raw.sensor), dispatch:safeObject(raw.dispatch),
+      data_source: raw.data_source === 'device' ? 'device' : 'demo', report_age_sec: raw.report_age_sec };
   }
 
   function effectiveSnapshot() {
@@ -110,7 +111,7 @@
   function simulationChecks() { var s=state.program.simulate;return safeArray(s&&s.checks); }
   function simulationPassed() { var s=state.program.simulate;return !!(s&&(s.passed===true||s.status==='pass')); }
 
-  function sourceTag(source,label) { return '<span class="source-tag '+(source==='live'?'live':'mock')+'"><i></i>'+(label|| (source==='live'?'实时接口':'内置演示'))+'</span>'; }
+  function sourceTag(source,label) { var tone=(source==='live'||source==='device')?'live':'mock'; return '<span class="source-tag '+tone+'"><i></i>'+(label|| (source==='device'?'设备实时':source==='live'?'实时接口':'内置演示'))+'</span>'; }
   function badge(text,tone) { return '<span class="badge '+(tone||'')+'">'+esc(text)+'</span>'; }
   function icon(name) {
     var icons={radar:'⌁',route:'⌘',stand:'▦',chart:'◒',business:'◇',wind:'≋',alert:'!',link:'↗',shield:'◆',clock:'◷',plane:'✦'};
@@ -306,7 +307,8 @@
   function sensorCard(label,value,unit,ratio,ico) { var p=Math.max(0,Math.min(1,Number(ratio)||0));return '<article class="sensor-card"><div class="sensor-ring" style="--sensor:'+(p*100)+'"><span>'+icon(ico)+'</span></div><div><small>'+label+'</small><b class="mono">'+value+'<i>'+unit+'</i></b></div></article>'; }
   function renderGround() {
     var g=state.ground,s=g.sensor,d=g.dispatch,stands=safeArray(g.stands),rid=safeArray(g.rid_targets);
-    var mockBanner = state.source.ground!=='live'
+    var device = state.ground.data_source === 'device';
+    var mockBanner = !device
       ? '<div class="mock-banner" role="status"><b>模拟数据</b><span>机位、RID 与传感器数值由数据桥的正弦波生成，不反映现场真实状态；请勿据此安排运行。</span></div>'
       : '';
     return '<div class="page">'+breadcrumb('地面站机位')+pageHead('GROUNDSTATION · STAND & SENSOR','地面站机位','停靠调度、RID900 探测与 Modbus 传感器实时视图&nbsp; '+sourceTag(state.source.ground),button('刷新地面站数据','refresh-ground','ghost'))+mockBanner+
@@ -315,7 +317,7 @@
       '<div class="ground-lower"><div class="ground-column">'+panel('停靠调度','DOCK DISPATCH',badge('SCHEDULER','info'),'<div class="dispatch-track"><article><span class="dispatch-icon">IN</span><div><small>进场任务</small><b>'+esc(d.inbound)+'</b></div><i class="success">运行中</i></article><article><span class="dispatch-icon out">OUT</span><div><small>离场任务</small><b>'+esc(d.outbound)+'</b></div><i class="warning">准备中</i></article><article><span class="dispatch-icon wait">Q</span><div><small>等待区队列</small><b class="mono">'+number(d.waiting_count,0)+' 架等待</b></div><i>动态排序</i></article></div>')+
       panel('RID900 探测目标','REMOTE ID TARGETS',badge(rid.length+' TARGETS','purple'),'<div class="table-scroll rid-table"><table><thead><tr><th>序列号</th><th>厂商 / 型号</th><th>位置</th><th>高度</th><th>速度</th><th>信号</th></tr></thead><tbody>'+rid.map(function(r){return '<tr data-entity="rid" data-id="'+esc(r.id)+'"><td class="mono">'+esc(r.id)+'</td><td>'+esc(r.vendor)+'<small>'+esc(r.model)+'</small></td><td class="mono">'+number(r.lat,5)+'<small>'+number(r.lon,5)+'</small></td><td class="mono">'+number(r.alt_msl,0)+'m</td><td class="mono">'+number(r.speed,1)+'m/s</td><td>'+badge('SNR '+number(r.snr,0),Number(r.snr)>=16?'success':'warning')+'</td></tr>';}).join('')+'</tbody></table></div>')+'</div>'+
       '<div class="ground-column">'+panel('环境传感器','MODBUS · '+nowTime(),badge('CONNECTED','success'),'<div class="sensor-grid">'+sensorCard('风速',number(s.wind_speed,1),' m/s',s.wind_speed/12,'wind')+sensorCard('温度',number(s.temperature,1),' ℃',s.temperature/45,'chart')+sensorCard('湿度',number(s.humidity,0),' %',s.humidity/100,'radar')+sensorCard('气压',number(s.pressure,1),' hPa',.72,'shield')+'</div><div class="sensor-secondary"><div><small>风向</small><b class="mono">'+number(s.wind_dir,0)+'°</b></div><div><small>光照</small><b class="mono">'+number(s.light,0)+' lux</b></div><div><small>雨量</small><b class="mono">'+number(s.rainfall,1)+' mm</b></div></div>')+
-      panel('数据接入说明','GROUNDSTATION STATUS',badge(state.source.ground==='live'?'LIVE BRIDGE':'PENDING REST',state.source.ground==='live'?'success':'warning'),'<div class="integration-note"><span>i</span><p>'+(state.source.ground==='live'?'已接入地面站数据桥，机位 / RID900 / Modbus 传感器实时刷新。':'地面站数据源未就绪，当前使用内置演示数据。')+'</p></div>')+'</div></div></div>';
+      panel('数据接入说明','GROUNDSTATION STATUS',badge(device?'DEVICE REPORT':(state.source.ground==='live'?'BRIDGE DEMO':'PENDING REST'),device?'success':'warning'),'<div class="integration-note"><span>i</span><p>'+(device?'已接入地面站真实上报：机位 / 传感器 / RID 状态来自现场设备，数据年龄 '+(state.ground.report_age_sec!=null?number(state.ground.report_age_sec,1)+' 秒':'未知')+'。':(state.source.ground==='live'?'数据桥在线，但当前返回的是正弦波模拟值，不代表现场状态。':'地面站数据源未就绪，当前使用内置演示数据。'))+'</p></div>')+'</div></div></div>';
   }
 
   function chartPanel(id,title,subtitle,tool) { return '<section class="panel chart-panel"><header class="panel-head"><div><h2>'+title+'</h2><p>'+subtitle+'</p></div>'+tool+'</header><div id="'+id+'" class="chart-slot"><canvas></canvas></div></section>'; }
@@ -851,9 +853,9 @@
       if(pushRes&&pushRes.ok){state.push=pushRes.data;refreshPushPanel();}
       if(normalized){state.snapshot=normalized;state.source.core='live';}else{state.source.core='mock';}
       if(program.ok){state.program=normalizeProgram(program.data);state.source.program='live';}else if(state.source.program!=='live'){state.program=clone(Mock.program_analysis);state.source.program='mock';}
-      if(ground.ok){state.ground=normalizeGround(ground.data);state.source.ground='live';}else if(state.source.ground!=='live'){state.ground=clone(Mock.ground);state.source.ground='mock';}
+      if(ground.ok){state.ground=normalizeGround(ground.data);state.source.ground=state.ground.data_source==='device'?'device':'live';}else if(state.source.ground!=='live'&&state.source.ground!=='device'){state.ground=clone(Mock.ground);state.source.ground='mock';}
       state.syncing=false;state.lastSync=new Date();refreshView();
-      if(showToast){var anyLive=!!normalized||state.source.program==='live'||state.source.ground==='live';toast(anyLive?'已同步实时数据（态势 / 程序 / 地面站）':'后端不可用，继续使用内置演示数据',anyLive?'success':'warning');}
+      if(showToast){var anyLive=!!normalized||state.source.program==='live'||state.source.ground==='live'||state.source.ground==='device';toast(anyLive?'已同步实时数据（态势 / 程序 / 地面站）':'后端不可用，继续使用内置演示数据',anyLive?'success':'warning');}
     }).catch(function(){state.syncing=false;state.source.core='mock';render();if(showToast)toast('同步失败，页面已保持在演示模式','warning');});
   }
 

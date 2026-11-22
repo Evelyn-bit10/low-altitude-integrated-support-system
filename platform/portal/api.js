@@ -6,7 +6,7 @@
   var defaults = {
     baseUrl: 'http://' + HOST + ':8082',    // flycontrol API
     groundUrl: 'http://' + HOST + ':8090',  // groundstation 数据桥
-    timeoutMs: 2200
+    timeoutMs: 5000
   };
   var config = Object.assign({}, defaults, window.LAV_CONFIG || {});
 

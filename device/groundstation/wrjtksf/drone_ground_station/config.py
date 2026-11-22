@@ -14,6 +14,12 @@ AUTO_CONNECT_ON_START = False  # 启动时是否自动连接无人机
 WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "")
 WEATHER_UPDATE_INTERVAL = 300  # 5分钟更新一次
 
+# ================== 地面站状态上报（门户数据桥）==================
+# 缺口一：把机位 / 传感器 / RID 状态上报给门户，桥未启动时静默失败，不影响地面站
+GROUND_REPORT_ENABLED = os.environ.get("GROUND_REPORT_ENABLED", "true").lower() in ("1", "true", "yes")
+GROUND_BRIDGE_URL = os.environ.get("GROUND_BRIDGE_URL", "http://127.0.0.1:8090")
+GROUND_REPORT_INTERVAL = int(os.environ.get("GROUND_REPORT_INTERVAL", "2"))
+
 # ================== 地图配置 ==================
 DEFAULT_MAP_CENTER = (29.5689, 106.5577)  # 默认地图中心（重庆）
 AUTO_FIT_DISTANCE = 120  # 自动调整视野距离（米）
