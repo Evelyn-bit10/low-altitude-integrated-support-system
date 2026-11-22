@@ -38,6 +38,8 @@ dispatch = DispatchService(store)
 # 交通态势存储(内存, 演示);生产落库 lp_traffic。机场原点用于后续 ENU 回显。
 traffic_store = traffic.TrafficStore(settings)
 traffic_store.set_origin(store.airport)
+# 历史存储同时挂到 Store，供 dispatch / program / push 记录事件
+store.history = traffic_store.history
 
 push_service = PushService(store, traffic_store, settings)
 

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from ..services.weather_reference import locate_weather
+from ..services.history import record_event
 
 from ..domain import Meteo
 from ..plans_library import find_plans
@@ -164,6 +165,9 @@ def weather_reference(request: Request):
 def env_meteo(request: Request, body: MeteoUpdate):
     store = request.app.state.store
     store.set_meteo(Meteo(**body.model_dump()))
+    record_event(store, "environment", "meteo", "info",
+                 "风 %.1f m/s / 阵风 %.1f / 能见度 %.0f m" % (
+                     body.wind_speed, body.gust, body.visibility))
     return {"ok": True, "meteo": store.meteo.__dict__}
 
 
@@ -173,6 +177,8 @@ def env_obstacle_toggle(request: Request, body: ObstacleToggle):
     ob = store.toggle_obstacle(body.id, body.active)
     if ob is None:
         return {"ok": False, "msg": f"障碍物 {body.id} 不存在"}
+    record_event(store, "environment", "obstacle", "warn",
+                 "%s -> %s" % (ob.name, "active" if body.active else "inactive"))
     return {"ok": True, "id": ob.id, "name": ob.name, "active": body.active}
 
 

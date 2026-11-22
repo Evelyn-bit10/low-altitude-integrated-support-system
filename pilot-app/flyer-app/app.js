@@ -270,6 +270,19 @@
     };
 
     if (state.permit.status === 'approved') { startCountdown(); }
+
+    // 许可历史：把签发 / 拒绝写进后端事件表（失败不影响本地许可）
+    try {
+      fetch(Api.config.baseUrl.replace(/\/$/, '') + '/api/permit/record', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          id: state.permit.id, uav_id: uav.id, action: state.applyAction,
+          level: ev.level, status: state.permit.status,
+          reasons: (ev.reasons || []).map(function (r) { return r.text || String(r); })
+        })
+      }).catch(function () {});
+    } catch (e) { /* 记录失败不影响本地许可 */ }
     renderApplyBody();
     toast(ev.level === 'APPROVE' ? '演示预检已通过，有效期 60 秒' : ev.level === 'HOLD' ? '待人工确认' : '演示预检存在限制', ev.level === 'APPROVE' ? 'ok' : ev.level === 'HOLD' ? 'warn' : 'danger');
   }

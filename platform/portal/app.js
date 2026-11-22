@@ -63,7 +63,10 @@
     // 数据看板：态势历史
     history: null,
     historyLoaded: false,
-    _historyBusy: false
+    _historyBusy: false,
+    events: null,
+    eventsLoaded: false,
+    _eventsBusy: false
   };
 
   function normalizeSnapshot(raw) {
@@ -362,7 +365,7 @@
     return '<div class="page">'+breadcrumb('数据看板')+pageHead('ANALYTICS · OPERATION INSIGHT','运行数据看板','跨系统汇总指标、趋势和运行质量&nbsp; '+sourceTag(state.source.core),button('更新数据','sync','ghost'))+
       '<div class="kpi-grid">'+kpi('今日架次','32',' 架次','较昨日 +14.2%','plane','cyan')+kpi('平均周转时长','18.6',' min','目标 ≤ 22 min','clock')+kpi('机位占用率','66.7',' %','4 / 6 active','stand')+kpi('安全事件','0',' 起','连续 18 天无事故','shield','cyan')+'</div>'+
       '<div class="dashboard-grid">'+chartPanel('traffic-chart','在线架次趋势','过去 12 小时 · 在线 / 离场',badge('12H','info'))+chartPanel('alarm-chart','告警分布','按运行来源归类',badge('24 TOTAL','danger'))+chartPanel('weather-chart','气象走势','风速 / 温度 · 过去 8 小时',badge('METEO','info'))+
-      panel('运行质量','QUALITY TARGET',badge('THIS WEEK','success'),'<div class="quality-list">'+[['程序准时发布率','98.4',98.4],['RID 识别覆盖率','96.8',96.8],['C2 链路可用率','99.9',99.9],['传感器在线率','100',100],['告警闭环率','94.1',94.1]].map(function(q){return '<article><header><span>'+q[0]+'</span><b class="mono">'+q[1]+'%</b></header><div><i style="width:'+q[2]+'%"></i></div></article>';}).join('')+'</div>','quality-panel')+'</div>'+runtimePanel()+historyPanel()+pushPanel()+'</div>';
+      panel('运行质量','QUALITY TARGET',badge('THIS WEEK','success'),'<div class="quality-list">'+[['程序准时发布率','98.4',98.4],['RID 识别覆盖率','96.8',96.8],['C2 链路可用率','99.9',99.9],['传感器在线率','100',100],['告警闭环率','94.1',94.1]].map(function(q){return '<article><header><span>'+q[0]+'</span><b class="mono">'+q[1]+'%</b></header><div><i style="width:'+q[2]+'%"></i></div></article>';}).join('')+'</div>','quality-panel')+'</div>'+runtimePanel()+historyPanel()+eventsPanel()+pushPanel()+'</div>';
   }
 
   function businessTable() {
@@ -781,6 +784,46 @@
       'history-panel');
   }
 
+  function loadEvents(force) {
+    if (state.dataMode !== 'live') return;
+    if (state._eventsBusy) return;
+    if (state.eventsLoaded && !force) return;
+    state._eventsBusy = true;
+    Api.historyEvents(1440, 50).then(function (r) {
+      state._eventsBusy = false;
+      if (r.ok) {
+        state.events = r.data;
+        state.eventsLoaded = true;
+        if (state.route === 'dashboard') render();
+      }
+    }).catch(function () { state._eventsBusy = false; });
+  }
+
+  function eventsPanel() {
+    if (state.dataMode !== 'live') {
+      return panel('事件历史','EVENT HISTORY · 最近 24 小时',badge('演示模式','warning'),
+        '<div class="empty-state">切换到「实时数据」后可查询事件（程序 / 环境 / 推送 / 许可）</div>','events-panel');
+    }
+    var e = state.events;
+    if (!e || !e.events) {
+      return panel('事件历史','EVENT HISTORY · 最近 24 小时',badge('加载中','info'),
+        '<div class="empty-state">正在读取事件…</div>','events-panel');
+    }
+    var rows = e.events.slice(0, 20).map(function (x) {
+      var t = new Date(x.ts * 1000).toLocaleTimeString('zh-CN', { hour12: false });
+      var tone = x.kind === 'permit' ? 'success' : x.kind === 'push' ? 'purple' : (x.level === 'error' ? 'danger' : x.level === 'warn' ? 'warning' : 'info');
+      return '<tr><td class="mono">' + t + '</td><td>' + badge(esc(x.kind), tone) + '</td>' +
+        '<td class="mono">' + esc(x.subject) + '</td><td>' + esc(x.level) + '</td>' +
+        '<td class="muted-cell">' + esc(x.message) + '</td></tr>';
+    }).join('');
+    return panel('事件历史','EVENT HISTORY · 最近 ' + (e.minutes || 1440) + ' 分钟',
+      badge((e.count || 0) + ' 条','info'),
+      '<div class="table-scroll" style="max-height:240px"><table><thead><tr><th>时间</th><th>类型</th><th>对象</th><th>级别</th><th>内容</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="5" class="empty-state">该时间段暂无事件</td></tr>') +
+      '</tbody></table></div><div class="form-note">来源：SQLite <span class="mono">event_history</span>（GET /api/history/events）</div>',
+      'events-panel');
+  }
+
   // ---- 局部 DOM 更新：数据刷新时只改变化的部分，不重建整页（避免闪烁）----
   function morphChildren(current, next) {
     var cur = Array.prototype.slice.call(current.childNodes);
@@ -840,7 +883,7 @@
       if(curProg.direction&&!state.dirTouched){state.direction=curProg.direction;}
       if(state.dataMode==='live'&&!state.plansLoaded)loadPlans();
       var p=state.program.program||effectiveSnapshot().program||Mock.snapshot.program;Visuals.program(document.getElementById('program-map'),effectiveSnapshot(),p);Visuals.profile(document.getElementById('profile-map'),p);}
-    if(state.route==='dashboard'){cleanup.push(Visuals.dashboard(Mock.analytics));Visuals.loadECharts(function(ok){if(ok&&state.route==='dashboard'){Visuals.disposeCharts();cleanup.push(Visuals.dashboard(Mock.analytics));}});loadHistory();}
+    if(state.route==='dashboard'){cleanup.push(Visuals.dashboard(Mock.analytics));Visuals.loadECharts(function(ok){if(ok&&state.route==='dashboard'){Visuals.disposeCharts();cleanup.push(Visuals.dashboard(Mock.analytics));}});loadHistory();loadEvents();}
     if(state.route==='admin'){loadAdmin(false);}
     if(state.route==='decision'){loadVerdict(false);}
   }

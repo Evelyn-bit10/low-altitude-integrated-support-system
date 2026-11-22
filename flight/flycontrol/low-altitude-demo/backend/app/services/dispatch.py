@@ -14,6 +14,7 @@ from ..domain import FlightProgram, Waypoint
 from ..plans_library import find_plans, plan_to_program
 from ..engines import compliance, planner, risk, simulate
 from ..store import Store
+from .history import record_event
 
 log = logging.getLogger("lowalt.dispatch")
 
@@ -77,6 +78,8 @@ class DispatchService:
                 prog = cand
         if prog is None:
             prog = planner.replan_arrival(env, rules)
+            record_event(store, "procedure", "auto_replan", "warn",
+                         "风险 %s，自动重规划进近程序" % rr.level_name)
 
         self._verify_and_publish(prog, rr.level)
 
@@ -87,13 +90,18 @@ class DispatchService:
         store.compliance = comp
         if not comp.is_pass:
             store.last_alarm = "合规校验未通过: " + comp.err_msg()
+            record_event(store, "procedure", "publish_failed", "error", store.last_alarm)
             return
         sim = simulate.simulate_check(prog, env)
         store.simulate = sim
         if not sim.is_pass:
             store.last_alarm = "仿真校验未通过: " + sim.err_msg()
+            record_event(store, "procedure", "publish_failed", "error", store.last_alarm)
             return
         store.publish(prog, risk_level)
+        record_event(store, "procedure", "published", "info",
+                     "%s %s v%s（风险 %s）" % (prog.program_type, prog.plan_id,
+                                               prog.version, risk_level))
         store.last_alarm = None
 
     def _plan_program(self, plan_id: int) -> FlightProgram:
@@ -118,6 +126,8 @@ class DispatchService:
         lvl = store.risk_result.level if store.risk_result else risk.SAFE
         if publish:
             store.publish(prog, lvl)
+            record_event(store, "procedure", "manual_replan", "info",
+                         "人工重规划 %s（方向 %s）" % (program_type, direction or "auto"))
         return prog, comp, sim
 
     def run_generate(self, program_type: str, direction: str,

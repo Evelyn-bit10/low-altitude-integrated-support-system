@@ -57,3 +57,33 @@ def test_empty_history(tmp_path):
     assert history.recent(60, 10)["count"] == 0
     assert history.summary(60, 60)["samples"] == 0
     history.close()
+
+
+def test_event_record_and_query(tmp_path):
+    history = _store(tmp_path)
+    now = time.time()
+    history.record_event("permit", "CLR-1", "info", "起飞 UAS-A -> APPROVE", "pilot-app", now)
+    history.record_event("procedure", "publish", "info", "发布 ARR v1", "dispatch", now)
+
+    events = history.recent_events(60, 10)
+    assert events["count"] == 2
+    assert {e["kind"] for e in events["events"]} == {"permit", "procedure"}
+
+    only_permit = history.recent_events(60, 10, "permit")
+    assert only_permit["count"] == 1
+    history.close()
+
+
+def test_event_summary(tmp_path):
+    history = _store(tmp_path)
+    now = time.time()
+    for _ in range(3):
+        history.record_event("push", "send", "warn", "发送失败", "push", now)
+    history.record_event("permit", "CLR-1", "info", "通过", "pilot-app", now)
+
+    summary = history.event_summary(60)
+    assert summary["total"] == 4
+    kinds = {k["kind"]: k["count"] for k in summary["kinds"]}
+    assert kinds["push"] == 3
+    assert kinds["permit"] == 1
+    history.close()

@@ -23,6 +23,8 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
+from .history import record_event
+
 from ..integrations import uom_adapter as adapter
 from ..integrations.outbox import Outbox
 from ..integrations.uom_client import PushClient
@@ -193,6 +195,11 @@ class PushService:
                     self.last_error = res.error
                     if status == "dead":
                         self.counters["dead"] += 1
+                        record_event(self.store, "push", "dead", "error",
+                                     "%s 超过重试上限：%s" % (row["msg_id"], res.error))
+                    else:
+                        record_event(self.store, "push", "failed", "warn",
+                                     "%s 发送失败：%s" % (row["msg_id"], res.error))
                     failed += 1
             return {"sent": sent, "failed": failed}
 

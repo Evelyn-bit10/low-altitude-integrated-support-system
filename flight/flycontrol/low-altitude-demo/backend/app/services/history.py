@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS traffic_history (
     PRIMARY KEY (id, ts)
 );
 CREATE INDEX IF NOT EXISTS idx_history_ts ON traffic_history(ts);
+CREATE TABLE IF NOT EXISTS event_history (
+    seq     INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts      REAL NOT NULL,
+    kind    TEXT NOT NULL,
+    subject TEXT,
+    level   TEXT,
+    message TEXT,
+    source  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_event_ts ON event_history(ts);
 """
 
 
@@ -189,14 +199,74 @@ class HistoryStore:
             "retention_hours": round(self.retention_sec / 3600.0, 1),
         }
 
+    # ------------------------------------------------------------ 事件
+    def record_event(self, kind: str, subject: str = "", level: str = "info",
+                     message: str = "", source: str = "", now: Optional[float] = None) -> None:
+        """记录一条事件（告警 / 许可 / 程序 / 推送）。事件低频，直接写库。"""
+        ts = time.time() if now is None else float(now)
+        try:
+            with self._lock, self._connect() as conn:
+                conn.execute(
+                    "INSERT INTO event_history (ts, kind, subject, level, message, source) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (ts, str(kind), str(subject or ""), str(level or "info"),
+                     str(message or "")[:2000], str(source or "")),
+                )
+        except Exception:
+            pass
+
+    def recent_events(self, minutes: int = 1440, limit: int = 200,
+                      kind: Optional[str] = None) -> Dict[str, Any]:
+        since = time.time() - max(1, int(minutes)) * 60
+        sql = ("SELECT seq, ts, kind, subject, level, message, source "
+               "FROM event_history WHERE ts >= ?")
+        args: List[Any] = [since]
+        if kind:
+            sql += " AND kind = ?"
+            args.append(str(kind))
+        sql += " ORDER BY ts DESC LIMIT ?"
+        args.append(max(1, int(limit)))
+        with self._lock, self._connect() as conn:
+            cur = conn.execute(sql, args)
+            columns = [c[0] for c in cur.description]
+            rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+        return {"minutes": int(minutes), "count": len(rows), "events": rows}
+
+    def event_summary(self, minutes: int = 1440) -> Dict[str, Any]:
+        since = time.time() - max(1, int(minutes)) * 60
+        with self._lock, self._connect() as conn:
+            cur = conn.execute(
+                "SELECT kind, COUNT(*) FROM event_history WHERE ts >= ? "
+                "GROUP BY kind ORDER BY COUNT(*) DESC",
+                (since,),
+            )
+            kinds = [{"kind": k, "count": c} for k, c in cur.fetchall()]
+            total = conn.execute(
+                "SELECT COUNT(*) FROM event_history WHERE ts >= ?", (since,)
+            ).fetchone()[0]
+        return {"minutes": int(minutes), "total": total, "kinds": kinds}
+
     # ------------------------------------------------------------ 维护
     def prune(self) -> int:
         cutoff = time.time() - self.retention_sec
         with self._lock, self._connect() as conn:
             cur = conn.execute("DELETE FROM traffic_history WHERE ts < ?", (cutoff,))
+            conn.execute("DELETE FROM event_history WHERE ts < ?", (cutoff,))
             return cur.rowcount
 
     def close(self) -> None:
         self._stop.set()
         self._thread.join(timeout=3)
         self.flush_now()
+
+
+def record_event(store, kind: str, subject: str = "", level: str = "info",
+                 message: str = "", source: str = "") -> None:
+    """业务侧记录事件的便捷入口；历史未启用时静默，不影响主流程。"""
+    history = getattr(store, "history", None)
+    if history is None:
+        return
+    try:
+        history.record_event(kind, subject, level, message, source)
+    except Exception:
+        pass

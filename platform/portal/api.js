@@ -134,6 +134,14 @@
       return request('/api/history/tracks?minutes=' + (minutes || 60) + '&limit=' + (limit || 200));
     },
     historyStats: function () { return request('/api/history/stats'); },
+    historyEvents: function (minutes, limit, kind) {
+      var q = '/api/history/events?minutes=' + (minutes || 1440) + '&limit=' + (limit || 50);
+      if (kind) q += '&kind=' + encodeURIComponent(kind);
+      return request(q);
+    },
+    historyEventSummary: function (minutes) {
+      return request('/api/history/events/summary?minutes=' + (minutes || 1440));
+    },
 
     setBaseUrl: function (value) { config.baseUrl = String(value || defaults.baseUrl).replace(/\/$/, ''); }
   };
