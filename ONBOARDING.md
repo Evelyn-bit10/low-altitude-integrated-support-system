@@ -212,7 +212,7 @@ communication →  flycontrol            ：POST /api/traffic/ingest
 
 **位置**：`flight/flycontrol/low-altitude-demo/`
 **技术栈**：FastAPI + SQLAlchemy +（PostgreSQL 15/PostGIS 3.3，可回退 SQLite）
-**规模**：后端约 1100 行 Python
+**规模**：后端约 9000 行 Python（46 个模块，含建议护栏与测试工具）
 
 ```
 backend/app/
@@ -248,7 +248,7 @@ backend/app/
 
 ### 6.2 communication —— 通讯与态势（纯前端 Demo）
 
-**位置**：`comms/communication/`（约 1100 行 `app.js`）
+**位置**：`comms/communication/`（约 1130 行 `app.js`）
 
 - 单页 `index.html`，直接浏览器打开即可（`file://` 也能跑）。
 - 模拟：RID 广播（1s）/ 心跳（3s）/ 位置报告（2s）/ 起飞降落申请 / 许可 / 等待 / 复飞 / 气象广播 / 障碍物告警 / 链路检查。
@@ -263,7 +263,7 @@ backend/app/
 
 ### 6.3 portal —— 一体化门户（自研 B/S）
 
-**位置**：`platform/portal/`（约 48 KB `app.js`，压缩风格单行较多）
+**位置**：`platform/portal/`（约 950 行 `app.js`，压缩风格单行较多）
 
 | 文件 | 职责 |
 | --- | --- |
@@ -383,6 +383,7 @@ config/demo_config.yaml         # 仿真 / 地图 / 偏航 / gcs / 告警参数
 | `DATABASE_URL` | `sqlite:///./flight_demo.db` | 生产改为 PostgreSQL+PostGIS |
 | `DISPATCH_INTERVAL` | `2` | 闭环调度周期（秒） |
 | `AUTH_ENABLED` | `false` | 演示关闭 |
+| `CORS_ORIGINS` | `*` | 跨域来源，逗号分隔；生产必须收紧（如 `https://ops.example.com`） |
 | `FRONTEND_DIR` | `../frontend` | 前端静态目录 |
 
 ### 7.3 地面站仿真配置（`wrjtksf/config/demo_config.yaml`）

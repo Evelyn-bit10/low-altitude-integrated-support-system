@@ -102,6 +102,11 @@ tr.candidate-rec{background:rgba(39,224,216,.07)}
 tr.candidate-rec td{color:#d9fff9}
 .rec-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:rgba(39,224,216,.16);color:#8ff7ef;font:9px var(--mono)}
 
+/* ---------- 模拟数据提示条（地面站页） ---------- */
+.mock-banner{display:flex;align-items:flex-start;gap:10px;margin:0 0 12px;padding:11px 14px;border:1px solid rgba(255,179,92,.38);border-radius:10px;background:linear-gradient(90deg,rgba(255,179,92,.10),rgba(255,179,92,.04))}
+.mock-banner b{flex:0 0 auto;color:#ffc67c;font-size:11px;letter-spacing:.04em}
+.mock-banner span{color:#c9a97f;font-size:10px;line-height:1.6}
+
 /* ---------- AI 决策：引擎结论 / 分歧 / 降级 ---------- */
 .verdict-panel .verdict-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .verdict-head>span{color:#6f86a2;font-size:10px}

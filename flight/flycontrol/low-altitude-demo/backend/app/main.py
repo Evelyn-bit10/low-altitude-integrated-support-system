@@ -147,10 +147,13 @@ async def _rbac(request, call_next):
     return await call_next(request)
 
 
-# 允许 communication 前端(含 file:// 的 null 源)跨域访问;生产按域名白名单收紧。
+# 允许 communication 前端(含 file:// 的 null 源)跨域访问。
+# 演示默认放宽；生产用 CORS_ORIGINS（逗号分隔）收紧，例如 CORS_ORIGINS=https://ops.example.com
+if settings.auth_enabled and "*" in settings.cors_origins:
+    log.warning("AUTH_ENABLED=1 但 CORS_ORIGINS 仍为 *；建议用 CORS_ORIGINS=https://your-host 收紧来源")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

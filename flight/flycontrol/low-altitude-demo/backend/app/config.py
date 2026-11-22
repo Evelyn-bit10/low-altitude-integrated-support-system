@@ -37,6 +37,9 @@ class Settings:
     dedup_autocalib: bool = True     # 用双源残差在线校正 σ 尺度
     dedup_calib_samples: int = 200   # 累计多少对样本后更新一次
 
+    # ---- 跨域来源（演示默认全开；生产用 CORS_ORIGINS 收紧）----
+    cors_origins: list = None
+
     # ---- 对外推送（UOM / 地方平台）----
     push_enabled: bool = True        # 是否启用推送
     push_mode: str = "dry-run"       # dry-run 本地演示 / http 真实发送
@@ -76,4 +79,5 @@ class Settings:
             dedup_source_sigmas=_json_env("DEDUP_SOURCE_SIGMAS"),
             dedup_autocalib=os.getenv("DEDUP_AUTOCALIB", "true").lower() in ("1", "true", "yes"),
             dedup_calib_samples=int(os.getenv("DEDUP_CALIB_SAMPLES", "200")),
+            cors_origins=[x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip()] or ["*"],
         )
