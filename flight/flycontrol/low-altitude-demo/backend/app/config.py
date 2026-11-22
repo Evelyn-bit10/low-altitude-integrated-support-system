@@ -37,6 +37,11 @@ class Settings:
     dedup_autocalib: bool = True     # 用双源残差在线校正 σ 尺度
     dedup_calib_samples: int = 200   # 累计多少对样本后更新一次
 
+    # ---- 态势历史（缺口二）----
+    history_enabled: bool = True
+    history_db: str = "data/history.db"
+    history_retention_hours: float = 24.0
+
     # ---- 跨域来源（演示默认全开；生产用 CORS_ORIGINS 收紧）----
     cors_origins: list = None
 
@@ -79,5 +84,8 @@ class Settings:
             dedup_source_sigmas=_json_env("DEDUP_SOURCE_SIGMAS"),
             dedup_autocalib=os.getenv("DEDUP_AUTOCALIB", "true").lower() in ("1", "true", "yes"),
             dedup_calib_samples=int(os.getenv("DEDUP_CALIB_SAMPLES", "200")),
+            history_enabled=os.getenv("HISTORY_ENABLED", "true").lower() in ("1", "true", "yes"),
+            history_db=os.getenv("HISTORY_DB", "data/history.db"),
+            history_retention_hours=float(os.getenv("HISTORY_RETENTION_HOURS", "24")),
             cors_origins=[x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip()] or ["*"],
         )

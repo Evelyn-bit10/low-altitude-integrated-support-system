@@ -59,7 +59,11 @@
     shadow: null,
     rl: null,
     adminLoaded: false,
-    adminBusy: false
+    adminBusy: false,
+    // 数据看板：态势历史
+    history: null,
+    historyLoaded: false,
+    _historyBusy: false
   };
 
   function normalizeSnapshot(raw) {
@@ -358,7 +362,7 @@
     return '<div class="page">'+breadcrumb('数据看板')+pageHead('ANALYTICS · OPERATION INSIGHT','运行数据看板','跨系统汇总指标、趋势和运行质量&nbsp; '+sourceTag(state.source.core),button('更新数据','sync','ghost'))+
       '<div class="kpi-grid">'+kpi('今日架次','32',' 架次','较昨日 +14.2%','plane','cyan')+kpi('平均周转时长','18.6',' min','目标 ≤ 22 min','clock')+kpi('机位占用率','66.7',' %','4 / 6 active','stand')+kpi('安全事件','0',' 起','连续 18 天无事故','shield','cyan')+'</div>'+
       '<div class="dashboard-grid">'+chartPanel('traffic-chart','在线架次趋势','过去 12 小时 · 在线 / 离场',badge('12H','info'))+chartPanel('alarm-chart','告警分布','按运行来源归类',badge('24 TOTAL','danger'))+chartPanel('weather-chart','气象走势','风速 / 温度 · 过去 8 小时',badge('METEO','info'))+
-      panel('运行质量','QUALITY TARGET',badge('THIS WEEK','success'),'<div class="quality-list">'+[['程序准时发布率','98.4',98.4],['RID 识别覆盖率','96.8',96.8],['C2 链路可用率','99.9',99.9],['传感器在线率','100',100],['告警闭环率','94.1',94.1]].map(function(q){return '<article><header><span>'+q[0]+'</span><b class="mono">'+q[1]+'%</b></header><div><i style="width:'+q[2]+'%"></i></div></article>';}).join('')+'</div>','quality-panel')+'</div>'+runtimePanel()+pushPanel()+'</div>';
+      panel('运行质量','QUALITY TARGET',badge('THIS WEEK','success'),'<div class="quality-list">'+[['程序准时发布率','98.4',98.4],['RID 识别覆盖率','96.8',96.8],['C2 链路可用率','99.9',99.9],['传感器在线率','100',100],['告警闭环率','94.1',94.1]].map(function(q){return '<article><header><span>'+q[0]+'</span><b class="mono">'+q[1]+'%</b></header><div><i style="width:'+q[2]+'%"></i></div></article>';}).join('')+'</div>','quality-panel')+'</div>'+runtimePanel()+historyPanel()+pushPanel()+'</div>';
   }
 
   function businessTable() {
@@ -735,6 +739,48 @@
       '<div class="metrics-grid">'+cells.map(function(c){return '<div class="metrics-cell"><small>'+esc(c[0])+'</small><b class="mono">'+esc(c[1])+'</b></div>';}).join('')+'</div>','metrics-panel');
   }
 
+  function loadHistory(force) {
+    if (state.dataMode !== 'live') return;
+    if (state._historyBusy) return;
+    if (state.historyLoaded && !force) return;
+    state._historyBusy = true;
+    Api.historySummary(60, 60).then(function (r) {
+      state._historyBusy = false;
+      if (r.ok) {
+        state.history = r.data;
+        state.historyLoaded = true;
+        if (state.route === 'dashboard') render();
+      }
+    }).catch(function () { state._historyBusy = false; });
+  }
+
+  function historyPanel() {
+    if (state.dataMode !== 'live') {
+      return panel('态势历史','TRAFFIC HISTORY · 最近 60 分钟',badge('演示模式','warning'),
+        '<div class="empty-state">切换到「实时数据」后可查询历史（SQLite 落库，保留 24 小时）</div>','history-panel');
+    }
+    var h = state.history;
+    if (!h || !h.points) {
+      return panel('态势历史','TRAFFIC HISTORY · 最近 60 分钟',badge('加载中','info'),
+        '<div class="empty-state">正在读取历史…</div>','history-panel');
+    }
+    var points = h.points.slice(-30);
+    var rows = points.map(function (p) {
+      var t = new Date(p.ts * 1000).toLocaleTimeString('zh-CN', { hour12: false });
+      return '<tr><td class="mono">' + t + '</td>' +
+        '<td class="mono">' + number(p.unique_tracks, 0) + '</td>' +
+        '<td class="mono">' + number(p.samples, 0) + '</td>' +
+        '<td class="mono">' + (p.avg_battery != null ? number(p.avg_battery, 0) + '%' : '—') + '</td>' +
+        '<td class="mono">' + (p.max_speed != null ? number(p.max_speed, 1) + ' m/s' : '—') + '</td></tr>';
+    }).join('');
+    return panel('态势历史','TRAFFIC HISTORY · 最近 ' + (h.minutes || 60) + ' 分钟',
+      badge((h.unique_tracks || 0) + ' 条唯一航迹 / ' + (h.samples || 0) + ' 样本','info'),
+      '<div class="table-scroll" style="max-height:240px"><table><thead><tr><th>时间</th><th>唯一航迹</th><th>样本</th><th>平均电量</th><th>最大速度</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="5" class="empty-state">该时间段暂无历史</td></tr>') +
+      '</tbody></table></div><div class="form-note">来源：SQLite <span class="mono">traffic_history</span>（GET /api/history/summary）</div>',
+      'history-panel');
+  }
+
   // ---- 局部 DOM 更新：数据刷新时只改变化的部分，不重建整页（避免闪烁）----
   function morphChildren(current, next) {
     var cur = Array.prototype.slice.call(current.childNodes);
@@ -794,7 +840,7 @@
       if(curProg.direction&&!state.dirTouched){state.direction=curProg.direction;}
       if(state.dataMode==='live'&&!state.plansLoaded)loadPlans();
       var p=state.program.program||effectiveSnapshot().program||Mock.snapshot.program;Visuals.program(document.getElementById('program-map'),effectiveSnapshot(),p);Visuals.profile(document.getElementById('profile-map'),p);}
-    if(state.route==='dashboard'){cleanup.push(Visuals.dashboard(Mock.analytics));Visuals.loadECharts(function(ok){if(ok&&state.route==='dashboard'){Visuals.disposeCharts();cleanup.push(Visuals.dashboard(Mock.analytics));}});}
+    if(state.route==='dashboard'){cleanup.push(Visuals.dashboard(Mock.analytics));Visuals.loadECharts(function(ok){if(ok&&state.route==='dashboard'){Visuals.disposeCharts();cleanup.push(Visuals.dashboard(Mock.analytics));}});loadHistory();}
     if(state.route==='admin'){loadAdmin(false);}
     if(state.route==='decision'){loadVerdict(false);}
   }

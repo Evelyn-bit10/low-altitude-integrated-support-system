@@ -98,6 +98,19 @@ class TrafficStore:
         _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.persist_path = os.environ.get(
             "DEDUP_SNAPSHOT", os.path.join(_root, "data", "tracks.json"))
+
+        # 态势历史（缺口二）：去重后的航迹按帧落库，支撑交班摘要与看板
+        self.history = None
+        self._last_prune = 0.0
+        if getattr(settings, "history_enabled", False):
+            try:
+                from app.services.history import HistoryStore
+                self.history = HistoryStore(
+                    os.path.join(_root, getattr(settings, "history_db", "data/history.db")),
+                    getattr(settings, "history_retention_hours", 24.0),
+                )
+            except Exception as exc:
+                log.warning("历史存储初始化失败: %s", exc)
         self._last_snap = 0.0
         # 启动恢复（DEDUP_RESTORE=1）：把上次的航迹快照装回来，避免重启后目标"集体消失"
         if os.environ.get("DEDUP_RESTORE", "0") == "1" and self.engine is not None:
@@ -130,6 +143,18 @@ class TrafficStore:
         try:
             from app.services import persist
             persist.save(self.persist_path, self.engine)
+        except Exception:
+            pass
+
+    def _record_history(self, now: float) -> None:
+        """把当前唯一航迹投递到历史队列；每 10 分钟清理一次过期行。"""
+        if self.history is None:
+            return
+        try:
+            self.history.record(self.records.values(), now)
+            if now - getattr(self, "_last_prune", 0.0) > 600:
+                self._last_prune = now
+                self.history.prune()
         except Exception:
             pass
 
@@ -197,7 +222,9 @@ class TrafficStore:
         recs = [normalize_traffic_record(r) for r in raw]
 
         if not self.enabled:
-            return self._ingest_legacy(recs, now)
+            stats = self._ingest_legacy(recs, now)
+            self._record_history(now)
+            return stats
 
         observations = []
         for r in recs:
@@ -248,6 +275,7 @@ class TrafficStore:
             pass
         self._rebuild(res, now)
         self._maybe_snapshot(now)
+        self._record_history(now)
 
         # ---- 影子模式：规则跑完后再让策略判一次，只写日志 ----
         if shadow_snap is not None:

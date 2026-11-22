@@ -126,6 +126,15 @@
     setShadow: function (enabled) { return request('/api/traffic/shadow', { method:'POST', body:JSON.stringify({ enabled: !!enabled }) }); },
     rlHealth: function () { return request('/api/rl/health'); },
 
+    // ---- 态势历史（缺口二）----
+    historySummary: function (minutes, bucketSec) {
+      return request('/api/history/summary?minutes=' + (minutes || 60) + '&bucket_sec=' + (bucketSec || 60));
+    },
+    historyTracks: function (minutes, limit) {
+      return request('/api/history/tracks?minutes=' + (minutes || 60) + '&limit=' + (limit || 200));
+    },
+    historyStats: function () { return request('/api/history/stats'); },
+
     setBaseUrl: function (value) { config.baseUrl = String(value || defaults.baseUrl).replace(/\/$/, ''); }
   };
 }());
