@@ -33,7 +33,9 @@ def client(monkeypatch):
         env = snapshot()
         env.advisory_sources = {name: {"source": "test-adapter", "observed_at": (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat(), "trusted": True} for name in ("meteo", "obstacles", "airspace")}
         return env
-    monkeypatch.setenv("ADVISORY_MAX_AGE_SECONDS", "60")
+    for name in ("METEO", "OBSTACLES", "AIRSPACE"):
+        monkeypatch.setenv(f"ADVISORY_{name}_SOURCE", "test-adapter")
+        monkeypatch.setenv(f"ADVISORY_{name}_MAX_AGE_SECONDS", "60")
     monkeypatch.setattr(app.state.store, "snapshot", trusted_snapshot)
     app.include_router(ai.router, prefix="/api")
     return TestClient(app)
@@ -87,7 +89,7 @@ def test_no_available_candidate_is_refused(client, monkeypatch):
     assert result["advice"] is None
 
 
-def test_success_sends_context(client, monkeypatch):
+def test_success_sends_context(client, monkeypatch, tmp_path):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "secret")
     monkeypatch.delenv("DEEPSEEK_MODEL", raising=False)
     _set_current_program(client.app.state.store)
@@ -116,6 +118,13 @@ def test_success_sends_context(client, monkeypatch):
     assert result["requires_human_review"] is True
     assert result["validated"] is False and result["executed"] is False
     assert result["context"]["data_freshness"] == "fresh"
+    snapshot = json.loads((tmp_path / "assessments.jsonl").read_text(encoding="utf-8"))
+    assert snapshot["schema_version"] == 2
+    assert snapshot["inputs"]["environment"]["obstacles"]
+    assert snapshot["inputs"]["current_program"]["waypoints"]
+    assert snapshot["inputs"]["plans_library"]
+    assert snapshot["inputs"]["rules"]
+    assert "_assessment_inputs" not in result["context"]
 
 
 @pytest.mark.parametrize("error,detail", [
@@ -467,6 +476,7 @@ def test_named_admin_can_replay_and_record_review(client, monkeypatch, tmp_path)
     assert review["snapshot_sha256"] == replay["snapshot_sha256"]
     assert datetime.fromisoformat(review["reviewed_at"]).utcoffset() == timedelta(0)
     assert client.get("/api/ai/reviews", headers=admin).json()["records"] == [review]
+    assert client.get(path, headers=admin).json()["reviews"] == [review]
     assert "private question" not in (tmp_path / "assessments.jsonl").read_text(encoding="utf-8")
 
 

@@ -32,7 +32,7 @@ services:
       DATABASE_URL: postgresql+psycopg://flight:${POSTGRES_PASSWORD:-Flight@2026}@db:5432/low_flight_program
       DISPATCH_INTERVAL: ${DISPATCH_INTERVAL:-2}
     ports:
-      - "8080:8080"
+      - "8082:8082"
     depends_on:
       db:
         condition: service_healthy

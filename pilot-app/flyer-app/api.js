@@ -5,7 +5,7 @@
  * 页面在任何情况下都不会白屏。
  *
  * 预留接口（后期对接真实机场只需改下面 defaults 的地址）：
- *   flycontrol / 机场 UTM 服务   baseUrl   默认 http://127.0.0.1:8080
+ *   flycontrol / 机场 UTM 服务   baseUrl   默认 http://127.0.0.1:8082
  *   groundstation 地面站服务     groundUrl 默认 http://127.0.0.1:8090
  *
  * 字段一律遵循统一契约 canonical（WGS84 经纬度 + 海拔 MSL + snake_case）。
@@ -22,7 +22,7 @@
   var PAGE_HOST = (location.hostname && location.hostname !== 'localhost') ? location.hostname : '127.0.0.1';
 
   var defaults = {
-    baseUrl: 'http://' + PAGE_HOST + ':8080',     // flycontrol / 真实机场 UTM
+    baseUrl: 'http://' + PAGE_HOST + ':8082',     // flycontrol / 真实机场 UTM
     groundUrl: 'http://' + PAGE_HOST + ':8090',   // 地面站数据服务
     timeoutMs: 2400
   };
@@ -87,6 +87,7 @@
   }
   function mockGround() {
     return {
+      airport_code: M.airport.code, data_source: 'demo',
       generated_at: new Date().toISOString(),
       stands: clone(M.stands), rid_targets: clone(M.rid_targets),
       sensor: clone(M.sensor), dispatch: clone(M.dispatch)

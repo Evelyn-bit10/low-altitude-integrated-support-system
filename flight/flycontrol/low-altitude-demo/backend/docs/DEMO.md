@@ -13,7 +13,7 @@
 
 | 步骤 | 服务 | 端口 | 说明 |
 | --- | --- | --- | --- |
-| 1 | flycontrol 后端 | 8080 | 以 `PUSH_MODE=http` 启动（推送走真实 HTTP） |
+| 1 | flycontrol 后端 | 8082 | 以 `PUSH_MODE=http` 启动（推送走真实 HTTP） |
 | 2 | 模拟 UOM 接收端 | 8099 | 校验签名并落盘，供第三幕演示 |
 | 3 | 门户静态服务 | 5500 | 承载演示台页面 |
 | 4 | 打开浏览器 | — | 自动打开 `demo.html` |
@@ -118,7 +118,7 @@ python tools\mock_uom_server.py --port 8099
 # 2) 后端（另开窗口）
 $env:PUSH_MODE="http"
 $env:PUSH_ENDPOINT="http://127.0.0.1:8099/uom/v1/messages"
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8082
 
 # 3) 静态服务（再开一个窗口）
 cd ..\..\..\platform\portal
@@ -145,11 +145,11 @@ start http://127.0.0.1:5500/demo.html
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
-| 顶部「后端 8080」红灯 | 后端未启动 | 运行 `启动演示.bat`，或手动起 uvicorn |
+| 顶部「后端 8082」红灯 | 后端未启动 | 运行 `启动演示.bat`，或手动起 uvicorn |
 | 推送页右上角显示 "未连接" | 模拟对端没起 | 起 8099：`python tools\mock_uom_server.py` |
 | 推送列表一直空 | 后端是 dry-run 模式 | 用 `PUSH_MODE=http` 重启后端 |
 | 去重数字不是 10→7 | 有旧航迹残留（15 秒 TTL） | 等 15 秒再点「开始上报」 |
-| 方向点不动 | 后端没响应 | 看 F12 控制台与 8080 日志 |
+| 方向点不动 | 后端没响应 | 看 F12 控制台与 8082 日志 |
 
 ---
 

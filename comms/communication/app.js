@@ -26,15 +26,13 @@
     trailMax: 40,                              // 航迹点数
     // 起降最低气象标准（演示阈值，可配置）
     metMin: { visibilityM: 1600, ceilingM: 120, windMs: 8.0 },
-    // 冲突判定余量
-    obstacleMarginM: 60,
-    obstacleAltMarginM: 40,
   };
 
   // 与 flycontrol 的双向同步配置(可覆盖 baseUrl)
   const SYNC = {
     enabled: true,
-    baseUrl: (typeof window !== "undefined" && window.LAC_SYNC_BASE) || "http://127.0.0.1:8080",
+    baseUrl: (typeof window !== "undefined" && window.LAC_SYNC_BASE) || "http://127.0.0.1:8082",
+    groundUrl: (typeof window !== "undefined" && window.LAC_GROUND_BASE) || "http://127.0.0.1:8090",
     snapshotIntervalMs: 3000,   // 周期拉取统一快照(环境/气象/程序)
     pushIntervalMs: 1000,       // 周期回传飞行器态势
     timeoutMs: 2000,
@@ -51,7 +49,6 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const deg2rad = (d) => (d * Math.PI) / 180;
-  const dist2d = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
   const fmtM = (m) => (m >= 1000 ? (m / 1000).toFixed(2) + " km" : Math.round(m) + " m");
 
   function makeMsgId() {
@@ -268,24 +265,13 @@
 
   function atcSend(type, targetId, payload) {
     const t = state.flights.find((f) => f.id === targetId);
-    const isDirective = type.startsWith("ATC_CLEARANCE") || type === "HOLD_INSTRUCTION" || type === "GO_AROUND";
-    if (isDirective && payload && typeof payload === "object") {
-      payload.validUntil = new Date(Date.now() + 60 * 1000).toISOString(); // 指令有效期 60s，超时自动失效
-      payload.revalidate = true;
+    if (type.startsWith("ATC_CLEARANCE") || type === "HOLD_INSTRUCTION" || type === "GO_AROUND") {
+      addLog("warn", `${targetId} · 演示场景待人工确认，未发送指令。`);
+      return;
     }
     const msg = buildAtcMessage(type, targetId, payload);
     addMessage("from-atc", type, CONFIG.vertiportId, targetId, type, JSON.stringify(msg.payload));
-    if (t) {
-      if (type === "GO_AROUND" && t.phase !== "LANDED") {
-        t.routeDir = -1;          // 复飞：调转航线方向，飞离起降点
-        t.vs = Math.abs(t.vs) + 1;
-        addLog("warn", `${t.id} 收到复飞指令，调整航向等待天气好转。`);
-      }
-      if (type === "ATC_CLEARANCE_LAND" && t.routeDir === -1) {
-        t.routeDir = 1;           // 重新许可后调头进近
-      }
-      scheduleUasAck(t, type);
-    }
+    if (t) scheduleUasAck(t, type);
     return msg;
   }
 
@@ -380,6 +366,15 @@
     if (f.phase === "LANDED") { f.speed = 0; f.vs = 0; f.alt = 0; }
   }
 
+  function evaluateEnvironment(f) {
+    const coords = f && state.externalSnapshot && window.LAC && window.LAC.geo.ready &&
+      Number.isFinite(f.x) && Number.isFinite(f.y) && Number.isFinite(f.alt)
+      ? window.LAC.geo.toLatLon(f.x, f.y, f.alt) : null;
+    return window.DemoDecision.environment(coords && {
+      lat: coords.lat, lon: coords.lon, alt_msl: coords.alt
+    }, state.externalSnapshot);
+  }
+
   /* ----------------------------- 冲突与告警 ----------------------------- */
   function runConflictDetection() {
     const w = state.weather;
@@ -398,27 +393,28 @@
       }
     }
 
-    // 障碍物冲突
+    const activeObstacleAlerts = new Set();
+    let environmentUnavailable = false;
     for (const f of state.flights) {
-      if (f.phase === "LANDED" || f.phase === "STANDBY") continue;
-      let anyConflict = false;
-      for (const o of obstacles) {
-        const d = dist2d(f.x, f.y, o.x, o.y);
-        const conflict = d < o.radius + CONFIG.obstacleMarginM &&
-                         f.alt < o.height + CONFIG.obstacleAltMarginM;
-        if (conflict) {
-          anyConflict = true;
-          const id = `OBS-CONFLICT-${f.id}-${o.id}`;
-          addAlert(id, `${f.id} 与障碍物「${o.name}」水平距离 ${Math.round(d)}m、高度 ${Math.round(f.alt)}m，低于障碍高度 ${o.height}m，存在冲突风险！`, "bad");
-          if (!state.scripted[id]) {
-            state.scripted[id] = true;
-            atcSend("OBSTACLE_ALERT", f.id, { obstacle: o.name, distance_m: Math.round(d), uasAlt_m: Math.round(f.alt), obstacleAlt_m: o.height, action: "立即拉升或改航避让" });
-          }
-        } else {
-          clearAlert(`OBS-CONFLICT-${f.id}-${o.id}`);
+      const result = evaluateEnvironment(f);
+      if (result.reasons.some((r) => r.tone === 'warn')) environmentUnavailable = true;
+      for (const hit of result.obstacleHits) {
+        const id = `OBS-CONFLICT-${f.id}-${hit.id}`;
+        activeObstacleAlerts.add(id);
+        if (!state.alerts.some((a) => a.id === id)) {
+          addMessage('alert', 'OBSTACLE_ALERT', CONFIG.vertiportId, f.id, '障碍物演示告警', `请人工评估障碍物「${hit.name}」风险。`);
         }
+        addAlert(id, `${f.id} 与障碍物「${hit.name}」存在演示冲突，水平距离 ${Math.round(hit.distance_m)}m。`, "bad");
       }
-      f.emergency = anyConflict;
+    }
+    if (!environmentUnavailable && state.externalSnapshot) {
+      state.alerts.filter((a) => a.id.startsWith('OBS-CONFLICT-') && !activeObstacleAlerts.has(a.id))
+        .forEach((a) => clearAlert(a.id));
+    }
+    if (environmentUnavailable || !state.externalSnapshot) {
+      addAlert('OBS-DATA-UNAVAILABLE', '环境或位置数据不可用，障碍物冲突状态待确认。', 'warn');
+    } else {
+      clearAlert('OBS-DATA-UNAVAILABLE');
     }
 
     // RID 丢失告警（在 RID 接收逻辑中处理）
@@ -443,6 +439,7 @@
       clearAlert(`RID-LOST-${f.id}`);
       addLog("ok", `${f.id} RID 广播恢复。`);
     }
+    f.ridLost = false;
     f.lastRidAt = nowMs;
     // 更新链路质量
     f.linkQuality = clamp(3 + Math.round(rnd(0, 2) + (f.ridLost ? -2 : 0)), 1, 5);
@@ -513,18 +510,31 @@
     return state.flights.find((f) => f.id === id);
   }
 
-    /* 起降许可自动决策引擎（简化演示：输入 RID 合法性 / 气象 / 障碍物 / 占用状态） */
     function autoDecision(f) {
-      if (!f || f.ridLost) return { result: "DENY", reason: "RID 远程识别不可用，禁止接入" };
-      const w = state.weather;
-      if (state.degraded.met) return { result: "DENY", reason: "气象源失效，切人工值守，禁止自动许可" };
-      const below = w ? metBelowStandard(w) : ["气象源失效"];
-      if (below.length) return { result: "DENY", reason: `气象低于起降标准（${below.join("、")}）` };
-      const inConflict = state.alerts.some((a) => a.id.startsWith(`OBS-CONFLICT-${f.id}-`));
-      if (inConflict) return { result: "DENY", reason: "进近存在障碍物冲突" };
-      if (state.occupied && f.id !== "UAS-2024-0001") return { result: "DENY", reason: "起降点占用" };
-      if (w && (w.visibility < 5000 || w.wind > 6)) return { result: "ADVISE_HOLD", reason: "气象条件受限，建议等待" };
-      return { result: "APPROVE", reason: "满足起降条件" };
+      const w = state.degraded.met ? null : state.weather;
+      const decision = window.DemoDecision.evaluate(f && {
+        rid_lost: f.ridLost === true ? true : f.ridLost === false ? false : null,
+        emergency: f.emergency, reg_no: f.regNo, ua_id: f.uaId,
+        battery_pct: f.battery, link_quality: state.degraded.c2 ? null : f.linkQuality
+      }, w && { visibility: w.visibility, cloud_base_agl: w.ceiling,
+        wind_speed: w.wind, gust: w.gust });
+      const environment = evaluateEnvironment(f);
+      if (environment.level === 'DENY') decision.level = 'DENY';
+      else if (environment.level === 'HOLD' && decision.level === 'APPROVE') decision.level = 'HOLD';
+      decision.reasons.push(...environment.reasons);
+      if (state.occupied && decision.level !== 'DENY') {
+        decision.level = 'HOLD';
+        decision.reasons.push({ text: '起降区域占用，需确认' });
+      }
+      if (f && (f.phase === 'APPROACH' || f.phase === 'HOVER')) {
+        const ground = window.DemoDecision.stands(state.externalSnapshot && state.externalSnapshot.airport && state.externalSnapshot.airport.code, state.ground);
+        if (ground.level === 'HOLD' && decision.level === 'APPROVE') decision.level = 'HOLD';
+        decision.reasons.push(...ground.reasons);
+        if (state.ground && state.ground.data_source === 'demo') decision.reasons.push({ text: '机位为演示数据' });
+      }
+      if (decision.level === 'APPROVE') decision.level = 'HOLD';
+      decision.reasons.push({ text: '起降区域占用为演示态势，需人工确认' });
+      return { result: decision.level, reason: decision.reasons.map((r) => r.text).join('；') };
     }
 
   /* ----------------------------- 渲染：列表 ----------------------------- */
@@ -556,7 +566,7 @@
     if (!f) { box.textContent = "尚未选中"; return; }
     const rid = buildRidMessage(f);
       const dec = autoDecision(f);
-      const decBadge = dec.result === "APPROVE" ? "🟢 APPROVE 许可" : dec.result === "ADVISE_HOLD" ? "🟡 HOLD 建议等待" : "🔴 " + dec.result + " 拒绝/告警";
+      const decBadge = dec.result === "APPROVE" ? "🟢 APPROVE 演示预判" : dec.result === "HOLD" ? "🟡 HOLD 待确认" : "🔴 " + dec.result + " 风险提示";
     box.innerHTML =
       `<div style="color:#eaf3ff">${f.id}（${f.model}）</div>
        <div>登记号：${f.regNo}</div>
@@ -565,7 +575,7 @@
        <div>速度：${f.speed.toFixed(1)} m/s · 航向 ${Math.round(f.heading)}° · 升降 ${f.vs.toFixed(1)} m/s</div>
        <div>距起降点：${fmtM(Math.hypot(f.x, f.y))} · 电池 ${Math.round(f.battery)}%</div>
        <div>链路质量：${"▮".repeat(f.linkQuality)}${"▯".repeat(5 - f.linkQuality)} · 紧急：${f.emergency ? "是" : "否"}</div>
-       <div style="margin-top:4px;color:#eaf3ff">自动决策：${decBadge}${dec.reason ? " · " + dec.reason : ""}</div>
+       <div style="margin-top:4px;color:#eaf3ff">自动决策：${decBadge}${dec.reason ? " · " + escapeHtml(dec.reason) : ""}</div>
          <div style="color:#7f9bc4">RID 最后报文：${f.ridLost ? "丢失" : "正常"} · ${fmtTime()}</div>`;
   }
 
@@ -864,8 +874,8 @@
     const type = $("cmd-type").value;
     const f = getFlight(target);
     if (target === "ALL") {
-      atcSend(type, "ALL", { note: "广播指令", text: $("cmd-type").selectedOptions[0].textContent });
-      for (const u of state.flights) if (u.phase !== "LANDED" && u.phase !== "STANDBY") scheduleUasAck(u, type);
+      const message = atcSend(type, "ALL", { note: "广播指令", text: $("cmd-type").selectedOptions[0].textContent });
+      if (message) for (const u of state.flights) if (u.phase !== "LANDED" && u.phase !== "STANDBY") scheduleUasAck(u, type);
     } else if (f) {
       atcSend(type, target, { note: $("cmd-type").selectedOptions[0].textContent });
     }
@@ -918,6 +928,7 @@
       renderWeather();
     }
 
+    state.externalSnapshot = snap;
     state.external = true;
     state.externalAirport = mapped.airport;
     return true;
@@ -938,8 +949,23 @@
     } catch (e) {
       // flycontrol 未启动 / 网络不可达 → 保持本地演示
     }
-    syncSetStatus("本地演示", "warn");
+    state.externalSnapshot = null;
+    syncSetStatus("同步失败，环境待核验", "warn");
     return false;
+  }
+
+  async function syncGround() {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), SYNC.timeoutMs);
+    try {
+      const response = await fetch(SYNC.groundUrl + '/api/ground', { cache: 'no-store', signal: ctrl.signal });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      state.ground = await response.json();
+    } catch (_) {
+      state.ground = null;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async function pushTraffic() {
@@ -1067,6 +1093,7 @@
       if (syncNow - lastSyncPull > SYNC.snapshotIntervalMs) {
         lastSyncPull = syncNow;
         syncPullSnapshot();
+        syncGround();
       }
     }
   }

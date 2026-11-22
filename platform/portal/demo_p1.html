@@ -107,11 +107,11 @@
 </main>
 
 <script>
-/* 后端固定 8080，主机名自适应（file:// 与 5500 静态服务都能用）；?api= 可覆盖 */
+/* 后端固定 8082，主机名自适应（file:// 与 5500 静态服务都能用）；?api= 可覆盖 */
 const API = (function () {
   var q = new URLSearchParams(location.search).get('api');
   if (q) return q.replace(/\/+$/, '');
-  return 'http://' + (location.hostname || '127.0.0.1') + ':8080';
+  return 'http://' + (location.hostname || '127.0.0.1') + ':8082';
 })();
 const $ = s => document.querySelector(s);
 
@@ -473,7 +473,7 @@ if (fleetBtn) fleetBtn.onclick = fleetToggle;
   try {
     snap = await api('/api/sync/snapshot');
     $('#pill-api').className = 'pill ok';
-    $('#pill-api').lastElementChild.textContent = '已连接 8080';
+    $('#pill-api').lastElementChild.textContent = '已连接 8082';
   } catch (e) {
     $('#pill-api').className = 'pill bad';
     $('#pill-api').lastElementChild.textContent = '未连接';

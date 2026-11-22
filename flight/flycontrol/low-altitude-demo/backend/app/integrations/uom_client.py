@@ -74,9 +74,12 @@ class PushClient:
         return body, headers
 
     def send(self, message: dict) -> SendResult:
-        if self.mode != "http" or not self.endpoint:
-            # dry-run：本地演示模式，不产生网络流量
+        if self.mode == "dry-run":
             return SendResult(ok=True, status=0, latency_ms=0.0)
+        if self.mode != "http":
+            return SendResult(ok=False, error="Unsupported push mode: %s" % self.mode)
+        if not self.endpoint:
+            return SendResult(ok=False, error="HTTP push endpoint is missing")
 
         body, headers = self.build_request(message)
         req = urllib.request.Request(self.endpoint, data=body.encode("utf-8"),

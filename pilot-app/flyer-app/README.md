@@ -23,7 +23,7 @@
 
 | 服务 | 监听 | 说明 |
 | --- | --- | --- |
-| flycontrol API | `0.0.0.0:8080` | 机场 / 程序 / 态势后端 |
+| flycontrol API | `0.0.0.0:8082` | 机场 / 程序 / 态势后端 |
 | 地面站数据桥 | `0.0.0.0:8090` | 机位 / RID900 / 传感器 |
 | 飞手端 App | `0.0.0.0:5502` | 本 App |
 | 一体化门户 | `0.0.0.0:5500` | 网页端门户（用于对比） |
@@ -41,7 +41,7 @@
 
 **关键点**：App 的后端地址是按「当前页面所在主机」自动推导的（`api.js` 里的 `PAGE_HOST`）——电脑上打开指向 `127.0.0.1`，手机上打开指向**电脑的局域网 IP**。所以手机和电脑访问的是**同一套后端**，数据天然一致，不用改任何代码。
 
-> 如果不做这个推导，手机上 `http://127.0.0.1:8080` 会指向**手机自己**，永远连不上后端，只能看演示数据 —— 这正是真机测试最容易踩的坑。
+> 如果不做这个推导，手机上 `http://127.0.0.1:8082` 会指向**手机自己**，永远连不上后端，只能看演示数据 —— 这正是真机测试最容易踩的坑。
 
 验证步骤：
 
@@ -85,7 +85,7 @@
 
 ```powershell
 cd yth\flight\flycontrol\low-altitude-demo\backend
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8082
 
 cd yth
 python ground-bridge.py --host 0.0.0.0 --port 8090
@@ -100,7 +100,7 @@ python ..\..\platform\portal\serve.py 5502 --host 0.0.0.0
 2. 关掉电脑上的 VPN、代理、网络加速类软件；
 3. 放行防火墙 —— 以管理员身份运行一次：
    ```powershell
-   New-NetFirewallRule -DisplayName "TingzhongDemo" -Direction Inbound -Protocol TCP -LocalPort 5500,5502,8080,8090 -Action Allow
+   New-NetFirewallRule -DisplayName "TingzhongDemo" -Direction Inbound -Protocol TCP -LocalPort 5500,5502,8082,8090 -Action Allow
    ```
 4. 先用电脑浏览器访问 `http://<电脑IP>:5502/index.html`：能打开说明服务正常，问题在防火墙或路由器的 AP 隔离。
 
@@ -172,13 +172,13 @@ flyer-app/
 
 ```js
 var defaults = {
-  baseUrl:   'http://127.0.0.1:8080',   // flycontrol / 真实机场 UTM 服务
+  baseUrl:   'http://127.0.0.1:8082',   // flycontrol / 真实机场 UTM 服务
   groundUrl: 'http://127.0.0.1:8090',   // 地面站数据服务
   timeoutMs: 2400
 };
 ```
 
-也可用 URL 参数临时指定：`index.html?api=http://x.x.x.x:8080&ground=http://x.x.x.x:8090`，
+也可用 URL 参数临时指定：`index.html?api=http://x.x.x.x:8082&ground=http://x.x.x.x:8090`，
 或在「我的 → 设置」里填写并保存（存 localStorage）。
 
 已预留的接口方法：
@@ -203,7 +203,7 @@ var defaults = {
 已完成的封装：
 
 - `manifest.webmanifest`：可安装、`display: standalone` 独立窗口、竖屏锁定、主题色、应用图标（含 Android maskable）、两个快捷方式（起降申请 / 实时态势）；
-- `sw.js`：Service Worker 离线缓存静态资源（`/api/` 与 8080/8090 接口请求**不缓存**，避免运行数据过期），断网也能打开界面并回退演示数据；
+- `sw.js`：Service Worker 离线缓存静态资源（`/api/` 与 8082/8090 接口请求**不缓存**，避免运行数据过期），断网也能打开界面并回退演示数据；
 - `icons/`：SVG 应用图标与自适应图标；
 - iOS 支持：`apple-mobile-web-app-capable` + `apple-touch-icon` + 状态栏样式，可「添加到主屏幕」全屏运行。
 
@@ -258,7 +258,7 @@ APK 里的页面来自**本地资源**，`location.hostname` 推导会失效（�
 2. 或直接进 **「我的 → 设置」**，填写：
 
    ```text
-   机场服务     http://192.168.1.20:8080     ← 换成你电脑的局域网 IP
+   机场服务     http://192.168.1.20:8082     ← 换成你电脑的局域网 IP
    地面站服务   http://192.168.1.20:8090
    ```
 

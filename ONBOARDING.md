@@ -45,7 +45,7 @@
 
 | # | 组件 | 端口 | 启动方式 |
 | --- | --- | --- | --- |
-| 1 | 飞控后端 flycontrol | 8080 | `backend\.venv\Scripts\python.exe -m uvicorn app.main:app` |
+| 1 | 飞控后端 flycontrol | 8082 | `backend\.venv\Scripts\python.exe -m uvicorn app.main:app` |
 | 2 | 门户数据桥 ground-bridge | 8090 | `python ground-bridge.py`（仅标准库） |
 | 3 | 管理平台门户 | 5500 | `python serve.py 5500 --host 0.0.0.0`（no-store，改完刷新即生效） |
 | 4 | 飞手端 App | 5502 | `python serve.py 5502 --host 0.0.0.0 --dir ..\..\pilot-app\flyer-app` |
@@ -62,10 +62,10 @@
 
 ```powershell
 # 1) 飞控后端健康检查
-Invoke-RestMethod http://127.0.0.1:8080/api/health
+Invoke-RestMethod http://127.0.0.1:8082/api/health
 
 # 2) 统一快照（机场/障碍物/空域/气象/程序/态势）
-Invoke-RestMethod http://127.0.0.1:8080/api/sync/snapshot | ConvertTo-Json -Depth 4
+Invoke-RestMethod http://127.0.0.1:8082/api/sync/snapshot | ConvertTo-Json -Depth 4
 
 # 3) 地面站数据桥
 Invoke-RestMethod http://127.0.0.1:8090/api/ground | ConvertTo-Json -Depth 4
@@ -79,7 +79,7 @@ Start-Process http://127.0.0.1:5502/index.html
 
 - 门户顶栏右上角状态胶囊显示 **实时**（非「演示」）；
 - 飞手端 App 顶栏胶囊同样显示 **实时**；
-- `http://127.0.0.1:8080/docs` 能打开 Swagger，且 `/api/sync/snapshot` 有数据。
+- `http://127.0.0.1:8082/docs` 能打开 Swagger，且 `/api/sync/snapshot` 有数据。
 
 ### 2.3 各子系统单独启动
 
@@ -105,12 +105,12 @@ Start-Process http://127.0.0.1:5502/index.html
                                 ▼
 ┌──────────────────── 管理平台 platform/portal :5500 ────────────┐
 │  8 个页面：总览/态势/程序/AI 决策/地面站/看板/业务/系统            │
-│  演示数据（默认）  ⇄  实时数据（每 5s 轮询 8080 + 8090）          │
+│  演示数据（默认）  ⇄  实时数据（每 5s 轮询 8082 + 8090）          │
 └───────────────▲──────────────────────────────▲─────────────────┘
                 │ /api/sync/snapshot           │ /api/program/current
                 │                              │ /api/traffic
 ┌───────────────┴──────────── 飞控 flight/ ─────┴─────────────────┐
-│  flycontrol :8080  FastAPI + 4 引擎 + 2s 闭环调度               │
+│  flycontrol :8082  FastAPI + 4 引擎 + 2s 闭环调度               │
 │  合规校验 / 风险评估 / A*+RRT*+Dubins 规划 / 仿真验证             │
 └───────────────▲────────────────────────────────────────────────┘
                 │ POST /api/traffic/ingest
@@ -270,7 +270,7 @@ backend/app/
 | `index.html` | 页面壳 + 顶部导航 |
 | `styles.css` | 深色科技风 / 响应式 |
 | `app.js` | 路由 + 状态 + 8 个页面渲染 + 详情抽屉 + 事件 |
-| `api.js` | **唯一 baseUrl 配置点**（8080 / 8090） |
+| `api.js` | **唯一 baseUrl 配置点**（8082 / 8090） |
 | `mock-data.js` | 演示数据（canonical 字段） |
 | `visuals.js` | Canvas 态势图 / 程序图 / 高度剖面 / ECharts 降级 |
 | `ground-bridge.py` | 地面站数据桥（8090，仅标准库） |
@@ -369,7 +369,7 @@ config/demo_config.yaml         # 仿真 / 地图 / 偏航 / gcs / 告警参数
 
 | 端口 | 服务 |
 | --- | --- |
-| 8080 | 飞控后端 / 机场 UTM 服务（`/docs` 为 Swagger） |
+| 8082 | 飞控后端 / 机场 UTM 服务（`/docs` 为 Swagger） |
 | 8090 | 门户数据桥（地面站数据） |
 | 5500 | 管理平台门户 |
 | 5502 | 飞手端 App |
@@ -405,28 +405,28 @@ config/demo_config.yaml         # 仿真 / 地图 / 偏航 / gcs / 告警参数
 
 ```powershell
 # 查看当前程序 + 风险 + 合规 + 仿真
-Invoke-RestMethod http://127.0.0.1:8080/api/program/current | ConvertTo-Json -Depth 6
+Invoke-RestMethod http://127.0.0.1:8082/api/program/current | ConvertTo-Json -Depth 6
 
 # 激活动态塔吊（id=1），触发自动重规划
-Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/env/obstacle/toggle `
+Invoke-RestMethod -Method Post http://127.0.0.1:8082/api/env/obstacle/toggle `
   -ContentType 'application/json' -Body '{"id":1,"active":true}'
 
 # 手动重规划
-Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/program/replan `
+Invoke-RestMethod -Method Post http://127.0.0.1:8082/api/program/replan `
   -ContentType 'application/json' -Body '{"program_type":"arrival"}'
 
 # 注入恶劣气象
-Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/env/meteo `
+Invoke-RestMethod -Method Post http://127.0.0.1:8082/api/env/meteo `
   -ContentType 'application/json' `
   -Body '{"wind_speed":12,"wind_dir":90,"gust":18,"visibility":1200,"cloud_base":90,"turbulence":3,"wind_shear":3,"temperature":15,"pressure":1002}'
 
 # 模拟 communication 回传态势
-Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/traffic/ingest `
+Invoke-RestMethod -Method Post http://127.0.0.1:8082/api/traffic/ingest `
   -ContentType 'application/json' `
   -Body '[{"id":"UAS-TEST-1","lat":30.001,"lon":120.002,"alt_msl":120,"phase":"APPROACH"}]'
 
 # 查看态势
-Invoke-RestMethod http://127.0.0.1:8080/api/traffic
+Invoke-RestMethod http://127.0.0.1:8082/api/traffic
 ```
 
 飞控后端单元测试：
@@ -460,7 +460,7 @@ node selftest.js
 4. **虚拟环境不入库**（`.gitignore` 已忽略 `.venv` / `venv` / `.conda` / `__pycache__`）。启动器优先用各子项目的
    `.venv`，没有就回退系统 Python；需要重建后端环境见 `HANDOFF.md` §2 的「环境现状」。
 5. **「有内容」≠「连上了」**：门户和 App 都有 mock 回退，必须看顶栏 `实时 / 演示` 胶囊。
-6. **手机连不上**：常见原因是手机开了 VPN/流量、电脑防火墙未放行 5500/5502/8080/8090，或路由器 AP 隔离。
+6. **手机连不上**：常见原因是手机开了 VPN/流量、电脑防火墙未放行 5500/5502/8082/8090，或路由器 AP 隔离。
 7. **PWA 安装需要安全上下文**：`http://192.168.x.x` 下 Android Chrome 不出安装按钮，需用 `adb reverse` 或 `chrome://flags` 白名单。
 8. **`www/` 是打包产物**，改了不生效是改错文件了。
 9. **`start-system.ps1` 里地面站路径**指向 `wrjtksf\drone_ground_station`，不是 `wrjtksf\src`。

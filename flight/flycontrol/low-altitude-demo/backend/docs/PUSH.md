@@ -47,12 +47,13 @@
 }
 ```
 
-> 真实 UOM 规范的字段名与信封可能不同（`uasId`/`uavId`、`altMsl`/`altitude` 等），
-> **只需修改 `uom_adapter.py` 的 `FIELD_MAP` 与 `envelope()`**，其余代码不动。
+> 当前适配器和签名协议仅为演示约定，尚未依据对端正式规范验证。真实接入除字段和信封映射外，还需核对认证、传输安全、业务回执、重试幂等、数据来源及双方联调要求。
 
 ---
 
 ## 3. 可靠性设计
+
+`dry-run` 不联网，但目前会把演示消息标记为已发送；切换到 HTTP 模式不会自动重放这些消息。HTTP 模式仅依据 HTTP 2xx 判断发送成功，不解析对方业务回执，因此“成功”不等于对方业务接收或正式对接验收通过。演示发件箱不应用作生产补传队列。
 
 | 机制 | 做法 |
 | --- | --- |
@@ -102,13 +103,13 @@ python tools\mock_uom_server.py --port 8099
 # 2) 以真实发送模式启动后端
 $env:PUSH_MODE="http"
 $env:PUSH_ENDPOINT="http://127.0.0.1:8099/uom/v1/messages"
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8080
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8082
 
 # 3) 生成一些态势（可选）
 .\.venv\Scripts\python.exe tools\sim_two_devices.py --frames 5
 
 # 4) 查看结果
-Invoke-RestMethod http://127.0.0.1:8080/api/push/status
+Invoke-RestMethod http://127.0.0.1:8082/api/push/status
 Invoke-RestMethod http://127.0.0.1:8099/uom/v1/messages
 ```
 

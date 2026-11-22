@@ -8,7 +8,7 @@ set "PORTAL_DIR=%~dp0platform\portal"
 set "APP_DIR=%~dp0pilot-app\flyer-app"
 set "COMMS_DIR=%~dp0comms\communication"
 
-set "API_PORT=8080"
+set "API_PORT=8082"
 set "GROUND_PORT=8090"
 set "PORTAL_PORT=5500"
 set "APP_PORT=5502"
@@ -51,12 +51,12 @@ echo.
 echo     [1]  Full system           portal + bridge + flyer app + groundstation
 echo     [2]  Demo console          3 features + mock UOM on 8099
 echo     [3]  RL association lab    visualise the dedup policy network
-echo     [4]  Backend only          8080, foreground, shows logs
-echo     [5]  Backend + demo pages  8080 + demo.html + rl_lab.html
-echo     [6]  Backend + built-in frontend page (8080)
+echo     [4]  Backend only          8082, foreground, shows logs
+echo     [5]  Backend + demo pages  8082 + demo.html + rl_lab.html
+echo     [6]  Backend + built-in frontend page (8082)
 echo     [7]  Groundstation desktop  PyQt5 window + DSM tiles on 8081
 echo     [8]  Flyer app             5502, this PC only
-echo     [9]  Phone / LAN test      8080 + 8090 + 5500 + 5502 on 0.0.0.0
+echo     [9]  Phone / LAN test      8082 + 8090 + 5500 + 5502 on 0.0.0.0
 echo    [10]  Communication page
 echo    [11]  Decision engine prototype (Python)
 echo    [12]  Build Android APK
@@ -214,7 +214,7 @@ echo.
 echo    If the phone cannot connect:
 echo      1) Allow Python through Windows Firewall (private + public)
 echo      2) Or run once as Administrator:
-echo         New-NetFirewallRule -DisplayName "TingzhongDemo" -Direction Inbound -Protocol TCP -LocalPort 5500,5502,8080,8090 -Action Allow
+echo         New-NetFirewallRule -DisplayName "TingzhongDemo" -Direction Inbound -Protocol TCP -LocalPort 5500,5502,8082,8090 -Action Allow
 echo.
 echo    Stop: close the four minimized windows just opened.
 echo.
@@ -273,12 +273,12 @@ echo  Commands:
 echo    portal     full system: portal + data bridge + flyer app + groundstation
 echo    demo       demo console (3 features + mock UOM on 8099)
 echo    rl         RL association lab (starts the backend if needed)
-echo    api        backend only on 8080, foreground, shows logs
+echo    api        backend only on 8082, foreground, shows logs
 echo    pages      backend + demo.html + rl_lab.html
 echo    apidev     backend + its built-in frontend page
 echo    device     groundstation desktop (PyQt5 window + DSM tiles on 8081)
 echo    app        flyer app on 5502 (this PC only)
-echo    mobile     phone / LAN test (8080 + 8090 + 5500 + 5502 on 0.0.0.0)
+echo    mobile     phone / LAN test (8082 + 8090 + 5500 + 5502 on 0.0.0.0)
 echo    comms      communication / situation page
 echo    decision   decision engine prototype (Python)
 echo    apk        build the Android APK

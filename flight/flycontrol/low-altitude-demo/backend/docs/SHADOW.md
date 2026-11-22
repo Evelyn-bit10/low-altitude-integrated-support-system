@@ -40,13 +40,13 @@ RL 策略是在仿真数据上训的。离线指标好 ≠ 线上好：
 # 默认关闭，零影响；打开只需一个环境变量
 $env:DEDUP_SHADOW = "1"
 $env:DEDUP_SHADOW_LOG = "logs/shadow.jsonl"     # 可选
-python -m uvicorn app.main:app --port 8080
+python -m uvicorn app.main:app --port 8082
 ```
 
 **运行时开关**（演示台用，不必重启）：
 
 ```powershell
-curl -X POST http://127.0.0.1:8080/api/traffic/shadow ^
+curl -X POST http://127.0.0.1:8082/api/traffic/shadow ^
      -H "Content-Type: application/json" ^
      -d "{\"enabled\": true, \"reset\": true}"
 ```
@@ -56,7 +56,7 @@ curl -X POST http://127.0.0.1:8080/api/traffic/shadow ^
 验证：
 
 ```powershell
-curl http://127.0.0.1:8080/api/traffic/shadow
+curl http://127.0.0.1:8082/api/traffic/shadow
 ```
 
 ```json

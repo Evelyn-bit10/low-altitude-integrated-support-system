@@ -3,7 +3,7 @@
 #  由根目录「启动一体化门户.bat」调用（双击即用）。
 #
 #  本脚本是【全系统总入口】，会拉起：
-#    1. 飞控后端            flight\flycontrol  (端口 8080)
+#    1. 飞控后端            flight\flycontrol  (端口 8082)
 #    2. 门户数据桥          platform\portal\ground-bridge.py (端口 8090)
 #    3. 管理平台门户        platform\portal     (端口 5500)
 #    4. 飞手端 App          pilot-app\flyer-app (端口 5502)
@@ -33,7 +33,7 @@ $groundPy  = Join-Path $groundDir "venv\Scripts\python.exe"
 
 $portalUrl    = "http://127.0.0.1:5500/index.html"
 $pilotUrl     = "http://127.0.0.1:5502/index.html"
-$apiHealth    = "http://127.0.0.1:8080/api/health"
+$apiHealth    = "http://127.0.0.1:8082/api/health"
 $bridgeHealth = "http://127.0.0.1:8090/api/health"
 
 function Test-Url([string]$Url, [int]$TimeoutSec = 1) {
@@ -147,13 +147,15 @@ Write-Host ("  Python     : " + $python)
 Write-Host ""
 
 # ---------------------------------------------------------------- 1 飞控后端
-Write-Host "[1/6] 飞控后端       端口 8080" -NoNewline
+Write-Host "[1/6] 飞控后端       端口 8082" -NoNewline
 if (Test-Flycontrol) { Write-Host "   已在运行，复用" -ForegroundColor Green }
 else {
     # 有 .venv 就用 .venv，没有就用系统 Python（$python 由 Find-Python 回退得到）
     $pyLabel = if ($python -eq $apiPy) { "venv" } else { "系统 Python" }
+    if (-not $env:ADVISORY_SHOW_DEMO) { $env:ADVISORY_SHOW_DEMO = "1" }
+    if (-not $env:ADVISORY_DEMO_CALL_MODEL) { $env:ADVISORY_DEMO_CALL_MODEL = "1" }
     Start-Process -FilePath $python `
-        -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080") `
+        -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8082") `
         -WorkingDirectory $apiDir -WindowStyle Hidden
     Write-Host ("   已启动 · " + $pyLabel) -ForegroundColor Green
 }
@@ -229,11 +231,11 @@ if (Test-Flycontrol) {
 }
 Write-Host ("  管理平台门户    " + $portalUrl)
 Write-Host ("  飞手端 App      " + $pilotUrl)
-Write-Host ("  飞控接口文档    http://127.0.0.1:8080/docs")
+Write-Host ("  飞控接口文档    http://127.0.0.1:8082/docs")
 if ($lan) {
     Write-Host ""
     Write-Host ("  手机访问（同一 Wi-Fi）  http://" + $lan + ":5502/index.html") -ForegroundColor Yellow
-    Write-Host ("  手机端首次打开需在「我的 → 设置」填 http://" + $lan + ":8080") -ForegroundColor Yellow
+    Write-Host ("  手机端首次打开需在「我的 → 设置」填 http://" + $lan + ":8082") -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "  停止服务：把启动时新开的最小化窗口关掉即可。"

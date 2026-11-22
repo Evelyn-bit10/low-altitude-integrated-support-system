@@ -13,7 +13,7 @@
 
 | # | 子系统 | 端口 | 说明 |
 | --- | --- | --- | --- |
-| 1 | 飞控后端（flycontrol API） | 8080 | 统一快照 / 飞行程序 / 风险合规 |
+| 1 | 飞控后端（flycontrol API） | 8082 | 统一快照 / 飞行程序 / 风险合规 |
 | 2 | 门户数据桥（ground-bridge） | 8090 | 机位 / RID900 / 传感器数据（**模拟值**，见第三节） |
 | 3 | 管理平台门户 | 5500 | 浏览器自动打开 |
 | 4 | 飞手端 App（PWA） | 5502 | 手机同 Wi-Fi 可直接访问 |
@@ -23,7 +23,7 @@
 服务统一绑定 `0.0.0.0`，手机在同一 Wi-Fi 下可直接访问（启动完成时会打印本机局域网地址）。
 已在运行的服务会自动复用，不会重复启动。
 
-**停止服务**：双击根目录的 **`停止服务.bat`** —— 它按端口（8080 / 8081 / 8090 / 8099 / 5500 / 5502）
+**停止服务**：双击根目录的 **`停止服务.bat`** —— 它按端口（8082 / 8081 / 8090 / 8099 / 5500 / 5502）
 把本项目启动的 Python 进程连子进程一起结束，并逐条打印停掉了什么、哪些端口本来空闲。
 
 > 第 1~4 项是**隐藏窗口**，任务栏里看不到，不能靠"关窗口"停；地面站（第 6 项）虽是独立窗口，
@@ -139,7 +139,7 @@ low-altitude/
                                │
                     ┌──────────┴───────────┐
    飞控             │  flight/flycontrol   │
-   flight/          │  FastAPI (8080)      │
+   flight/          │  FastAPI (8082)      │
                     └──────────▲───────────┘
                                │ 飞行器态势回传 /api/traffic/ingest
                     ┌──────────┴───────────┐
@@ -165,7 +165,7 @@ low-altitude/
 
 | 端口 | 用途 |
 | --- | --- |
-| 8080 | 飞控后端 / 机场 UTM 服务（`/docs` 为 Swagger） |
+| 8082 | 飞控后端 / 机场 UTM 服务（`/docs` 为 Swagger） |
 | 8081 | 地面站本地 DSM 瓦片服务（由地面站桌面端自行启动） |
 | 8090 | 门户数据桥（地面站**模拟**数据） |
 | 8099 | 模拟 UOM 接收端（仅 `启动演示.bat` 拉起） |
@@ -181,7 +181,7 @@ low-altitude/
 | 管理平台门户 | `platform\portal\` — 直接打开 `index.html`（默认演示数据模式，不发任何请求），或起静态服务 |
 | 地面站（真机版） | `低空系统.bat device`（或双击 `低空系统.bat` 选 `[7]`）。**需先建 venv**：`python -m venv venv` → `venv\Scripts\pip install -r requirements.txt`（PyQt5 / PyQtWebEngine / pymavlink / pyserial / aiohttp / rs1090 …）。**工程路径含中文时**启动器会自动建一个纯 ASCII 的 junction（`%LOCALAPPDATA%\gs-venv`）绕过 Qt 5.15 的 8-bit 路径限制，否则会报 `Could not find the Qt platform plugin "windows"` / `Couldn't mmap icu data file` |
 | 地面站（仿真版） | `device\groundstation\wrjtksf\src\` — `python main.py`，需 PySide6（见 `wrjtksf\requirements.txt`） |
-| 飞控 | `低空系统.bat api`（前台起 8080，看日志）或 `低空系统.bat apidev`（连带打开后端自带前端页） |
+| 飞控 | `低空系统.bat api`（前台起 8082，看日志）或 `低空系统.bat apidev`（连带打开后端自带前端页） |
 | 通讯态势 | `低空系统.bat comms`（打开页面）；决策引擎原型：`低空系统.bat decision` |
 | 飞手端 App | `低空系统.bat app`（本机 5502）/ `低空系统.bat mobile`（手机联调）/ `低空系统.bat apk`（打安卓包） |
 

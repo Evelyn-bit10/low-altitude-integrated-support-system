@@ -72,7 +72,9 @@ def build_ground_data():
         "deviation_alerts": int(1 + round(1 + math.sin(t / 53))),
     }
     return {
-        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()),
+        "airport_code": "CQ-LX01",
+        "data_source": "demo",
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "stands": STANDS,
         "rid_targets": rid_targets,
         "sensor": sensor,

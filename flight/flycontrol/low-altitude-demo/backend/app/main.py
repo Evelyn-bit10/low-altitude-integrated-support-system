@@ -1,7 +1,7 @@
 """FastAPI 应用入口。
 
 启动方式:
-    uvicorn app.main:app --host 0.0.0.0 --port 8080
+    uvicorn app.main:app --host 0.0.0.0 --port 8082
 启动后后台闭环调度自动运行(间隔由 DISPATCH_INTERVAL 控制, 默认 2 秒)。
 """
 from __future__ import annotations
@@ -24,6 +24,7 @@ from .config import Settings
 from .routers import program, push, traffic
 from .services.dispatch import DispatchService
 from .services.push_service import PushService
+from .services.weather_reference import WeatherReference
 from .store import Store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -31,6 +32,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 settings = Settings.from_env()
 store = Store(settings)
 store.init()
+store.weather_reference = WeatherReference()
 dispatch = DispatchService(store)
 
 # 交通态势存储(内存, 演示);生产落库 lp_traffic。机场原点用于后续 ENU 回显。
@@ -62,7 +64,7 @@ async def lifespan(app: FastAPI):
     async def _warm_join_points():
         import urllib.request
         await asyncio.sleep(8)
-        base = os.getenv("SELF_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
+        base = os.getenv("SELF_BASE_URL", "http://127.0.0.1:8082").rstrip("/")
         pts = []
         for deg in range(0, 360, 22):      # 16 个方位
             for r in (500, 1000, 1500, 2000, 2500):
@@ -78,10 +80,20 @@ async def lifespan(app: FastAPI):
         log.info("点击点位预热完成：%d/%d（约 80 个常用点位，基址 %s）", ok, len(pts), base)
     asyncio.create_task(_warm_join_points())
 
+    async def _weather_loop():
+        while True:
+            await asyncio.to_thread(store.weather_reference.refresh)
+            await asyncio.sleep(600)
+
+    weather_task = asyncio.create_task(_weather_loop())
     push_service.start()
-    yield
-    await push_service.stop()
-    await dispatch.stop()
+    try:
+        yield
+    finally:
+        weather_task.cancel()
+        await asyncio.gather(weather_task, return_exceptions=True)
+        await push_service.stop()
+        await dispatch.stop()
 
 
 app = FastAPI(
@@ -93,7 +105,7 @@ app.state.store = store
 app.state.dispatch = dispatch
 app.state.traffic = traffic_store
 app.state.push = push_service
-from app.routers import admin, ai, rl_lab  # noqa: E402
+from app.routers import admin, ai, rl_lab, task_drafts  # noqa: E402
 
 app.include_router(program.router, prefix="/api")
 app.include_router(traffic.router, prefix="/api")
@@ -101,6 +113,7 @@ app.include_router(push.router, prefix="/api")
 app.include_router(rl_lab.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
+app.include_router(task_drafts.router, prefix="/api")
 
 # ---- 轻量 RBAC：开启后所有写操作都要带 X-Token（见 app/services/auth.py）----
 app.state.auth_enabled = bool(getattr(settings, "auth_enabled", False))
@@ -117,8 +130,8 @@ async def _rbac(request, call_next):
                 if not allow(role, need):
                     from fastapi.responses import JSONResponse
                     status = 403 if role else 401
-                    if request.url.path == "/api/ai/advice":
-                        ai._audit_access_denied("ai/advice", status, role,
+                    if request.url.path in ("/api/ai/advice", "/api/ai/verdict", "/api/ai/follow-up", "/api/ai/reviews"):
+                        ai._audit_access_denied(request.url.path.removeprefix("/api/"), status, role,
                                                 "insufficient_permissions" if role else "invalid_credentials")
                     return JSONResponse(
                         {"detail": "需要 %s 权限（请在 X-Token 头里带 token）" % need},

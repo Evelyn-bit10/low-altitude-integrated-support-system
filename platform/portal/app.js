@@ -39,8 +39,10 @@
     syncing: false,
     lastSync: null,
     selectedTraffic: 'UAV-CQ031',
+    taskDraft: {busy:false, result:null, error:''},
     businessTab: 'plans',
     adverseWeather: false,
+    deviceWeather: {busy: false, data: null, status: '', note: '默认地点：重庆邮电大学（南岸区）。点击定位后，坐标将提交给后端和高德以查询所在区县。'},
     actionBusy: false,
     // AI 决策页
     advice: null,
@@ -129,6 +131,67 @@
     return{value:'APPROVE',tone:'success',reason:'当前航迹、RID 与链路状态满足演示许可条件。'};
   }
 
+  function renderDeviceWeather() {
+    var view = state.deviceWeather;
+    var weather = view.data;
+    var label = view.busy ? '查询中…' : '使用此设备位置';
+    var details = weather ? '<p><b>'+esc(weather.location)+' · '+esc(weather.weather)+' · '+esc(weather.temperature_c)+'°C</b></p>'+
+      '<p>风向 '+esc(weather.wind_direction)+' · 风力 '+esc(weather.wind_power_level)+' 级 · 湿度 '+esc(weather.humidity_percent)+'%</p>'+
+      '<p>'+esc(weather.source)+' · 发布于 '+esc(localTime(weather.published_at))+(view.status==='stale'?' · 数据已过期':'')+'</p>' : '';
+    return panel('区域天气参考', '用于查看设备所在区县天气',
+      badge(view.device ? '设备位置' : '默认地点','info'),
+      '<div class="compact-list"><article><div><div role="status">'+details+'<p>'+esc(view.note)+'</p></div>'+
+      '<p class="form-note">定位后，坐标将发送给后端和高德用于此次查询。区域天气仅供参考。</p>'+
+      button(label,'device-weather','ghost',view.busy?'disabled':'')+'</div></article></div>');
+  }
+
+  function loadDefaultWeather(note) {
+    var view = state.deviceWeather;
+    view.device = false;
+    view.data = null;
+    view.note = (note ? note+'。' : '')+'默认地点：重庆邮电大学（南岸区）。';
+    view.busy = true;
+    if (note) render();
+    Api.weatherReference().then(function (result) {
+      var weather = result.ok && result.data;
+      view.data = weather && weather.data || null;
+      view.status = weather && weather.status;
+      if (!view.data) view.note += ' 区域天气暂不可用。';
+      else if (weather.reason) view.note += ' 最新查询失败，当前显示上次获取的数据。';
+      view.busy = false;
+      if (state.route==='home') render();
+    });
+  }
+
+  function locateDeviceWeather() {
+    var view = state.deviceWeather;
+    if (view.busy) return;
+    if (!window.isSecureContext || !navigator.geolocation) {
+      loadDefaultWeather('设备定位需要 HTTPS 或本机 localhost');
+      return;
+    }
+    view.busy = true;
+    view.note = '正在获取设备位置…';
+    render();
+    navigator.geolocation.getCurrentPosition(function (position) {
+      Api.deviceWeather(position.coords.latitude, position.coords.longitude).then(function (result) {
+        var weather = result.ok && result.data;
+        if (!weather || !weather.data) {
+          loadDefaultWeather(result.error==='INSECURE_CONNECTION' ? '天气接口需要安全连接' : '设备所在区域的天气查询失败');
+          return;
+        }
+        view.busy = false;
+        view.device = true;
+        view.data = weather.data;
+        view.status = weather.status;
+        view.note = '根据本次设备定位查询。';
+        if (state.route==='home') render();
+      });
+    }, function (error) {
+      loadDefaultWeather(error.code===1 ? '浏览器未允许定位' : error.code===3 ? '设备定位超时' : '暂时无法获取设备位置');
+    }, {timeout: 10000, maximumAge: 0});
+  }
+
   function renderHome() {
     var s=effectiveSnapshot(),g=state.ground,traffic=s.traffic,occupied=safeArray(g.stands).filter(function(x){return x.status!=='free';}).length;
     var alarms=traffic.filter(function(x){return x.emergency||x.rid_lost;}).length+Number(g.dispatch.deviation_alerts||0);
@@ -136,6 +199,7 @@
       '<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span>INTEGRATED SKYPORT OPERATIONS</div><h1>每一次起降<br><em>都有据可循</em></h1><p>贯通感知、通信、规划与业务的低空起降点统一运行门户。数据先于界面到达，决策在同一张图上闭环。</p><div class="hero-actions">'+button('进入实时态势&nbsp; ↗','go-situation','primary')+button('同步运行数据','sync','ghost')+'</div><div class="hero-caption">'+sourceTag(state.source.core)+(usesTrafficOverlay()?badge('态势采用演示目标','warning'):'')+'<span class="mono">'+esc(s.airport.code)+' · '+esc(s.frame)+' / '+esc(s.altitude_ref)+'</span></div></div>'+
       '<div class="hero-visual"><div class="orbital"><span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span><span class="orb-core"><i></i><b>'+esc(s.airport.code)+'</b><small>SKYPORT</small></span><span class="blip b1"></span><span class="blip b2"></span><span class="blip b3"></span></div><div class="hero-reading r1"><small>RUNWAY</small><b class="mono">'+number(s.airport.runway_heading,0)+'°</b></div><div class="hero-reading r2"><small>SAFE RADIUS</small><b class="mono">'+number(s.airport.safe_radius,0)+'m</b></div></div></section>'+
       '<div class="kpi-grid">'+kpi('在线飞行器',String(traffic.length),' 架','进近 '+traffic.filter(function(x){return x.phase==='APPROACH';}).length+' · 离场 '+traffic.filter(function(x){return x.phase==='DEPARTURE';}).length,'plane')+kpi('占用及预约机位',String(occupied),' / '+safeArray(g.stands).length,'地面站当前调度状态','stand')+kpi('开放告警',String(alarms),' 项','RID / 紧急 / 偏航','alert','warn')+kpi('今日运行架次','32',' 架次','较昨日 +14.2%','chart','cyan')+'</div>'+
+      renderDeviceWeather()+
       '<div class="section-title"><div><span>运行数据链</span><small>OPERATION PIPELINE</small></div><b>END-TO-END</b></div><section class="panel flowline">'+[
         ['ground','01','数据采集','传感器 · RID · 遥测'],['situation','02','通讯态势','识别 · C2 · 周边空域'],['program','03','规划决策','程序 · 风险 · 合规'],['business','04','业务管理','许可 · 飞手 · 审计']
       ].map(function(x,i){return '<a href="#/'+x[0]+'" data-nav="'+x[0]+'" class="flow-node"><span class="flow-index mono">'+x[1]+'</span><div><b>'+x[2]+'</b><small>'+x[3]+'</small></div>'+(i<3?'<i>→</i>':'')+'</a>';}).join('')+'</section></div>';
@@ -298,26 +362,33 @@
     if(state.businessTab==='audit')return '<table><thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>对象</th><th>结果</th></tr></thead><tbody>'+b.audit.map(function(x){return '<tr><td class="mono">'+esc(x.timestamp)+'</td><td>'+esc(x.actor)+'</td><td>'+esc(x.action)+'</td><td class="mono">'+esc(x.target)+'</td><td>'+badge(x.result==='success'?'成功':'已记录',x.result==='success'?'success':'warning')+'</td></tr>';}).join('')+'</tbody></table>';
     return '<table><thead><tr><th>计划 ID</th><th>申请主体</th><th>运行类型</th><th>许可决策</th><th>指令有效期</th><th>状态</th></tr></thead><tbody>'+b.plans.map(function(p){return '<tr data-entity="plan" data-id="'+esc(p.plan_id)+'"><td class="mono">'+esc(p.plan_id)+'</td><td>'+esc(p.applicant)+'</td><td>'+esc(p.operation)+'</td><td>'+badge(p.decision,p.decision==='APPROVE'?'success':p.decision==='HOLD'?'warning':'danger')+'</td><td class="mono">'+esc(p.valid_until)+'</td><td>'+badge(p.status==='active'?'已生效':p.status==='review'?'待复核':'已驳回',p.status==='active'?'success':p.status==='review'?'warning':'danger')+'</td></tr>';}).join('')+'</tbody></table>';
   }
+  function taskDraftPanel() {
+    var r=state.taskDraft.result, error=state.taskDraft.error;
+    var missing=safeArray(r&&r.missing_information);
+    return '<section class="panel task-draft-panel"><header class="business-toolbar"><div><span class="eyebrow">TASK DRAFT · PRECHECK</span><h2>任务草稿检查</h2></div>'+badge('只检查资料','info')+'</header>'+
+      '<p class="form-note">填写任务和载荷信息，检查资料是否完整。此处不验证真实性、不审批、不执行。</p>'+
+      '<form id="task-draft-form"><div class="task-draft-grid">'+
+      '<label>任务编号<input id="task-draft-id" maxlength="100" placeholder="例如 TASK-001"></label>'+
+      '<label>航空器标识<input id="task-aircraft-id" maxlength="100" placeholder="例如 UAV-001"></label>'+
+      '<label>起降点标识<input id="task-site-id" maxlength="100" placeholder="例如 CQ-LX01"></label>'+
+      '<label>运行类型<select id="task-operation"><option value="">请选择</option><option value="arrival">进场</option><option value="departure">离场</option></select></label>'+
+      '<label>载荷说明<input id="task-payload-description" maxlength="500" placeholder="无载荷或货物说明"></label>'+
+      '<label>载荷重量（kg）<input id="task-payload-weight" type="number" min="0" max="100000" step="any" placeholder="无载荷填 0"></label></div>'+
+      '<div class="task-draft-actions"><button class="button primary" type="submit"'+(state.taskDraft.busy?' disabled':'')+'>检查资料</button></div></form><div role="status">'+
+      (state.taskDraft.busy?'<div class="empty-state">正在检查草稿…</div>':'')+
+      (error?'<div class="advice-error"><b>检查未完成</b><p>'+esc(error)+'</p></div>':'')+
+      (r?'<div class="task-draft-result">'+badge(r.draft_complete?'资料已填全':'仍缺少资料',r.draft_complete?'success':'warning')+ (missing.length?'<ul>'+missing.map(function(x){return '<li>'+esc(x.label)+'</li>';}).join('')+'</ul>':'<p>字段已填写完整，但仍未进行运行真实性和许可校验。</p>')+'</div>':'')+
+      '</div></section>';
+  }
+
   function renderBusiness() {
     var tabs=[['plans','飞行计划 / 许可'],['pilots','飞手 / 客户'],['audit','审计日志']];
     return '<div class="page">'+breadcrumb('业务管理')+pageHead('BUSINESS · PERMIT & AUDIT','业务管理','许可指令、实名登记与全链路审计的演示业务层&nbsp; '+sourceTag('mock','BUSINESS MOCK'),button('新建登记','new-registration','primary'))+
       '<div class="kpi-grid">'+kpi('待审批计划','02',' 项','1 项需安全复核','clock','warn')+kpi('有效许可指令','18',' 条','当前运行窗口','shield','cyan')+kpi('实名登记主体','36',' 个','飞手 + 客户','business')+kpi('审计完整率','100',' %','链路操作已留痕','link','cyan')+'</div>'+
-      '<section class="panel business-panel"><header class="business-toolbar"><div class="tabs">'+tabs.map(function(t){return '<button class="tab '+(state.businessTab===t[0]?'active':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div><div>'+badge('INTERNAL DEMO','info')+'</div></header><div class="table-scroll">'+businessTable()+'</div></section><div class="integration-note business-note"><span>i</span><p>业务管理实体尚未纳入当前 canonical REST 契约，本页仅展示需求中明确要求的许可状态、实名登记、指令有效期与审计信息，不向 flycontrol 接口写入这些字段。</p></div></div>';
+      '<section class="panel business-panel"><header class="business-toolbar"><div class="tabs">'+tabs.map(function(t){return '<button class="tab '+(state.businessTab===t[0]?'active':'')+'" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div><div>'+badge('INTERNAL DEMO','info')+'</div></header><div class="table-scroll">'+businessTable()+'</div></section>'+taskDraftPanel()+'<div class="integration-note business-note"><span>i</span><p>业务管理实体尚未纳入当前 canonical REST 契约，本页仅展示需求中明确要求的许可状态、实名登记、指令有效期与审计信息，不向 flycontrol 接口写入这些字段。</p></div></div>';
   }
 
-  // ---- AI 决策页（只读建议，不执行）与系统管理页 ----
-  var DEMO_CANDIDATES = [
-    {direction:'S',score:1.0,available:true,mode:'template',fallback:false,metrics:{distance_m:2490,eta_s:166,clearance_m:132,crosswind_ms:0},reasons:['逆风 5.0 m/s、侧风 0.0（最优）','航程 2.5 km']},
-    {direction:'N',score:0.92,available:true,mode:'template',fallback:false,metrics:{distance_m:2560,eta_s:171,clearance_m:118,crosswind_ms:1.2},reasons:['顺风 5.0 m/s，能耗略低','超障余度 118 m']},
-    {direction:'SW',score:0.81,available:true,mode:'dynamic',fallback:true,metrics:{distance_m:2980,eta_s:199,clearance_m:96,crosswind_ms:3.4},reasons:['模板不适用，已动态重规划','航程偏长']},
-    {direction:'NE',score:0,available:false,mode:'dynamic',fallback:true,metrics:{},reasons:['合规校验未通过：穿越限飞区']}
-  ];
-  var DEMO_ADVICE = {
-    advice:'（演示示例）数据来源和观测时间需要核验。候选结果仅用于展示，不能作为放行或运行依据。',
-    model:'demo-advisory', requires_human_review:true, validated:false, executed:false,
-    context:{captured_at:'—',data_freshness:'unknown',candidates:DEMO_CANDIDATES,
-      limitations:['演示数据，非真实观测','未接入真实空域许可与机型参数','模型输出可能有误，需人工复核后使用']}
-  };
+  // ---- AI 决策页与系统管理页 ----
   var DEMO_DEVICES = [
     {id:'D-A-RID',name:'A 站 RID 接收机',source_key:'A-RID',kind:'rid',sigma_m:8,status:'online'},
     {id:'D-B-RID',name:'B 站 RID 接收机',source_key:'B-RID',kind:'rid',sigma_m:22,status:'online'},
@@ -330,12 +401,6 @@
   var DEMO_METRICS = {
     metrics:{uptime_sec:0,frames:0,avg_frame_ms:0,frame_ms:{p50:0,p90:0,p99:0,max:0},candidates:{p50:0,p99:0,max:0},unique_tracks:{now:0,p50:0,max:0},counters:{matched:0,created:0,duplicate:0}},
     kalman:{tracks:0,sigma_mean:0,sigma_max:0,sigma_scale:1}
-  };
-  var DEMO_VERDICT = {
-    code:'AVAILABLE_CANDIDATES',label:'存在可用候选',refusal_reason:null,
-    recommended:{direction:'S',score:1.0,mode:'template',fallback:false,reasons:['逆风 5.0 m/s、侧风 0.0（最优）','航程 2.5 km'],metrics:{length_m:2490,crosswind_mps:0,clearance_m:132}},
-    available_count:3,total_count:4,no_current_program:false,hard_forbid:false,hard_forbid_reasons:[],
-    constraints:{max_crosswind_ms:12,min_visibility_m:500,moc_approach_m:75}
   };
 
   function candidateTable(list) {
@@ -354,7 +419,7 @@
   }
 
   function verdictPanel(v, demo) {
-    var verdict=v||(demo?DEMO_VERDICT:null);
+    var verdict=v;
     if(!verdict) return '<div class="empty-state" role="status">'+(state.verdictLoaded?'未能加载引擎结果，请刷新上下文。':'正在加载引擎结果…')+'</div>';
     var rec=demo||verdict.demo_only?{}:(verdict.recommended||{}), cst=verdict.constraints||{};
     var codeTone=verdict.code==='AVAILABLE_CANDIDATES'?'success':(verdict.code==='NO_AVAILABLE_CANDIDATE'?'warning':'danger');
@@ -391,41 +456,79 @@
   }
 
   function adviceBody(adv,demo) {
-    if(state.adviceLoading) return '<div class="empty-state">正在请求大模型建议…（最长 45 秒）</div>';
-    if(state.adviceError) return '<div class="advice-error"><b>请求失败</b><p>'+esc(state.adviceError)+'</p><p class="mono">检查 backend/.env.deepseek 或 DEEPSEEK_API_KEY 是否配置，以及后端 8080 是否可访问。</p></div>';
-    var shown=adv||(demo?DEMO_ADVICE:null);
-    if(!shown) return '<div class="empty-state">输入问题后点右上角「请求 AI 建议」。</div>';
-    var divergence=adviceDivergence(shown);
-    var refusal=shown.refusal?'<div class="refusal-banner"><b>确定性拒绝（未调用大模型）</b><div>'+esc(shown.refusal.reason||'')+'</div></div>':'';
-    var fallback=shown.fallback?'<div class="fallback-banner"><b>模型不可用，已回落引擎结论</b><div>'+esc(shown.fallback.message||'')+'</div></div>':'';
-    var adviceText=shown.advice?('<div class="advice-text">'+esc(shown.advice)+'</div>'):'<div class="empty-state">无模型陈述，请以左侧引擎结论为准。</div>';
-    return divergence+refusal+fallback+adviceText+
-      '<div class="advice-meta">'+badge('模型 '+(shown.model||'—'),'purple')+badge(shown.validated?'已校验':'未校验',shown.validated?'success':'warning')+badge(shown.executed?'已执行':'未执行','warning')+badge(shown.requires_human_review?'需人工复核':'—','warning')+'</div>'+
-      (demo?'<div class="form-note">当前为内置演示示例，不可用于运行。</div>':'');
+    if(state.adviceLoading) return '<div class="empty-state">正在分析任务…</div>';
+    if(state.adviceError) return '<div class="advice-error"><b>请求未完成</b><p>'+esc(state.adviceError)+'</p></div>';
+    if(!adv) return '<div class="empty-state">暂无分析结果。</div>';
+    var notice=(demo||(adv.context&&adv.context.demo_only))?
+      '<div class="refusal-banner"><b>基于预设数据，仅供演示</b></div>':'';
+    var failure=adv.fallback;
+    var modelErrors={model_config_unavailable:'后端未配置可用的 DeepSeek 密钥。',upstream_timeout:'DeepSeek 响应超时，请稍后重试。',
+      upstream_http_401:'DeepSeek 拒绝了当前密钥，请联系管理员检查配置。',upstream_http_402:'DeepSeek 账户余额不足，请联系管理员。',
+      upstream_http_429:'DeepSeek 请求过多，请稍后重试。'};
+    var status=adv.refusal?'<div class="refusal-banner">'+esc(adv.refusal.reason||'数据未通过核验，未调用模型。')+'</div>':
+      failure?'<div class="fallback-banner">'+esc(modelErrors[failure.reason]||'DeepSeek 暂不可用，请稍后重试。')+'</div>':'';
+    var names={N:'北',NE:'东北',E:'东',SE:'东南',S:'南',SW:'西南',W:'西',NW:'西北'};
+    var direction=adv.demo_direction;
+    var candidate=safeArray(adv.context&&adv.context.candidates).some(function(c){return c.direction===direction&&c.available===true;});
+    var directionHead=adv.context&&adv.context.demo_only&&names[direction]&&candidate?
+      '<div class="ai-demo-direction"><span>模拟建议方向 · 仅供演示</span><strong>'+esc(names[direction])+'向 <small>'+esc(direction)+'</small></strong><span>非真实运行建议</span></div>':'';
+    var text=adv.advice?'<div class="advice-text">'+esc(adv.advice)+'</div>':'';
+    return directionHead+notice+status+adviceDivergence(adv)+text;
+  }
+
+  function missingInformation(context) {
+    var items=safeArray(context&&context.missing_information);
+    var sources=safeObject(context&&context.data_sources);
+    var names={meteo:'气象',obstacles:'障碍物',airspace:'空域'};
+    var statuses={fresh:'时效通过',stale:'已过期',future:'时间异常',conflict:'来源不匹配',unknown:'待核验'};
+    var sourceRows=Object.keys(names).filter(function(key){return sources[key];}).map(function(key){
+      var source=sources[key];
+      return '<li>'+esc(names[key])+' · '+esc(statuses[source.status]||'待核验')+' · '+esc(source.source)+' · '+esc(localTime(source.observed_at))+'</li>';
+    });
+    if(!items.length&&!sourceRows.length) return '';
+    return panel('来源状态与待补充信息','',badge(items.length+' 项待补充','warning'),
+      '<ul class="limitation-list">'+sourceRows.join('')+items.map(function(item){
+        return '<li>'+esc(item.prompt||item.label||'')+(item.value_type==='server_source_metadata'?' <b>（需服务端核验）</b>':'')+'</li>';
+      }).join('')+'</ul>');
+  }
+
+  function reviewPanel(demo) {
+    if(demo) return '';
+    var saved=state.advice&&state.advice.context;
+    var questions=safeArray(saved&&saved.missing_information).filter(function(q){return q.value_type==='string';});
+    return panel('追问与人工复核','','',
+      '<p class="form-note">追问和复核需要具名管理员。追问回答保留在当前页面内存中。</p>'+
+      '<label>归档评估编号 <input id="ai-replay-id" class="form-input" maxlength="32" value="'+(saved?esc(saved.assessment_id):'')+'"></label> '+
+      button('读取归档','ai-replay','ghost')+
+      (questions.length?'<ul class="limitation-list">'+questions.map(function(q){
+        return '<li><label>'+esc(q.label)+' <input class="form-input" maxlength="2000" data-follow-up="'+esc(q.id)+'"></label></li>';
+      }).join('')+'</ul>'+button('核对剩余问题','ai-followup','ghost'):'')+
+      '<div id="ai-review-status" role="status" aria-live="polite"></div><div id="ai-replay-result"></div>', 'advice-panel');
   }
 
   function renderDecision() {
-    var demo=state.dataMode!=='live', adv=state.advice;
-    var verdict=state.verdict||(demo?DEMO_VERDICT:null);
-    var ctx=adv&&adv.context?adv.context:null;
-    if(!ctx&&verdict&&(safeArray(verdict.candidates).length||safeArray(verdict.limitations).length)){ctx={candidates:verdict.candidates,limitations:verdict.limitations};}
-    var candidates=safeArray(ctx&&ctx.candidates).length?safeArray(ctx.candidates):(demo?DEMO_CANDIDATES:[]);
-    var limitations=safeArray(ctx&&ctx.limitations).length?safeArray(ctx.limitations):(demo?safeArray(DEMO_ADVICE.context.limitations):[]);
-    var modeBadge=state.adviceLoading?badge('请求中','warning'):(adv?badge(adv.model||'LLM','purple'):(demo?badge('演示数据','warning'):badge('待请求','info')));
-    var verdictBadge=verdict?badge('确定性引擎','success'):badge('待加载','info');
-    return '<div class="page">'+breadcrumb('AI 决策')+
-      pageHead('ADVISORY · LLM ASSISTED DECISION','AI 轨迹决策','数据须经独立核验；<b>只读建议，不执行、不下发</b>&nbsp; '+badge('READ ONLY','warning'),button('请求 AI 建议','ask-ai','primary')+button('刷新上下文','refresh-decision','ghost'))+
-      panel('决策问题','QUESTION · 上下文由后端组装后发送',badge(state.adviceType==='departure'?'离场':'进近','info'),
-        '<textarea id="ai-question" class="ai-question" rows="3" placeholder="例如：当前电量 68%、风速 8 m/s，应选择哪条进近航道？需要哪些放行条件？">'+esc(state.adviceQuestion||'当前电量与气象条件下，应安排哪条进近航道？请说明理由与风险。')+'</textarea>'+
-        '<div class="ai-question-row"><label>程序类型 <select id="ai-program-type"><option value="arrival"'+(state.adviceType!=='departure'?' selected':'')+'>进近 arrival</option><option value="departure"'+(state.adviceType==='departure'?' selected':'')+'>离场 departure</option></select></label>'+
-        '<span class="mono ai-hint">POST /api/ai/advice · 超时 45s</span></div>','decision-question')+
-      '<div class="decision-grid">'+
-        panel('引擎结论（确定性）','ENGINE VERDICT · 结论码模型不可改写',verdictBadge,verdictPanel(verdict,demo),'verdict-panel')+
-        panel('AI 建议（模型陈述）','ADVISORY',modeBadge,adviceBody(adv,demo),'advice-panel')+
-      '</div>'+
-      panel(verdict&&verdict.demo_only||demo?'候选航道（仅供演示，不可用于运行）':'候选航道（只读评估）','CANDIDATES · '+candidates.length,badge(verdict&&verdict.demo_only||demo?'演示':'后端计算','warning'),candidateTable(candidates))+
-      (limitations.length?panel('数据与使用限制','LIMITATIONS',badge('必须人工复核','warning'),'<ul class="limitation-list">'+limitations.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'):'')+
-      '</div>';
+    var demo=state.dataMode!=='live', adv=state.advice, verdict=state.verdict;
+    var ctx=(adv&&adv.context)||verdict;
+    var demoResult=demo||(ctx&&ctx.demo_only);
+    var candidates=safeArray(ctx&&ctx.candidates), limitations=safeArray(ctx&&ctx.limitations);
+    var details='<details class="ai-details" id="ai-details"><summary>数据与复核详情</summary>'+
+      (verdict?verdictPanel(verdict,demoResult):'')+missingInformation(ctx)+
+      (candidates.length?panel(demoResult?'演示候选（不可用于运行）':'候选航道',null,'',candidateTable(candidates)):'')+
+      (limitations.length?'<ul class="limitation-list">'+limitations.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'')+
+      reviewPanel(demoResult)+ '</details>';
+    var resultStatus=state.adviceLoading?'分析中':state.adviceError?'请求失败':adv&&adv.advice?'已收到回复':adv?'未生成回复':'待提交';
+    return '<div class="page ai-workspace">'+breadcrumb('AI 决策')+
+      pageHead('','AI 决策',demo?'演示数据，仅供演示，不可用于真实运行。':'只读分析，需人工复核；不授权、不下发飞行任务。')+
+      panel('提交任务',null,'',
+        '<label for="ai-question" class="ai-field-label">任务或问题</label>'+
+        '<textarea id="ai-question" class="ai-question" rows="3" maxlength="4000" placeholder="例如：检查这次任务还缺哪些数据">'+esc(state.adviceQuestion||'')+'</textarea>'+
+        '<div class="ai-question-row"><label>程序类型 <select id="ai-program-type"><option value="arrival"'+(state.adviceType!=='departure'?' selected':'')+'>进近</option><option value="departure"'+(state.adviceType==='departure'?' selected':'')+'>离场</option></select></label>'+
+        button(state.adviceLoading?'分析中…':'提交给 AI','ask-ai','primary',state.adviceLoading?'disabled':'')+'</div>'+
+        '<details class="ai-access" id="ai-access"><summary>访问设置</summary><label>访问令牌（启用鉴权时填写） <input type="password" id="ai-access-token" autocomplete="off" class="form-input"></label></details>',
+        'decision-question')+
+      panel('分析结果',null,badge(resultStatus,state.adviceError?'warning':'info'),
+        '<div role="status" class="ai-result" aria-busy="'+(state.adviceLoading?'true':'false')+'">'+adviceBody(adv,demo)+'</div>'+
+        '<div class="ai-retry">'+(state.adviceError||(adv&&adv.fallback)?button('重试','ask-ai','ghost'):'')+'</div>'+details,'advice-panel')+'</div>';
   }
 
   function deviceTable(list,demo) {
@@ -505,6 +608,64 @@
   var decisionGeneration = 0;
   var verdictGeneration = 0;
 
+  var advisoryToken = '';
+  var reviewedAssessment = '';
+
+  function captureAdvisoryToken() {
+    var input = document.getElementById('ai-access-token');
+    if(input && input.value.trim()) {
+      advisoryToken = input.value.trim();
+      input.value = '';
+    }
+    return advisoryToken;
+  }
+
+  function assessmentAction(action, element) {
+    var status = document.getElementById('ai-review-status');
+    var output = document.getElementById('ai-replay-result');
+    var token = captureAdvisoryToken();
+    var id = document.getElementById('ai-replay-id').value.trim();
+    var call;
+    if(action==='ai-followup') {
+      var context = state.advice && state.advice.context;
+      var answers = Array.from(document.querySelectorAll('[data-follow-up]')).filter(function(input){return input.value.trim();}).map(function(input){return {question_id:input.dataset.followUp,value:input.value.trim()};});
+      if(!context || !answers.length){status.textContent='请先填写至少一项待补充信息。';return;}
+      call = Api.followUp(context.assessment_id, answers, token);
+    } else if(action==='ai-replay') {
+      if(!/^[0-9a-f]{32}$/.test(id)){status.textContent='请输入有效的归档评估编号。';return;}
+      reviewedAssessment='';
+      output.textContent='';
+      call = Api.replay(id, token);
+    } else {
+      if(!reviewedAssessment){status.textContent='请先读取归档。';return;}
+      call = Api.review(reviewedAssessment, document.getElementById('ai-review-decision').value, token);
+    }
+    element.disabled=true;
+    status.textContent='正在请求…';
+    call.then(function(result){
+      element.disabled=false;
+      if(!status.isConnected) return;
+      if(!result.ok){status.textContent='请求未完成，请核对访问权限、评估编号及服务状态。';return;}
+      if(action==='ai-followup') {
+        var remaining=safeArray(result.data.remaining_questions);
+        status.textContent=remaining.length?'尚需补充：'+remaining.map(function(item){return item.label;}).join('、'):'信息已填写，仍需独立核验和重新评估。';
+      } else if(action==='ai-replay') {
+        var saved=result.data.snapshot.context;
+        reviewedAssessment=result.data.snapshot.assessment_id;
+        output.innerHTML='<p>归档编号 '+esc(reviewedAssessment)+' · '+esc(localTime(saved.captured_at))+'</p>'+verdictPanel(Object.assign({},saved.engine_verdict,saved),false)+
+          '<p>快照哈希 <code>'+esc(result.data.snapshot_sha256)+'</code></p>'+
+          '<ul class="limitation-list">'+safeArray(result.data.reviews).map(function(review){
+            return '<li>'+esc(review.reviewer_identity)+' · '+esc(localTime(review.reviewed_at))+' · '+esc(({acknowledged:'已审阅',disagreed:'有异议',needs_more_info:'需补充信息'})[review.decision]||review.decision)+'</li>';
+          }).join('')+'</ul>'+
+          '<label>复核决定 <select id="ai-review-decision"><option value="acknowledged">已审阅</option><option value="disagreed">有异议</option><option value="needs_more_info">需补充信息</option></select></label> '+button('记录复核','ai-record-review','ghost');
+        status.textContent='已读取历史评估。';
+      } else {
+        var review=result.data.review;
+        status.textContent='已记录复核：'+review.reviewer_identity+' · '+localTime(review.reviewed_at);
+      }
+    });
+  }
+
   function resetDecision() {
     decisionGeneration++; verdictGeneration++;
     state.advice=null;state.adviceLoading=false;state.adviceError=null;
@@ -515,7 +676,7 @@
     if(state.dataMode!=='live'||state.verdictBusy||(state.verdictLoaded&&!force)) return;
     state.verdictBusy=true;
     var generation=++verdictGeneration;
-    Api.verdict(state.adviceType).then(function(r){
+    Api.verdict(state.adviceType,advisoryToken).then(function(r){
       if(generation!==verdictGeneration) return;
       state.verdictBusy=false;
       state.verdictLoaded=true;
@@ -530,20 +691,30 @@
     var message=((q&&q.value)||'').trim();
     if(!message){toast('请先输入决策问题','warning');return;}
     state.adviceQuestion=message;state.adviceType=(t&&t.value)||'arrival';
-    if(state.dataMode!=='live'){toast('当前展示内置示例，不调用模型','info');return;}
+    var scenario=state.dataMode==='live'?'live':'demo';
     var generation=++decisionGeneration;
+    var token=captureAdvisoryToken();
     state.advice=null;state.adviceLoading=true;state.adviceError=null;render();
-    Api.advice(message,state.adviceType).then(function(r){
+    Api.advice(message,state.adviceType,token,scenario).then(function(r){
       if(generation!==decisionGeneration) return;
       state.adviceLoading=false;
-      if(r.ok){
+      if(r.ok&&scenario==='demo'&&!(r.data.context&&r.data.context.demo_only)){
+        state.adviceError='后端未返回演示场景，请重启飞控后端后重试。';
+      }else if(r.ok){
         state.advice=r.data;
         var ctx=r.data.context;
         if(ctx&&ctx.engine_verdict){
           verdictGeneration++;state.verdictBusy=false;state.verdictLoaded=true;
           state.verdict=Object.assign({},ctx.engine_verdict,ctx,{engine_verdict:undefined});
         }
-      }else{state.adviceError=r.error==='TIMEOUT'?'请求超时，请刷新上下文后重试。':'建议请求未完成，请检查后端或调整问题。';}
+      }else{
+        var errors={TIMEOUT:'分析超时，请稍后重试。', WRONG_SERVICE:'此地址返回的不是飞控接口，请用一体化门户启动脚本启动。',
+          NOT_FOUND:'飞控后端版本过旧，请重启后端后重试。', UNAUTHORIZED:'请在「访问设置」填写有效的访问令牌。',
+          FORBIDDEN:r.detail==='Demo AI consultation is not enabled on the server'?'当前后端未启用演示咨询，请用一体化门户启动脚本启动。':'当前账户没有提交任务的权限。',
+          INSECURE_CONNECTION:'发送访问令牌需要 HTTPS 或本机访问。', BAD_REQUEST:'请检查任务内容并重新提交。',
+          RATE_LIMITED:'请求过多，请稍后重试。', SERVICE_UNAVAILABLE:'后端暂时无法处理分析任务，请稍后重试或联系管理员。'};
+        state.adviceError=errors[r.error]||'无法连接飞控后端，请确认一体化门户已启动。';
+      }
       if(state.route==='decision')render();
     });
   }
@@ -578,6 +749,7 @@
     var i, attr;
     for (i = current.attributes.length - 1; i >= 0; i--) {
       attr = current.attributes[i];
+      if (current.tagName==='DETAILS' && attr.name==='open') continue;
       if (!next.hasAttribute(attr.name)) { current.removeAttribute(attr.name); }
     }
     for (i = 0; i < next.attributes.length; i++) {
@@ -590,6 +762,7 @@
   function render() {
     cleanup.forEach(function(fn){try{fn();}catch(_){}});cleanup=[];Visuals.disposeCharts();
     var nextRoute=parseRoute(), routeChanged=(nextRoute!==state.route);
+    if(routeChanged&&state.route==='business')state.taskDraft={busy:false,result:null,error:''};
     state.route=nextRoute;
     document.querySelectorAll('[data-nav]').forEach(function(node){node.classList.toggle('active',node.getAttribute('data-nav')===state.route);});
     document.body.classList.remove('nav-open');
@@ -688,9 +861,25 @@
   function weatherScenario() { state.adverseWeather=!state.adverseWeather;var current=effectiveSnapshot().meteo;var next=state.adverseWeather?{wind_speed:11.8,wind_dir:112,gust:16.2,visibility:1800,cloud_base:140,turbulence:3,wind_shear:3,temperature:Number(current.temperature||27),pressure:Number(current.pressure||1008)}:{wind_speed:5.8,wind_dir:68,gust:8.2,visibility:9600,cloud_base:680,turbulence:2,wind_shear:1,temperature:27.4,pressure:1008.6};if(state.dataMode!=='live'){applyWeatherLocally(next);toast(state.adverseWeather?'已注入恶劣气象（演示）':'已恢复标准气象（演示）','info');return;}Api.setMeteo(next).then(function(result){if(result.ok){syncData(false);toast(state.adverseWeather?'恶劣气象已写入 flycontrol':'标准气象已恢复','success');}else{applyWeatherLocally(next);toast('后端不可用，气象场景仅在本页演示','warning');}}); }
   function toggleObstacle() { var list=safeArray(state.snapshot.obstacles),target=list.find(function(x){return x.type==='dynamic';})||list[0];if(!target){toast('当前没有可切换障碍物','warning');return;}var active=target.active===false;if(state.source.core!=='live'){target.active=active;render();toast(target.name+' 已切换为'+(active?'活动':'停用')+'（演示）','info');return;}Api.toggleObstacle(target.id,active).then(function(result){if(result.ok){syncData(false);toast(target.name+' 状态已更新','success');}else toast('障碍物切换失败：接口未接受该 ID','warning');}); }
 
+  function checkTaskDraft() {
+    if(state.taskDraft.busy)return;
+    var value=function(id){var node=document.getElementById(id);return node&&node.value.trim()||null;};
+    var weight=value('task-payload-weight');
+    var draft={task_id:value('task-draft-id'),aircraft_id:value('task-aircraft-id'),site_id:value('task-site-id'),operation:value('task-operation'),payload_description:value('task-payload-description'),payload_weight_kg:weight===null?null:Number(weight)};
+    var check=state.taskDraft={busy:true,result:null,error:''};render();
+    Api.taskDraft(draft,advisoryToken).then(function(result){
+      if(state.taskDraft!==check)return;
+      check.busy=false;
+      if(result.ok&&result.data&&typeof result.data.draft_complete==='boolean')check.result=result.data;
+      else check.error=({UNAUTHORIZED:'请在 AI 决策的访问设置中填写有效令牌。',FORBIDDEN:'当前账户没有检查草稿的权限。',NOT_FOUND:'后端未提供草稿检查，请重启新版后端。',BAD_REQUEST:'请检查草稿字段的填写格式。',INSECURE_CONNECTION:'发送令牌需要 HTTPS 或本机访问。'})[result.error]||'后端暂时无法检查草稿，请重试。';
+      render();
+    });
+  }
+
   function handleAction(action,element,clickEvent) {
     if(action==='close-drawer'){if(element.classList.contains('drawer-backdrop')&&clickEvent.target!==element)return;closeDrawer();return;}
     if(action==='sync'){syncData(true);return;}
+    if(action==='device-weather'){locateDeviceWeather();return;}
     if(action==='toggle-mode'){toggleDataMode();return;}
     if(action==='go-situation'){location.hash='#/situation';return;}
     if(action==='map-fullscreen'){var panel=document.querySelector('.map-panel');if(panel&&panel.requestFullscreen)panel.requestFullscreen().catch(function(){});return;}
@@ -703,7 +892,8 @@
     if(action==='weather-scenario'){weatherScenario();return;}
     if(action==='refresh-ground'){syncData(true);return;}
     if(action==='ask-ai'){askAdvice();return;}
-    if(action==='refresh-decision'){resetDecision();render();return;}
+    if(action==='ai-followup'||action==='ai-replay'||action==='ai-record-review'){assessmentAction(action,element);return;}
+    if(action==='refresh-decision'){captureAdvisoryToken();resetDecision();render();return;}
     if(action==='refresh-admin'){loadAdmin(true);return;}
     if(action==='shadow-toggle'){var on=element.getAttribute('data-on')==='1';Api.setShadow(on).then(function(r){if(r.ok){toast('影子模式已'+(on?'开启':'关闭'),'success');loadAdmin(true);}else toast('切换失败：影子模式未加载','warning');});return;}
     if(action==='device-del'){var did=element.getAttribute('data-id');Api.deleteDevice(did).then(function(r){if(r.ok){toast('设备已删除','success');loadAdmin(true);}else toast('删除失败（需 admin 角色）','warning');});return;}
@@ -721,6 +911,20 @@
   }
 
   document.addEventListener('click',function(event){var nav=event.target.closest('[data-nav]');if(nav){document.body.classList.remove('nav-open');return;}var tab=event.target.closest('[data-tab]');if(tab){state.businessTab=tab.getAttribute('data-tab');render();return;}var entity=event.target.closest('[data-entity]');if(entity){openDrawer(entity.getAttribute('data-entity'),entity.getAttribute('data-id'));return;}var action=event.target.closest('[data-action]');if(action){handleAction(action.getAttribute('data-action'),action,event);}});
+  document.addEventListener('submit',function(event){
+    if(event.target.id!=='task-draft-form')return;
+    event.preventDefault();
+    checkTaskDraft();
+  });
+  function invalidateTaskDraft(event) {
+    if(!event.target.closest('#task-draft-form'))return;
+    var check=state.taskDraft;
+    if(!check.busy&&!check.result&&!check.error)return;
+    state.taskDraft={busy:false,result:null,error:''};
+    render();
+  }
+  document.addEventListener('input',invalidateTaskDraft);
+  document.addEventListener('change',invalidateTaskDraft);
   document.addEventListener('change',function(event){
     if(event.target.id!=='ai-program-type')return;
     var question=document.getElementById('ai-question');
@@ -735,6 +939,7 @@
   setInterval(function(){var clock=document.getElementById('system-clock');if(clock)clock.textContent=nowTime();},1000);
 
   render();
+  loadDefaultWeather();
   if(state.dataMode==='live'){setTimeout(function(){syncData(false);},80);}
   setInterval(function(){if(state.dataMode==='live'&&!state.syncing)syncData(false,true);},5000);
 }());

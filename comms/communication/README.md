@@ -26,7 +26,7 @@ communication/
 
 **使用步骤：**
 
-1. 先启动后端：执行 `..\..\低空系统.bat api`（或双击工程根目录的 `低空系统.bat` 选 `[4] Backend only`），默认 `http://127.0.0.1:8080`，无 Postgres 自动回退 SQLite。
+1. 先启动后端：执行 `..\..\低空系统.bat api`（或双击工程根目录的 `低空系统.bat` 选 `[4] Backend only`），默认 `http://127.0.0.1:8082`，无 Postgres 自动回退 SQLite。
 2. 再打开本目录 `index.html`（或执行 `..\..\低空系统.bat comms`）。
 3. communication 顶栏会显示「已连接 flycontrol」，此时：
    - 起降点、障碍物、空域（限飞区）、气象、进近/离场飞行程序全部以 flycontrol 为准，并叠加显示在态势图上；

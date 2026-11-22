@@ -6,7 +6,7 @@
 打开方式：
 
 - 执行工程根目录的 `低空系统.bat rl`（或双击 `低空系统.bat` 选 `[3]`，会自动检查后端）
-- 或直接打开 `platform/portal/rl_lab.html`（需后端在 8080 运行）
+- 或直接打开 `platform/portal/rl_lab.html`（需后端在 8082 运行）
 
 ---
 
@@ -79,7 +79,7 @@
 ```powershell
 # 1) 带影子模式启动
 $env:DEDUP_SHADOW="1"
-python -m uvicorn app.main:app --port 8080
+python -m uvicorn app.main:app --port 8082
 
 # 2) 灌数据（另开一个窗口）
 python tools/sim_two_devices.py --frames 60 --interval 0.5
@@ -158,17 +158,17 @@ cd /d <工程根目录>
 低空系统.bat rl
 ```
 
-### 页面显示"未连接 8080"
+### 页面显示"未连接 8082"
 
 后端没起来。手动启动：
 
 ```powershell
 cd flight\flycontrol\low-altitude-demo\backend
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
-# 若已建好 .venv：.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8082
+# 若已建好 .venv：.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8082
 ```
 
-确认：`curl http://127.0.0.1:8080/api/rl/health` 应返回 `{"ok": true}`。
+确认：`curl http://127.0.0.1:8082/api/rl/health` 应返回 `{"ok": true}`。
 
 ### 页面上概率一直是 —、滑杆不动
 

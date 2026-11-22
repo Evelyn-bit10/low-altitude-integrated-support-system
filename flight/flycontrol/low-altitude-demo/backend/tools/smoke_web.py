@@ -15,7 +15,7 @@
     内容正确性交给后端的接口测试覆盖。
 
 用法：
-    python tools/smoke_web.py                # 默认 http://127.0.0.1:8080
+    python tools/smoke_web.py                # 默认 http://127.0.0.1:8082
     python tools/smoke_web.py --port 8081
 """
 from __future__ import annotations

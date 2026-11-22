@@ -4,9 +4,9 @@ title Stop all low-altitude services
 cd /d "%~dp0"
 
 REM  Ports used by the system:
-REM    8080 backend | 8081 groundstation DSM tiles | 8090 ground bridge
+REM    8082 backend | 8081 groundstation DSM tiles | 8090 ground bridge
 REM    8099 mock UOM | 5500 portal | 5502 flyer app
-set "PORTS=8080 8081 8090 8099 5500 5502"
+set "PORTS=8082 8081 8090 8099 5500 5502"
 set /a STOPPED=0
 set /a SKIPPED=0
 set /a FREE=0

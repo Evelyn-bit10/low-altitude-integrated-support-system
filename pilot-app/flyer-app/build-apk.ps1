@@ -65,7 +65,7 @@ $www = Join-Path $root "www"
 if (Test-Path $www) { Remove-Item $www -Recurse -Force }
 New-Item -ItemType Directory -Path $www -Force | Out-Null
 
-$assets = @("index.html", "styles.css", "app.js", "api.js", "map.js", "mock.js", "manifest.webmanifest", "sw.js")
+$assets = @("index.html", "styles.css", "app.js", "decision.js", "api.js", "map.js", "mock.js", "manifest.webmanifest", "sw.js")
 foreach ($f in $assets) {
     $src = Join-Path $root $f
     if (-not (Test-Path $src)) { Fail ("缺少文件：" + $f) }
@@ -91,7 +91,7 @@ if (-not (Test-Path (Join-Path $root "android"))) {
 else { Say "      android/ 已存在，跳过生成" }
 
 # ------------------------------------------------------------------ 5 明文 HTTP
-Step "[5/7] 允许明文 HTTP（连接内网后端 http://192.168.x.x:8080 必需）"
+Step "[5/7] 允许明文 HTTP（连接内网后端 http://192.168.x.x:8082 必需）"
 $manifest = Join-Path $root "android\app\src\main\AndroidManifest.xml"
 if (-not (Test-Path $manifest)) { Fail "未找到 AndroidManifest.xml，Android 工程可能生成失败" }
 $t = Get-Content $manifest -Raw -Encoding UTF8
@@ -153,7 +153,7 @@ Write-Host ("       adb install -r `"" + $out + "`"")
 Write-Host ""
 Write-Host "  首次打开后：" -ForegroundColor Yellow
 Write-Host "    进入「我的 → 设置」，填写后端地址（电脑/机场服务器局域网 IP），例如" -ForegroundColor Yellow
-Write-Host "      机场服务     http://192.168.1.20:8080" -ForegroundColor Yellow
+Write-Host "      机场服务     http://192.168.1.20:8082" -ForegroundColor Yellow
 Write-Host "      地面站服务   http://192.168.1.20:8090" -ForegroundColor Yellow
 Write-Host "    点「测试连接」确认通了，再「保存并同步」。" -ForegroundColor Yellow
 Write-Host ""

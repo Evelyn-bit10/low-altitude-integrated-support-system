@@ -4,9 +4,9 @@
 
 响应中的 `captured_at` 是快照采集时间，不是观测时间。当前数据源没有提供经核验的观测时间和来源，默认返回 `INSUFFICIENT_DATA`，不调用模型，也不提供推荐方向。服务端设置 `ADVISORY_SHOW_DEMO=1` 可展示内置模拟候选，始终标记仅供演示，不能用于运行，也不会发给模型。客户端参数不能启用此模式。
 
-为未来服务端数据适配器预留的元数据为快照对象 `advisory_sources`：`meteo`、`obstacles`、`airspace` 各包含 `source`、带时区的 `observed_at` 和由可信服务端适配器设置的 `trusted: true`。必须显式设置 `ADVISORY_MAX_AGE_SECONDS` 为正数，且三项均通过检查，才可进入后续流程。该阈值只是配置参数，不代表运行标准；当前没有生产适配器，不能把上述字段视为已接入现场数据。快照和其元数据须由同一服务端适配器一起提供。
+为未来服务端数据适配器预留的元数据为快照对象 `advisory_sources`：`meteo`、`obstacles`、`airspace` 各包含 `source`、带时区的 `observed_at` 和由可信服务端适配器设置的 `trusted: true`。服务端必须分别设置 `ADVISORY_METEO_SOURCE`、`ADVISORY_OBSTACLES_SOURCE`、`ADVISORY_AIRSPACE_SOURCE` 及对应的 `ADVISORY_METEO_MAX_AGE_SECONDS`、`ADVISORY_OBSTACLES_MAX_AGE_SECONDS`、`ADVISORY_AIRSPACE_MAX_AGE_SECONDS` 正数时效；来源必须完全匹配，冲突、配置缺失或无效均阻止模型调用。旧的全局 `ADVISORY_MAX_AGE_SECONDS` 不再生效。配置本身不证明来源权威，仍需业务方确认；当前没有生产适配器，不能把上述字段视为已接入现场数据。快照和元数据须由同一可信服务端适配器一起提供。
 
-每次成功构造评估上下文时，服务端生成唯一的 `assessment_id`。建议响应通过 `context.assessment_id` 返回，结论接口直接返回该字段；建议请求的相应审计记录也包含它。每次请求都会重新采集和计算，两个接口的标识通常不同。标识仅用于关联一次评估，不是数据源版本或内容哈希；系统不保存完整评估快照，不能据此回放，也不能替代带身份的人工复核记录。预先拒绝或上下文构建失败的请求没有评估标识。
+每次成功构造评估上下文时，服务端生成唯一的 `assessment_id`。建议响应通过 `context.assessment_id` 返回，结论接口直接返回该字段；建议请求的相应审计记录也包含它。每次请求都会重新采集和计算，两个接口的标识通常不同。建议接口会尝试保存评估上下文和已计算评估的输入，结论接口不存档；历史重算仍需要原算法版本及一致性保障。预先拒绝或上下文构建失败的请求没有评估标识。
 
 模型输出可能有误，不应视为控制或放行指令。接口不发布程序、不控制无人机，`validated` 和 `executed` 固定为 `false`，必须由授权人员核实数据并独立完成业务及安全检查。候选计算失败时接口返回 503，不请求 DeepSeek。该接口不实现多机排队；原有后台自动调度及其发布行为不受本改造约束。
 
@@ -69,7 +69,21 @@ X-Token: <configured-admin-token>
 
 开启鉴权后，复核需要同时在 `DEMO_TOKENS` 绑定管理员角色、在 `DEMO_IDENTITIES` 绑定稳定个人标识（格式为 `令牌:个人标识`，多项用逗号分隔）。内置演示令牌不能复核。`GET /api/ai/assessments/{assessment_id}` 回放已归档的评估上下文；`POST /api/ai/reviews` 接收 `assessment_id` 和 `decision`（`acknowledged`、`disagreed` 或 `needs_more_info`），服务端绑定审阅人、UTC 时间和快照哈希；`GET /api/ai/reviews` 查看近期记录。复核不改变引擎结论，也不会触发放行或执行。
 
-当前仅回放已保存的上下文，不能重新计算历史评估。静态令牌和本地 JSONL 仅用于开发验证，不提供生产身份校验、防篡改、保留期限管理或多进程写入保障。
+已计算的建议评估会保存参与计算的环境、规则、方案库及当前程序；来源不足而提前拒绝的请求没有计算输入。存档尚无算法版本或跨源原子一致性保证，不能据此承诺历史重算结果一致。默认 JSONL 仅用于开发验证；可选单机 SQLite 归档见下节。静态令牌仍不能替代生产身份校验，存储也不具备防篡改保障。
+
+## 单机事务归档
+
+设置 `ADVISORY_ARCHIVE_DB` 为 SQLite 文件路径，并设置 `ADVISORY_RETENTION_DAYS` 为部署方确认的正整数。数据库目录应已存在，且仅服务账号有写权限。启用后，建议审计、快照及复核均写入事务数据库。读取时隐藏过期项，写入时清理过期记录及其关联复核。数据库不可用时不会回退到文件。旧 JSONL 文件可在独立的旧配置实例中只读查阅，启用数据库的实例不会合并或自动迁移旧记录。数据库备份、归档文件权限及旧文件的保留需要部署方安排。
+
+部署集成可以给 `store.advisory_snapshot_provider` 安装一个无参数的只读适配器，返回携带 `advisory_sources` 的同份 `EnvSnapshot`。读取失败返回数据不足。门户会展示三类来源与观测时间，基于建议接口归档的编号核对追问、读取历史评估和记录人工复核。令牌仅保留在页面内存中，通过 HTTPS 或本机回环地址发送。
+
+`engine_verdict.rule_version` 当前为 `advisory-demo-v1`。飞手端与通讯态势可引用相同的结论字段。两端的既有业务阈值仍需现场确认后再迁移。
+
+## 现场验收所需信息
+
+- 逐一确认气象、障碍物与空域的权威来源、接入协议、覆盖范围、观测时间含义及各自允许时效。用现场样本核对时钟，并演练数据源中断、超时与冲突。
+- 确认生产身份系统、人员与角色映射、数据可见范围和审计保留期限。按部署条件验证归档备份及恢复。
+- 确认飞手端与通讯态势的正式判定口径，由现场审阅人核对同一输入、规则版本和评估结果。复核记录仅表示对指定快照的审阅。
 
 ## 配置与启动
 
@@ -86,14 +100,14 @@ X-Token: <configured-admin-token>
 
 ```powershell
 cd flight\flycontrol\low-altitude-demo\backend
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8082
 ```
 
 另一个 PowerShell 窗口中请求：
 
 ```powershell
 $body = @{ message = "请列出安排无人机巡检任务前需要确认的信息" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8080/api/ai/advice -ContentType 'application/json; charset=utf-8' -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8082/api/ai/advice -ContentType 'application/json; charset=utf-8' -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
 ```
 
 如启用 `AUTH_ENABLED=1`，按照现有权限规则传入 operator 或 admin 的 `X-Token`。项目默认关闭鉴权，且默认演示令牌不适用于生产环境；不要将该接口直接暴露到不可信网络。调用会产生外部 API 请求和费用，具体依赖账户及服务情况。

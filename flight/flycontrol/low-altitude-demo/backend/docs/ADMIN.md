@@ -56,7 +56,7 @@ $env:DEMO_TOKENS  = "tok-view:viewer,tok-op:operator,tok-admin:admin"   # 可选
 
 ```bash
 curl -X POST -H "X-Token: tok-admin" -H "Content-Type: application/json" \
-     -d '{"name":"A站","source_key":"A-RID"}' http://127.0.0.1:8080/api/devices
+     -d '{"name":"A站","source_key":"A-RID"}' http://127.0.0.1:8082/api/devices
 ```
 
 实测：

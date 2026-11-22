@@ -120,3 +120,33 @@ tr.candidate-rec td{color:#d9fff9}
 .divergence-banner b,.refusal-banner b,.fallback-banner b{display:block;font-size:10px;margin-bottom:4px}
 .refusal-banner{border:1px solid rgba(255,179,92,.3);background:rgba(255,179,92,.07);color:#d3b184}
 .fallback-banner{border:1px solid rgba(47,155,255,.3);background:rgba(47,155,255,.07);color:#9cc4e8}
+.task-draft-panel{margin-top:16px;padding:16px}
+.task-draft-panel h2{margin:4px 0 0;font-size:18px}
+.task-draft-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+.task-draft-grid label{display:grid;gap:6px;color:#a9c3dd;font-size:12px}
+.task-draft-grid input,.task-draft-grid select{width:100%;min-width:0}
+.task-draft-actions{display:flex;justify-content:flex-end;margin-top:14px}
+.task-draft-result{margin-top:14px;padding:12px;border-top:1px solid var(--line);color:#a9c3dd;font-size:13px}
+.task-draft-result ul{margin:10px 0 0;padding-left:18px}
+@media(max-width:760px){.task-draft-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.task-draft-grid{grid-template-columns:1fr}.task-draft-actions .button{width:100%}}
+.ai-demo-direction{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;padding:14px 0;border-bottom:1px solid var(--line);color:#a9c3dd;font-size:13px}
+.ai-demo-direction strong{color:#8ffff0;font-size:26px;line-height:1.2}
+.ai-demo-direction small{font-size:15px;font-weight:500}
+.ai-workspace{width:min(100%,860px);margin-inline:auto;min-width:0}
+.ai-workspace .page-head .eyebrow:empty,.ai-workspace .page-actions:empty{display:none}
+.ai-workspace .decision-question,.ai-workspace .advice-panel{min-width:0;padding-inline:16px}
+.ai-field-label{display:block;margin-top:12px;color:var(--text);font-size:13px}
+.ai-workspace .ai-question{margin-top:6px;padding:12px;font-size:14px}
+.ai-workspace .ai-question-row{flex-wrap:wrap;padding-bottom:8px;color:var(--text);font-size:13px}
+.ai-workspace .ai-question-row select{font-size:13px}
+.ai-access,.ai-details{border-top:1px solid var(--line);color:#a9c3dd}
+.ai-access summary,.ai-details summary{padding:12px 0;font-size:13px;cursor:pointer}
+.ai-access label{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-bottom:12px;font-size:12px}
+.ai-access input{max-width:100%}
+.ai-details .panel{margin-block:8px;min-width:0;padding-inline:0;background:none;box-shadow:none}
+.ai-workspace .advice-text,.ai-workspace .advice-error,.ai-workspace .fallback-banner,.ai-workspace .refusal-banner{overflow-wrap:anywhere;font-size:14px}
+.ai-workspace .advice-text{max-height:none;padding-inline:0}
+.ai-workspace .fallback-banner,.ai-workspace .refusal-banner,.ai-workspace .divergence-banner{margin-inline:0}
+.ai-retry:not(:empty){padding-block:0 12px}
+@media(max-width:560px){.ai-workspace .decision-question,.ai-workspace .advice-panel{padding-inline:12px}.ai-workspace .ai-question-row .button{width:100%}}

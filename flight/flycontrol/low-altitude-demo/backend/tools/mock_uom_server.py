@@ -15,7 +15,7 @@
     2) 后端以真实发送模式启动：
        PUSH_MODE=http PUSH_ENDPOINT=http://127.0.0.1:8099/uom/v1/messages
     3) 打开门户「数据看板 → 数据推送」，或在命令行：
-       Invoke-RestMethod -Method Post http://127.0.0.1:8080/api/push/flush
+       Invoke-RestMethod -Method Post http://127.0.0.1:8082/api/push/flush
 """
 
 from __future__ import annotations

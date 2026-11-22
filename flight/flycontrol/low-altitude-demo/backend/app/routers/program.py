@@ -5,6 +5,9 @@ import asyncio
 import math
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
+
+from ..services.weather_reference import locate_weather
 
 from ..domain import Meteo
 from ..plans_library import find_plans
@@ -139,6 +142,22 @@ async def program_generate(request: Request, body: GenerateRequest):
     return {"program": _serialize_program(prog),
             "compliance": _compliance_dict(comp), "simulate": _sim_dict(sim),
             "meta": meta}
+
+
+class DeviceLocation(BaseModel):
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+
+
+@router.post("/weather/device")
+def device_weather(body: DeviceLocation):
+    return locate_weather(body.latitude, body.longitude)
+
+
+@router.get("/weather/reference")
+def weather_reference(request: Request):
+    service = getattr(request.app.state.store, "weather_reference", None)
+    return service.snapshot() if service else {"status": "unavailable", "reason": "not_configured", "data": None}
 
 
 @router.post("/env/meteo")

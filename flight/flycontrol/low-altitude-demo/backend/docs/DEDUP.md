@@ -115,7 +115,7 @@ GET /api/traffic/stats
 ```powershell
 # 1) 启动后端
 cd flight\flycontrol\low-altitude-demo\backend
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8080
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8082
 
 # 2) 另一个窗口：双设备模拟（A/B 各 5 条，期望去重后 7 条）
 .\.venv\Scripts\python.exe tools\sim_two_devices.py
@@ -127,7 +127,7 @@ cd flight\flycontrol\low-altitude-demo\backend
 或者在同一个终端里直接验证：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/traffic/stats | ConvertTo-Json
+Invoke-RestMethod http://127.0.0.1:8082/api/traffic/stats | ConvertTo-Json
 ```
 
 ---

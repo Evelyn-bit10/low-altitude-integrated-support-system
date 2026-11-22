@@ -84,6 +84,13 @@ def test_dry_run_client_always_ok():
     assert res.ok and res.status == 0
 
 
+def test_invalid_push_configuration_does_not_report_success():
+    for client in (PushClient(mode="http"), PushClient(mode="invalid")):
+        result = client.send({"msgId": "x"})
+        assert not result.ok
+        assert result.error
+
+
 # ------------------------------------------------------------------ 发件箱
 def _outbox():
     return Outbox(":memory:", max_attempts=3)

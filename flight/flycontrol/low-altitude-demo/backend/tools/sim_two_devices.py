@@ -2,10 +2,10 @@
 """双设备态势模拟器：演示「同一架无人机被两个设备看到 → 只输出一条」。
 
 用法：
-    # 先启动后端（默认 8080）
+    # 先启动后端（默认 8082）
     python tools/sim_two_devices.py                 # 持续 60 秒，每秒一帧
     python tools/sim_two_devices.py --frames 10     # 跑 10 帧
-    python tools/sim_two_devices.py --url http://192.168.1.20:8080
+    python tools/sim_two_devices.py --url http://192.168.1.20:8082
 
 场景：
     UA-1/2/3  两个设备都能看到（其中 UA-2 在 B 设备侧丢失 ua_id，靠几何判定）
@@ -88,7 +88,7 @@ def get(url: str, path: str, timeout: float = 5.0):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="双设备态势模拟器")
-    ap.add_argument("--url", default="http://127.0.0.1:8080")
+    ap.add_argument("--url", default="http://127.0.0.1:8082")
     ap.add_argument("--interval", type=float, default=1.0, help="上报周期（秒）")
     ap.add_argument("--frames", type=int, default=60, help="总帧数（0=一直跑）")
     ap.add_argument("--quiet", action="store_true")
@@ -122,7 +122,7 @@ def main() -> int:
         print("\n已停止。")
     except urllib.error.URLError as exc:
         print("\n[错误] 连接后端失败：%s" % exc)
-        print("       请先启动：uvicorn app.main:app --port 8080")
+        print("       请先启动：uvicorn app.main:app --port 8082")
         return 1
 
     st = get(url, "/api/traffic/stats")

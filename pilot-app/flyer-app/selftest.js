@@ -85,8 +85,8 @@ function check(name, cond, extra) {
 function section(t) { console.log('\n== ' + t + ' =='); }
 
 /* ---------------- 加载 ---------------- */
-section('加载四个模块');
-for (const f of ['mock.js', 'api.js', 'map.js', 'app.js']) {
+section('加载模块');
+for (const f of ['decision.js', 'mock.js', 'api.js', 'map.js', 'app.js']) {
   try {
     vm.runInContext(fs.readFileSync(path.join(DIR, f), 'utf8'), ctx, { filename: f });
     check('加载 ' + f, true);
@@ -145,6 +145,22 @@ const rOk = App.evaluate(T('UAV-CQ009'), 'landing');
 check('正常待命飞行器 → 非 DENY', rOk.level !== 'DENY', rOk.level + ' / ' + rOk.reasons.length + ' 条依据');
 const rNo = App.evaluate(null, 'takeoff');
 check('未选飞行器 → DENY', rNo.level === 'DENY', rNo.reasons[0].text);
+const originalSpaces = App.state.snapshot.airspaces;
+App.state.snapshot.airspaces = null;
+check('空域数据缺失 → HOLD', App.evaluate(T('UAV-CQ009'), 'takeoff').level === 'HOLD');
+App.state.snapshot.airspaces = originalSpaces;
+check('位置缺失 → HOLD', App.evaluate(Object.assign({}, T('UAV-CQ009'), { lat: null }), 'takeoff').level === 'HOLD');
+App.state.source.ground = 'live';
+check('数据来源不一致 → HOLD', App.evaluate(T('UAV-CQ009'), 'landing').level === 'HOLD');
+App.state.source.ground = 'mock';
+const originalAirportCode = App.state.ground.airport_code;
+App.state.ground.airport_code = 'OTHER';
+check('不同起降点机位 → HOLD', App.evaluate(T('UAV-CQ009'), 'landing').level === 'HOLD');
+App.state.ground.airport_code = originalAirportCode;
+const originalGroundTime = App.state.ground.generated_at;
+App.state.ground.generated_at = '2000-01-01T00:00:00Z';
+check('机位数据过期 → HOLD', App.evaluate(T('UAV-CQ009'), 'landing').level === 'HOLD');
+App.state.ground.generated_at = originalGroundTime;
 
 section('恶劣气象 → 预判降级');
 const meteoBak = JSON.parse(JSON.stringify(App.state.snapshot.meteo));
@@ -189,11 +205,28 @@ function loadApiWithHost(host) {
   return c.FlyerApi.config;
 }
 const cfgLocal = loadApiWithHost('127.0.0.1');
-check('电脑访问 → 后端 127.0.0.1:8080', cfgLocal.baseUrl === 'http://127.0.0.1:8080', cfgLocal.baseUrl);
+check('电脑访问 → 后端 127.0.0.1:8082', cfgLocal.baseUrl === 'http://127.0.0.1:8082', cfgLocal.baseUrl);
 check('电脑访问 → 地面站 127.0.0.1:8090', cfgLocal.groundUrl === 'http://127.0.0.1:8090', cfgLocal.groundUrl);
 const cfgLan = loadApiWithHost('192.168.1.20');
-check('手机访问 → 后端自动指向电脑 IP:8080', cfgLan.baseUrl === 'http://192.168.1.20:8080', cfgLan.baseUrl);
+check('手机访问 → 后端自动指向电脑 IP:8082', cfgLan.baseUrl === 'http://192.168.1.20:8082', cfgLan.baseUrl);
 check('手机访问 → 地面站自动指向电脑 IP:8090', cfgLan.groundUrl === 'http://192.168.1.20:8090', cfgLan.groundUrl);
 
-console.log('\n' + (failed ? '❌ 失败 ' + failed + ' 项' : '✅ 全部通过'));
-process.exit(failed ? 1 : 0);
+(async function () {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const api = ctx.FlyerApi;
+  api.snapshot = () => Promise.resolve({ ok: true, data: {
+    airport: { code: 'LIVE' }, traffic: [], airspaces: [], obstacles: [], meteo: {}
+  }});
+  api.program = () => Promise.resolve({ ok: false });
+  api.ground = () => Promise.resolve({ ok: true, data: { stands: [] } });
+  await App.syncAll(false);
+  check('实时空航迹不混入演示目标', App.state.source.core === 'live' && App.state.snapshot.traffic.length === 0);
+  check('实时空机位不回退演示数据', App.state.source.ground === 'live' && App.state.ground.stands.length === 0);
+  api.snapshot = () => Promise.resolve({ ok: false });
+  api.ground = () => Promise.resolve({ ok: false });
+  await App.syncAll(false);
+  check('断线后快照完整回退演示数据', App.state.source.core === 'mock' && App.state.snapshot.airport.code === 'CQ-LX01' && App.state.snapshot.traffic.length === 5);
+  check('断线后机位完整回退演示数据', App.state.source.ground === 'mock' && App.state.ground.stands.length > 0);
+  console.log('\n' + (failed ? '❌ 失败 ' + failed + ' 项' : '✅ 全部通过'));
+  process.exit(failed ? 1 : 0);
+})().catch((error) => { console.error(error); process.exit(1); });

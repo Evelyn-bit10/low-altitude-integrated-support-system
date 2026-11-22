@@ -59,6 +59,10 @@ def build_verdict(context: Dict[str, Any], limits: Optional[Dict[str, Any]] = No
             refusal_reason = "观测数据已过期，未调用大模型。"
         elif context.get("data_freshness") == "future":
             refusal_reason = "观测时间在未来，请核对数据源时钟。未调用大模型。"
+        elif context.get("data_freshness") == "conflict":
+            refusal_reason = "数据来源与服务端配置不一致，未调用大模型。"
+        elif context.get("data_freshness") == "unavailable":
+            refusal_reason = "数据适配器读取失败，未调用大模型。"
     elif no_current:
         code = CONCLUSION_INSUFFICIENT
         refusal_reason = "没有当前飞行程序，无法进行确定性风险评估，已拒绝调用大模型。"
@@ -100,6 +104,7 @@ def build_verdict(context: Dict[str, Any], limits: Optional[Dict[str, Any]] = No
         recommended = None
 
     return {
+        "rule_version": "advisory-demo-v1",
         "code": code,
         "label": CONCLUSION_LABELS[code],
         "refusal_reason": refusal_reason,

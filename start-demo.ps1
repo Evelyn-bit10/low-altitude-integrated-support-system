@@ -16,7 +16,7 @@ $mockPy    = Join-Path $apiDir "tools\mock_uom_server.py"
 $servePy   = Join-Path $portalDir "serve.py"
 
 $demoUrl   = "http://127.0.0.1:5500/demo.html"
-$apiHealth = "http://127.0.0.1:8080/api/health"
+$apiHealth = "http://127.0.0.1:8082/api/health"
 $uomHealth = "http://127.0.0.1:8099/health"
 $portalUrl = "http://127.0.0.1:5500/index.html"
 
@@ -49,14 +49,14 @@ Write-Host ("  Python : " + $python)
 Write-Host ""
 
 # ---------------------------------------------------------------- 1 后端
-Write-Host "[1/4] 后端 8080" -NoNewline
+Write-Host "[1/4] 后端 8082" -NoNewline
 if (Test-Url $apiHealth) { Write-Host "   已在运行，复用" -ForegroundColor Green }
 else {
     $env:PUSH_MODE = "http"
     $env:PUSH_ENDPOINT = "http://127.0.0.1:8099/uom/v1/messages"
     $env:PUSH_TRACK_INTERVAL = "5"
     Start-Process -FilePath $python `
-        -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8080") `
+        -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8082") `
         -WorkingDirectory $apiDir -WindowStyle Hidden
     Write-Host "   已启动（推送模式 http）" -ForegroundColor Green
 }
@@ -96,7 +96,7 @@ Write-Host "  演示台已就绪" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host ("  功能演示台   " + $demoUrl)
 Write-Host ("  管理门户     " + $portalUrl) -ForegroundColor DarkGray
-Write-Host ("  接口文档     http://127.0.0.1:8080/docs") -ForegroundColor DarkGray
+Write-Host ("  接口文档     http://127.0.0.1:8082/docs") -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  建议演示顺序：① 进出场程序 → ② 多设备去重 → ③ 对外推送"
 Write-Host "  关闭服务：把启动时新开的最小化窗口关掉即可。"

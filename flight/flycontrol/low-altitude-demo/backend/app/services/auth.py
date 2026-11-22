@@ -87,6 +87,8 @@ def identity_of(token: Optional[str]) -> Optional[str]:
 
 
 def required_role(path: str, method: str) -> Optional[str]:
+    if method in ("GET", "HEAD") and path == "/api/ai/verdict":
+        return "viewer"
     if method in ("GET", "HEAD", "OPTIONS"):
         return None
     for prefix, role in RULES:

@@ -119,6 +119,20 @@ def test_ai_auth_denials_are_audited(monkeypatch, tmp_path):
     assert all(value not in data for value in ("viewer-secret", "bad-secret", "admin-secret", "private body"))
 
 
+def test_verdict_read_requires_viewer_when_auth_enabled(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    monkeypatch.setenv("ADVISORY_AUDIT_FILE", str(tmp_path / "audit.jsonl"))
+    monkeypatch.setitem(app.state._state, "auth_enabled", True)
+    monkeypatch.setattr(auth, "TOKENS", {"viewer-secret": "viewer"})
+    client = TestClient(app)
+    assert client.get("/api/ai/verdict").status_code == 401
+    assert client.get("/api/ai/verdict", headers={"X-Token": "viewer-secret"}).status_code == 200
+    record = json.loads((tmp_path / "audit.jsonl").read_text(encoding="utf-8"))
+    assert record["endpoint"] == "ai/verdict" and record["status"] == 401
+
+
 def test_ledger_feeds_engine(tmp_data, monkeypatch):
     """台账里的 σ 必须真的进入去重引擎（否则台账就是摆设）。"""
     from app.services import ledger

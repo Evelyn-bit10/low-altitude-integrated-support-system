@@ -6,13 +6,14 @@
  *   - 同源静态资源（html/css/js/svg/manifest）：缓存优先 + 后台更新
  *   - /api/ 等后端请求：直接走网络，不缓存（避免拿到过期运行数据）
  * ========================================================================= */
-var CACHE = 'flyer-app-v1';
+var CACHE = 'flyer-app-v7';
 
 var ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './decision.js',
   './api.js',
   './mock.js',
   './map.js',
@@ -46,7 +47,7 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
 
   // 后端接口不缓存
-  if (url.pathname.indexOf('/api/') === 0 || url.port === '8080' || url.port === '8090') { return; }
+  if (url.pathname.indexOf('/api/') === 0 || url.port === '8082' || url.port === '8090') { return; }
 
   // 只处理同源静态资源
   if (url.origin !== location.origin) { return; }

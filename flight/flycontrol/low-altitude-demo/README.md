@@ -49,11 +49,11 @@ low-altitude-demo/
 双击工程根目录的 **`低空系统.bat`** 并选 `[6] Backend + built-in frontend page`（或执行 `低空系统.bat apidev`）即可:
 
 1. 首次运行会自动创建虚拟环境 `backend\.venv` 并安装依赖(需本机已装 Python 3.10+)。
-2. 随后自动启动服务并打开浏览器 http://127.0.0.1:8080 。
+2. 随后自动启动服务并打开浏览器 http://127.0.0.1:8082 。
 3. 关闭弹出的命令行窗口即停止服务。
 
 > 若需手动运行, 虚拟环境已内置, 可直接:
-> `backend\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8080`
+> `backend\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8082`
 > (在 `backend` 目录下执行)。
 
 ### 方式 B: 纯 Python(本机无 Docker 也可演示)
@@ -63,12 +63,12 @@ low-altitude-demo/
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+uvicorn app.main:app --host 0.0.0.0 --port 8082
 ```
 
 > 首次运行默认使用 `sqlite:///./flight_demo.db`(无需数据库服务), 自动建表 +
-> 内置演示数据。浏览器打开 http://127.0.0.1:8080 即可看到平面/剖面视图与
-> 控制面板。交互式 API 文档在 http://127.0.0.1:8080/docs 。
+> 内置演示数据。浏览器打开 http://127.0.0.1:8082 即可看到平面/剖面视图与
+> 控制面板。交互式 API 文档在 http://127.0.0.1:8082/docs 。
 
 ### 方式 C: Docker Compose(生产形态, 统一 PostGIS)
 
@@ -76,7 +76,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 docker-compose up -d --build
 ```
 
-启动后: 前端 http://localhost:8080, 数据库 PostgreSQL/PostGIS(5432)。
+启动后: 前端 http://localhost:8082, 数据库 PostgreSQL/PostGIS(5432)。
 首次启动自动执行 `db/init/*.sql` 建表并写入种子数据。
 
 ## 演示流程(闭环)

@@ -366,7 +366,7 @@ class MapWindow(QMainWindow):
         self._load_map()
 
     def _init_managers(self):
-        # flycontrol occupies 8080; keep the groundstation's local DSM tiles isolated.
+        # flycontrol occupies 8082; keep the groundstation's local DSM tiles isolated.
         self.tile_server = TileServerThread(port=8081, tile_dir="offline_data/tiles")
         self.tile_server.start()
         self.weather_manager = WeatherManager(

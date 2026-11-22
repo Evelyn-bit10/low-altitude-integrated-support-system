@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------
  * 5 个 Tab：首页/态势 · 周边信息 · 起降申请 · 消息 · 我的
  * 核心交互：① 自动决策预判（APPROVE / HOLD / DENY + 原因）
- *          ② 许可状态时间线 + 指令有效期 60s 倒计时
+ *          ② 预检状态时间线 + 指令有效期 60s 倒计时
  * 数据：FlyerApi（真实接口 + mock 回退），字段遵循 canonical 契约。
  * ========================================================================= */
 (function () {
@@ -39,16 +39,6 @@
   }
   function phaseTone(p) {
     return p === 'HOVER' ? 'danger' : p === 'APPROACH' ? 'warn' : (p === 'STANDBY' || p === 'LANDED') ? 'ok' : 'info';
-  }
-  function pointInPolygon(lat, lon, poly) {
-    if (!Array.isArray(poly) || poly.length < 3) { return false; }
-    var inside = false, j = poly.length - 1;
-    for (var i = 0; i < poly.length; i++) {
-      var yi = poly[i][0], xi = poly[i][1], yj = poly[j][0], xj = poly[j][1];
-      if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) { inside = !inside; }
-      j = i;
-    }
-    return inside;
   }
   function haversine(lat1, lon1, lat2, lon2) {
     var R = 6371000, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
@@ -109,8 +99,8 @@
       altitude_ref: raw.altitude_ref || 'MSL',
       generated_at: raw.generated_at || new Date().toISOString(),
       airport: obj(raw.airport),
-      obstacles: arr(raw.obstacles),
-      airspaces: arr(raw.airspaces),
+      obstacles: Array.isArray(raw.obstacles) ? raw.obstacles : null,
+      airspaces: Array.isArray(raw.airspaces) ? raw.airspaces : null,
       meteo: obj(raw.meteo),
       program: raw.program ? obj(raw.program) : null,
       traffic: arr(raw.traffic)
@@ -118,7 +108,8 @@
   }
   function normalizeGround(raw) {
     raw = obj(raw);
-    return { stands: arr(raw.stands), rid_targets: arr(raw.rid_targets), sensor: obj(raw.sensor), dispatch: obj(raw.dispatch) };
+    return { airport_code: raw.airport_code, data_source: raw.data_source, generated_at: raw.generated_at,
+      stands: Array.isArray(raw.stands) ? raw.stands : null, rid_targets: arr(raw.rid_targets), sensor: obj(raw.sensor), dispatch: obj(raw.dispatch) };
   }
 
   function bootstrap() {
@@ -140,34 +131,26 @@
       var snap = res[0], prog = res[1], ground = res[2];
       var liveBefore = state.source.core === 'live';
 
-      if (snap.ok) {
-        var n = normalizeSnapshot(snap.data);
-        if (n && arr(n.traffic).length) {
-          // 保留演示位置连续性：以真实数据为准
-          state.snapshot = n; state.source.core = 'live';
-        } else if (n) {
-          // 实时快照没有飞行器：保留演示目标，仅更新环境
-          state.snapshot.airport = n.airport || state.snapshot.airport;
-          state.snapshot.obstacles = n.obstacles.length ? n.obstacles : state.snapshot.obstacles;
-          state.snapshot.airspaces = n.airspaces.length ? n.airspaces : state.snapshot.airspaces;
-          state.snapshot.meteo = Object.keys(n.meteo).length ? n.meteo : state.snapshot.meteo;
-          state.snapshot.program = n.program || state.snapshot.program;
-          state.source.core = 'live';
-        }
-      } else { state.source.core = 'mock'; }
+      var n = snap.ok ? normalizeSnapshot(snap.data) : null;
+      state.snapshot = n || normalizeSnapshot(Api.getMockSnapshot().data);
+      state.source.core = n ? 'live' : 'mock';
 
-      state.program = prog.ok ? prog.data : state.program;
+      state.program = prog.ok ? prog.data : Api.getMockProgram().data;
       state.source.program = prog.ok ? 'live' : 'mock';
 
-      if (ground.ok && arr(ground.data.stands).length) {
-        state.ground = normalizeGround(ground.data); state.source.ground = 'live';
-      } else { state.source.ground = 'mock'; }
+      if (ground.ok && Array.isArray(obj(ground.data).stands)) {
+        state.ground = normalizeGround(ground.data);
+        state.source.ground = ground.data.data_source === 'demo' ? 'mock' : 'live';
+      } else {
+        state.ground = normalizeGround(Api.getMockGround().data); state.source.ground = 'mock';
+      }
 
       state.refreshing = false;
       state.syncTried = true;
       setSyncBadge();
       updateLiveNodes();
-      if (liveBefore !== (state.source.core === 'live')) { render(); }   // 连接状态变化时刷新首页引导条
+      if (liveBefore !== (state.source.core === 'live')) { render(); }
+      else if (state.tab === 'apply') { renderApplyBody(); }
       if (showToast) {
         var live = state.source.core === 'live';
         toast(live ? '已同步起降点实时数据' : '未连接到后端，使用内置演示数据', live ? 'ok' : 'warn');
@@ -230,77 +213,31 @@
   function evaluate(uav, action) {
     var s = state.snapshot || {};
     var m = obj(s.meteo);
-    var reasons = [];
-    var level = 'APPROVE';
-
-    function deny(text) { level = 'DENY'; reasons.push({ tone: 'danger', text: text }); }
+    var shared = window.DemoDecision.evaluate(uav, m);
+    var reasons = shared.reasons.slice();
+    var level = shared.level;
     function hold(text) { if (level !== 'DENY') { level = 'HOLD'; } reasons.push({ tone: 'warn', text: text }); }
-    function pass(text) { if (level === 'APPROVE') { reasons.push({ tone: 'ok', text: text }); } }
 
-    if (!uav) { return { level: 'DENY', reasons: [{ tone: 'danger', text: '请先选择一架飞行器' }] }; }
-
-    // 1) 识别与登记
-    if (uav.rid_lost) { deny('RID 远程识别信号丢失，禁止进入起降程序'); }
-    if (uav.emergency) { deny('飞行器上报紧急状态，需地面介入确认'); }
-    if (!uav.reg_no || !uav.ua_id) { deny('缺少实名登记号或唯一产品识别码'); }
-    if (level === 'APPROVE') { pass('实名登记与 RID 识别正常'); }
-
-    // 2) 电量
-    var batt = Number(uav.battery_pct);
-    if (isFinite(batt)) {
-      if (batt < 25) { deny('电量 ' + num(batt, 0) + '%，低于最低安全裕度 25%'); }
-      else if (batt < 45) { hold('电量 ' + num(batt, 0) + '% 偏低，建议优先保障'); }
+    if (!uav) { return shared; }
+    var environment = window.DemoDecision.environment(uav, s);
+    if (environment.level === 'DENY') level = 'DENY';
+    else if (environment.level === 'HOLD' && level === 'APPROVE') level = 'HOLD';
+    reasons = reasons.concat(environment.reasons);
+    if (action === 'landing' && state.source.core !== state.source.ground) {
+      hold('飞行器与机位数据来源不同，需人工核对');
     }
 
-    // 3) C2 链路
-    var link = Number(uav.link_quality);
-    if (isFinite(link)) {
-      if (link <= 2) { deny('C2 链路质量 ' + num(link, 0) + '/5，不满足指挥控制要求'); }
-      else if (link === 3) { hold('C2 链路质量 3/5，注意航程与遮挡'); }
-      else { pass('C2 链路质量 ' + num(link, 0) + '/5'); }
-    }
-
-    // 4) 气象
-    var below = [];
-    if (Number(m.visibility) < 1600) { below.push('能见度 ' + Math.round(Number(m.visibility)) + ' m'); }
-    if (Number(m.cloud_base_agl) < 120) { below.push('云底高 ' + Math.round(Number(m.cloud_base_agl)) + ' m'); }
-    if (Number(m.wind_speed) > 8) { below.push('风速 ' + num(m.wind_speed, 1) + ' m/s'); }
-    if (below.length) { deny('气象低于起降标准（' + below.join('、') + '）'); }
-    else if (Number(m.wind_speed) > 6 || Number(m.gust) > 10) { hold('风速 ' + num(m.wind_speed, 1) + ' / 阵风 ' + num(m.gust, 1) + ' m/s，接近限制值'); }
-    else { pass('气象满足起降标准（风 ' + num(m.wind_speed, 1) + ' m/s · 能见度 ' + num(Number(m.visibility) / 1000, 1) + ' km）'); }
-
-    // 5) 空域限制
-    var inZone = null;
-    arr(s.airspaces).forEach(function (a) {
-      if (!a.active || inZone) { return; }
-      if (!pointInPolygon(uav.lat, uav.lon, a.polygon)) { return; }
-      var alt = Number(uav.alt_msl) || 0;
-      if (alt >= Number(a.floor_msl || 0) && alt <= Number(a.ceiling_msl || 99999)) { inZone = a; }
-    });
-    if (inZone) { deny('当前位于限制空域「' + inZone.name + '」内（' + num(inZone.floor_msl, 0) + '–' + num(inZone.ceiling_msl, 0) + ' m MSL）'); }
-
-    // 6) 障碍物净空（水平 < 半径+缓冲 且 高度低于顶高）
-    var conflict = null;
-    arr(s.obstacles).forEach(function (o) {
-      if (o.active === false || conflict) { return; }
-      var d = haversine(uav.lat, uav.lon, o.lat, o.lon);
-      var radius = Number(o.radius || 0) + Number(o.buffer || 0);
-      if (d < radius && (Number(uav.alt_msl) || 0) < Number(o.top_msl || 0)) { conflict = { o: o, d: d }; }
-    });
-    if (conflict) { deny('与障碍物「' + conflict.o.name + '」冲突：水平 ' + Math.round(conflict.d) + ' m / 顶高 ' + num(conflict.o.top_msl, 0) + ' m'); }
-
-    // 7) 机位（降落时）
     if (action === 'landing') {
-      var free = arr(obj(state.ground).stands).filter(function (st) { return st.status === 'free'; });
-      if (!free.length) { hold('当前无空闲机位，落地后需等待调度'); }
-      else { pass('可用机位 ' + free.length + ' 个（如 ' + free[0].name + '）'); }
+      var standResult = window.DemoDecision.stands(obj(s.airport).code, state.ground);
+      if (standResult.level === 'HOLD' && level !== 'DENY') level = 'HOLD';
+      reasons = reasons.concat(standResult.reasons);
     }
 
     return { level: level, reasons: reasons };
   }
 
   function verdictMeta(level) {
-    if (level === 'APPROVE') { return { label: 'APPROVE 可执行', tone: 'ok', desc: '满足起降条件' }; }
+    if (level === 'APPROVE') { return { label: 'APPROVE 演示预检通过', tone: 'ok', desc: '演示阈值内，仍需人工确认' }; }
     if (level === 'HOLD') { return { label: 'HOLD 建议等待', tone: 'warn', desc: '存在受限项，需确认后执行' }; }
     return { label: 'DENY 暂不可行', tone: 'danger', desc: '存在硬性限制，请处理后重新申请' };
   }
@@ -327,14 +264,14 @@
         { ts: clockText(new Date(now)), text: '提交' + (state.applyAction === 'takeoff' ? '起飞' : '降落') + '申请 · ' + uav.id, tone: 'info' },
         { ts: clockText(new Date(now + 300)), text: '自动决策预检完成 · ' + ev.level, tone: ev.level === 'APPROVE' ? 'ok' : ev.level === 'HOLD' ? 'warn' : 'danger' },
         ev.level === 'APPROVE'
-          ? { ts: clockText(new Date(now + 700)), text: '起降点已签发许可 ' + 'CLR-' + now.toString(36).toUpperCase().slice(-6) + '，有效期 ' + PERMIT_VALID_SECONDS + ' s', tone: 'ok' }
-          : { ts: clockText(new Date(now + 700)), text: ev.level === 'HOLD' ? '已进入等待队列，等待放行指令' : '申请被拒绝，请处理限制项后重新提交', tone: ev.level === 'HOLD' ? 'warn' : 'danger' }
+          ? { ts: clockText(new Date(now + 700)), text: '演示预检通过 · ' + 'CLR-' + now.toString(36).toUpperCase().slice(-6) + '，有效期 ' + PERMIT_VALID_SECONDS + ' s', tone: 'ok' }
+          : { ts: clockText(new Date(now + 700)), text: ev.level === 'HOLD' ? '待人工确认' : '演示预检存在限制，请处理限制项后重新提交', tone: ev.level === 'HOLD' ? 'warn' : 'danger' }
       ]
     };
 
     if (state.permit.status === 'approved') { startCountdown(); }
     renderApplyBody();
-    toast(ev.level === 'APPROVE' ? '许可已签发，有效期 60 秒' : ev.level === 'HOLD' ? '已进入等待队列' : '申请被拒绝', ev.level === 'APPROVE' ? 'ok' : ev.level === 'HOLD' ? 'warn' : 'danger');
+    toast(ev.level === 'APPROVE' ? '演示预检已通过，有效期 60 秒' : ev.level === 'HOLD' ? '待人工确认' : '演示预检存在限制', ev.level === 'APPROVE' ? 'ok' : ev.level === 'HOLD' ? 'warn' : 'danger');
   }
 
   var countdownTimer = null;
@@ -366,10 +303,10 @@
 
     if (remain <= 0) {
       p.status = 'expired';
-      p.timeline.push({ ts: clockText(), text: '许可有效期届满（60 s），如需继续请重新申请', tone: 'danger' });
+      p.timeline.push({ ts: clockText(), text: '预检结果有效期届满（60 s），请重新检查', tone: 'danger' });
       stopCountdown();
       renderApplyBody();
-      toast('许可已过期，请重新申请', 'warn');
+      toast('预检结果已过期，请重新申请', 'warn');
     }
   }
 
@@ -650,7 +587,7 @@
 
       '<div class="field-block"><label>④ 提交申请</label>' +
         '<button class="primary-btn" data-act="submit-apply">提交起降申请</button>' +
-        '<p class="hint">提交后由起降点签发许可，指令有效期 60 秒，超时需重新申请。</p>' +
+        '<p class="hint">提交后仅在本机生成演示预检记录，不发送起降申请。</p>' +
       '</div>';
 
     renderPermitSlot();
@@ -661,16 +598,16 @@
     if (!slot) { return; }
     var p = state.permit;
     if (!p) {
-      slot.innerHTML = '<section class="panel permit-empty"><div class="empty-row">尚未提交申请，提交后将在此显示许可状态与有效期倒计时</div></section>';
+      slot.innerHTML = '<section class="panel permit-empty"><div class="empty-row">尚未提交申请，提交后将在此显示预检状态与有效期倒计时</div></section>';
       return;
     }
 
     var remain = permitRemain();
-    var statusText = { approved: '许可已签发', hold: '等待放行', denied: '申请被拒绝', expired: '许可已过期' }[p.status] || p.status;
+    var statusText = { approved: '演示预检已通过', hold: '待人工确认', denied: '演示预检存在限制', expired: '预检结果已过期' }[p.status] || p.status;
     var statusTone = p.status === 'approved' ? 'ok' : p.status === 'hold' ? 'warn' : 'danger';
 
     slot.innerHTML = '<section class="panel permit-panel">' +
-      '<header class="panel-head"><div><h2>许可状态</h2><p class="mono">' + esc(p.id) + ' · ' + esc(p.uav_id) + '</p></div>' +
+      '<header class="panel-head"><div><h2>预检状态</h2><p class="mono">' + esc(p.id) + ' · ' + esc(p.uav_id) + '</p></div>' +
       '<span class="tag ' + statusTone + '">' + esc(statusText) + '</span></header>' +
 
       (p.status === 'approved' || p.status === 'expired' ?
@@ -678,8 +615,8 @@
           '<div id="permit-ring" class="count-ring" style="background:conic-gradient(var(--cyan) 360deg, rgba(114,146,181,.14) 0)">' +
             '<div class="count-core"><b id="permit-sec">' + (remain == null ? 0 : remain) + '</b><small>秒</small></div>' +
           '</div>' +
-          '<div class="count-copy"><b>' + (p.status === 'expired' ? '指令已失效' : '指令有效期') + '</b>' +
-          '<p>有效期内可执行' + (p.action === 'takeoff' ? '起飞' : '降落') + '；过期后需重新申请。</p>' +
+          '<div class="count-copy"><b>' + (p.status === 'expired' ? '预检已过期' : '预检倒计时') + '</b>' +
+          '<p>预检有效期内仅供演示参考；实际起降须经人工确认及相应授权。</p>' +
           '<small class="mono">ISSUED ' + stamp(0) + '</small></div>' +
         '</div>' : '') +
 
@@ -725,7 +662,7 @@
       '</section>' +
 
       '<section class="panel">' +
-        '<header class="panel-head"><div><h2>虚拟注册资料</h2><p>用于起降申请与许可签发</p></div></header>' +
+        '<header class="panel-head"><div><h2>虚拟注册资料</h2><p>用于演示预检</p></div></header>' +
         '<div class="kv-list">' +
           kv('飞手编号', p.pilot_id) + kv('实名登记号', p.license_no) +
           kv('唯一产品识别码', p.ua_id) + kv('资质有效期', p.valid_until) +
@@ -747,14 +684,14 @@
       '<section class="panel">' +
         '<header class="panel-head"><div><h2>设置</h2><p>后端地址可配，留空则用内置演示数据</p></div></header>' +
         '<div class="form-row"><label>机场 / UTM 服务</label>' +
-          '<input id="set-api" type="url" inputmode="url" placeholder="http://127.0.0.1:8080" value="' + esc(state.settings.baseUrl || Api.config.baseUrl) + '" /></div>' +
+          '<input id="set-api" type="url" inputmode="url" placeholder="http://127.0.0.1:8082" value="' + esc(state.settings.baseUrl || Api.config.baseUrl) + '" /></div>' +
         '<div class="form-row"><label>地面站服务</label>' +
           '<input id="set-ground" type="url" inputmode="url" placeholder="http://127.0.0.1:8090" value="' + esc(state.settings.groundUrl || Api.config.groundUrl) + '" /></div>' +
         '<div class="btn-row">' +
           '<button class="ghost-btn" data-act="test-conn">测试连接</button>' +
           '<button class="primary-btn" data-act="save-settings">保存并同步</button>' +
         '</div>' +
-        '<p class="hint">填电脑（或机场服务器）的局域网地址，例如 <b class="mono">http://192.168.1.20:8080</b>。<br>' +
+        '<p class="hint">填电脑（或机场服务器）的局域网地址，例如 <b class="mono">http://192.168.1.20:8082</b>。<br>' +
         '装成 App 后无法自动识别后端，需在此填写一次（地址会记住）。</p>' +
       '</section>' +
 

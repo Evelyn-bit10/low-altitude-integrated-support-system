@@ -15,7 +15,7 @@
 
 启动器会：
 
-1. 启动 flycontrol FastAPI（`127.0.0.1:8080`，态势 / 程序数据源）；
+1. 启动 flycontrol FastAPI（`127.0.0.1:8082`，态势 / 程序数据源）；
 2. 启动地面站数据桥（`127.0.0.1:8090`，机位 / RID900 / 传感器数据源）；
 3. 启动门户静态服务（`127.0.0.1:5500`）；
 4. 打开 communication 通讯态势（浏览器中运行，其飞行器态势会回传 flycontrol）；
@@ -72,7 +72,7 @@ rl_lab.html            RL 关联实验室（19 维特征 → 策略网络可视�
 
 ```js
 var defaults = {
-  baseUrl:   'http://127.0.0.1:8080',   // flycontrol / 真实机场 UTM 服务
+  baseUrl:   'http://127.0.0.1:8082',   // flycontrol / 真实机场 UTM 服务
   groundUrl: 'http://127.0.0.1:8090',   // 地面站数据服务
   timeoutMs: 2200
 };
@@ -102,7 +102,7 @@ var defaults = {
 与规则基线对比、查看训练曲线与特征重要性。
 
 - 打开：执行 `低空系统.bat rl`（或双击根目录 `低空系统.bat` 选 `[3]`），也可直接打开 `rl_lab.html`
-  （页面自带地址自适应：`file://` 直接开、或经 5500 静态服务打开，都会指向 `http://<当前主机>:8080`；
+  （页面自带地址自适应：`file://` 直接开、或经 5500 静态服务打开，都会指向 `http://<当前主机>:8082`；
    换端口/跨机演示时加 `?api=http://x.x.x.x:端口`）
-- 依赖后端 `GET /api/rl/model`（8080）
+- 依赖后端 `GET /api/rl/model`（8082）
 - 文档：`flight/flycontrol/low-altitude-demo/backend/docs/RL_LAB.md`

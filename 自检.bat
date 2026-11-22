@@ -29,7 +29,7 @@ popd
 
 echo  [2/3] API health ...
 powershell -NoProfile -Command ^
- "try { $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8080/api/health' -TimeoutSec 3 -UseBasicParsing; Write-Host '  [OK] backend 8080' } catch { Write-Host '  [SKIP] backend not running (start via the portal launcher)' }"
+ "try { $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8082/api/health' -TimeoutSec 3 -UseBasicParsing; Write-Host '  [OK] backend 8082' } catch { Write-Host '  [SKIP] backend not running (start via the portal launcher)' }"
 
 echo  [3/3] demo scenario ...
 echo  [OK] done
