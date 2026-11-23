@@ -252,6 +252,18 @@
     state.alerts.push({ id, text, level, time: fmtTime() });
     addLog(level === "bad" ? "bad" : "warn", "告警：" + text);
     renderAlerts();
+    // 告警写入后端事件历史（同一告警只报一次；后端不可用时静默）
+    try {
+      fetch(SYNC.baseUrl + "/api/events/record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "alert", subject: id,
+          level: level === "bad" ? "error" : "warn",
+          message: text, source: "communication",
+        }),
+      }).catch(function () {});
+    } catch (e) { /* 记录失败不影响告警展示 */ }
   }
 
   function clearAlert(id) {

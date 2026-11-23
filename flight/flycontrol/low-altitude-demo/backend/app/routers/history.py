@@ -27,6 +27,14 @@ class PermitRecord(BaseModel):
     reasons: List[str] = Field(default_factory=list)
 
 
+class EventRecord(BaseModel):
+    kind: str = "alert"
+    subject: str = ""
+    level: str = "warn"
+    message: str = ""
+    source: str = ""
+
+
 def _history(request: Request):
     store = getattr(request.app.state, "traffic", None)
     return getattr(store, "history", None) if store is not None else None
@@ -85,4 +93,21 @@ def permit_record(request: Request, body: PermitRecord):
     if body.reasons:
         message += "；" + "；".join(body.reasons[:3])
     history.record_event("permit", body.id, tone, message, "pilot-app")
+    return {"ok": True}
+
+
+@router.post("/events/record")
+def event_record(request: Request, body: EventRecord):
+    """通用事件上报（通讯态势前端写告警等）。"""
+    history = _history(request)
+    if history is None:
+        return {"ok": False, "detail": "历史存储未启用（HISTORY_ENABLED=0）"}
+    level = body.level if body.level in ("info", "warn", "error") else "warn"
+    history.record_event(
+        (body.kind or "alert")[:32],
+        (body.subject or "")[:128],
+        level,
+        (body.message or "")[:1000],
+        (body.source or "")[:64],
+    )
     return {"ok": True}

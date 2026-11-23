@@ -195,6 +195,8 @@ def test_file_configuration_and_environment_override(client, monkeypatch):
     expected[:] = ["env-key", "env-model"]
     assert client.post("/api/ai/advice", json={"message": "hi"}).status_code == 200
     ai._CONFIG_FILE.write_text("{", encoding="utf-8")
+    # 同时清掉环境变量：避免「配置文件读不到 → 回落到 env key」导致偶发通过
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     assert client.post("/api/ai/advice", json={"message": "hi"}).json()["fallback"]["reason"] == "model_config_unavailable"
 
 
